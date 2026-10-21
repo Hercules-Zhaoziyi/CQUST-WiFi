@@ -103,3 +103,19 @@ main{overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable both-edges;min-he
 
 
 nav{gap:0;justify-content:space-between}nav button{font-size:12px;gap:4px;white-space:nowrap}nav button svg{width:16px;height:16px}.site-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.site-tile{display:flex;align-items:center;gap:11px;text-align:left;min-width:0;min-height:94px;padding:15px 12px;border:1px solid var(--line);border-radius:19px;background:var(--card);color:var(--text);transition:transform .2s var(--ease),box-shadow .2s var(--ease),border-color .2s}.site-tile:hover{transform:translateY(-3px);border-color:var(--accent);box-shadow:0 8px 22px #2563eb12}.site-tile:active{transform:scale(.97)}.site-tile img{width:38px;height:38px;object-fit:contain;flex-shrink:0}.site-tile span{min-width:0}.site-tile strong{display:block;font-size:12px;line-height:1.5;font-weight:600;overflow-wrap:anywhere}.site-tile small{display:block;color:var(--muted);font-size:10px;margin-top:4px}.sites-note{font-size:11px;color:var(--muted);line-height:1.8;text-align:center;margin:22px 8px}
+
+
+/* 5.0.2: stable gutters, quiet scrollbars and guided authentication. */
+main{padding-left:4px;padding-right:13px;scrollbar-gutter:stable;scrollbar-color:transparent transparent;scrollbar-width:thin}
+main::-webkit-scrollbar{width:5px}main::-webkit-scrollbar-thumb{background:transparent;transition:background .25s}main.scroll-active{scrollbar-color:#9aa7bb70 transparent}main.scroll-active::-webkit-scrollbar-thumb{background:#9aa7bb70}main.scroll-active::-webkit-scrollbar-thumb:hover{background:#8390a4}
+#sites .page-title{margin-bottom:24px;padding:0 2px}#sites .page-title p{margin-top:9px}.site-grid{gap:13px}
+button.signature{border:0;background:transparent;color:var(--muted);padding:0;display:inline-flex;align-items:center;justify-content:center;gap:8px;font:inherit;font-size:11px;cursor:pointer}
+button.signature:hover{color:var(--accent)}.signature img{width:29px;height:auto}
+#auth-dialog{max-height:calc(100dvh - 32px);overflow-y:auto;scrollbar-gutter:stable;padding:23px;max-width:calc(100vw - 32px)}
+.auth-open{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;padding:12px 9px;margin:15px 0 12px;border:1px solid var(--line);border-radius:12px;background:var(--accent-soft);color:var(--accent);font-size:12px;font-weight:550}.auth-open svg{width:15px;height:15px}
+.auth-guide{padding-left:20px;margin:0 0 18px;color:var(--muted);font-size:11px;line-height:1.85}.auth-guide li+li{margin-top:6px}.auth-guide strong{font-weight:550;color:var(--text)}.auth-guide code{font:inherit;color:var(--accent)}
+.auth-url-tip{font-size:11px;color:#d36e42;margin-top:9px}.auth-guide+label{line-height:1.5}
+#height-resize{position:fixed;left:calc(50% - 35px);bottom:0;width:70px;height:9px;cursor:ns-resize;touch-action:none;z-index:8}
+#height-resize:after{content:'';position:absolute;top:3px;left:22px;right:22px;height:2px;border-radius:3px;background:var(--muted);opacity:.35}#height-resize:hover:after,#height-resize:focus-visible:after{opacity:1;background:var(--accent)}
+#status-title{letter-spacing:.08em;line-height:1.45;font-weight:600;margin:10px 0 9px}.page h1{letter-spacing:0}#status-title+h1{letter-spacing:.08em}#status-detail{line-height:1.8}
+main{padding-left:12px;padding-right:12px;scrollbar-gutter:stable both-edges}

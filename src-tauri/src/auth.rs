@@ -39,7 +39,15 @@ pub fn encrypt(password:&str,mac:&str,exponent:&str,modulus:&str)->Result<String
 pub struct Context{pub client:Client,pub page:Url,pub api:Url,pub query:String,pub mac:String,pub encrypt:bool,pub exponent:String,pub modulus:String,pub service:String,pub prefix:String,pub captcha:Option<Url>}
 pub struct Session{pub context:Context,pub index:String,pub username:String,pub display_name:String,pub ip:String,pub keepalive:f64,pub next_keepalive:Instant}
 #[derive(Clone)]pub struct Online{pub page:Url,pub index:String}
-#[derive(Default)]pub struct Auth{pub challenge:Option<Context>,pub online:Option<Online>}
+#[derive(Clone)]struct DiscoveryHint{page:Url,ip:String}
+#[derive(Default)]pub struct Auth{pub challenge:Option<Context>,pub online:Option<Online>,hint:Option<DiscoveryHint>}
+fn discovery_entries(manual:&str,hint:Option<&DiscoveryHint>,ip:&str)->Vec<String>{
+ if !manual.is_empty(){return vec![manual.to_owned()]}
+ let mut entries=ENTRIES.iter().map(|s|s.to_string()).collect::<Vec<_>>();
+ if let Some(hint)=hint{if !ip.is_empty()&&ip==hint.ip&&trusted(&hint.page)&&rx(r"(?i)(?:^|&)wlanuserip=").is_match(hint.page.query().unwrap_or("")){
+  if !entries.iter().any(|s|s==hint.page.as_str()){entries.insert(1,hint.page.to_string())}
+ }}entries
+}
 pub fn client()->Result<Client>{Client::builder().cookie_store(true).no_proxy().redirect(reqwest::redirect::Policy::none()).connect_timeout(Duration::from_secs(5)).timeout(Duration::from_secs(15)).user_agent("Mozilla/5.0").build().map_err(|_|network())}
 fn json_response(response:Response)->Result<Value>{if response.status().is_redirection(){return Err(Error::new("error","认证接口异常跳转，已停止发送凭据。"))}if !response.status().is_success(){return Err(network())}serde_json::from_str(&text(response)?).map_err(|_|Error::new("error","认证服务器返回格式异常，未确认结果。"))}
 fn post(client:&Client,url:&Url,body:String,page:&Url)->Result<Value>{
@@ -77,8 +85,8 @@ impl Auth{
  }
  pub fn discover(&mut self,manual:&str,selected:&str)->Result<Context>{
   let client=client()?;if !manual.is_empty()&&!Url::parse(manual).map(|u|trusted(&u)).unwrap_or(false){return Err(Error::new("context","仅接受学校域名或认证 IP 的网址。"))}
-  let entries=if manual.is_empty(){ENTRIES.to_vec()}else{vec![manual]};let mut found=None;
-  for entry in entries{match self.follow(&client,entry){Ok(Some(data))=>{found=Some(data);break},Err(error)if error.kind=="online"=>return Err(error),_=>()}}
+  let current_ip=lan_ip();if self.hint.as_ref().map(|hint|hint.ip!=current_ip).unwrap_or(false){self.hint=None}let entries=discovery_entries(manual,self.hint.as_ref(),&current_ip);let mut found=None;
+  for entry in entries{match self.follow(&client,&entry){Ok(Some(data))=>{found=Some(data);break},Err(error)if error.kind=="online"=>return Err(error),_=>()}}
   let (page,html)=found.ok_or_else(||Error::new("context","未取得当前认证登录页。请确认连接校园网，或粘贴浏览器当前完整认证网址。"))?;
   let query=page.query().unwrap_or("").to_string();let (mut values,mut services,_)=page_fields(&html);
   let init=capture(r#"AuthInterFace\.init\(\s*["']([^"']*)["']"#,&html).unwrap_or_else(||"./".into());
@@ -141,7 +149,7 @@ impl Auth{
   let index=field(&result,"userIndex");if !valid_index(&index){return Err(Error::new("error","认证服务器未返回有效会话。"))}
   let username=format!("{}{}",c.prefix,user.trim());
   let mut session=Session{context:c,index,username,display_name:String::new(),ip:lan_ip(),keepalive:0.,next_keepalive:Instant::now()};session.update_keepalive(&result);
-  let (online,_)=session.status()?;if !online{return Err(Error::new("error","登录响应成功，但尚未确认在线状态。"))}Ok(session)
+  let (online,_)=session.status()?;if !online{return Err(Error::new("error","登录响应成功，但尚未确认在线状态。"))}self.hint=Some(DiscoveryHint{page:session.context.page.clone(),ip:lan_ip()});Ok(session)
  }
  pub fn logout_discovered(&mut self)->Result<()>{
   let online=self.online.take().ok_or_else(||Error::new("error","请重新探测当前会话。"))?;
@@ -174,6 +182,14 @@ impl Session{
 
 #[cfg(test)]mod tests{
  use super::*;
+ #[test]fn reconnect_reprobes_last_successful_entry_on_same_network(){
+  let hint=DiscoveryHint{page:Url::parse("http://aaa.cqust.edu.cn/eportal/index.jsp?wlanuserip=demo&mac=aa").unwrap(),ip:"10.0.0.2".into()};
+  let entries=discovery_entries("",Some(&hint),"10.0.0.2");assert_eq!(entries[0],ENTRIES[0]);assert_eq!(entries[1],hint.page.as_str());assert_eq!(entries.len(),ENTRIES.len()+1);
+  assert_eq!(discovery_entries("",Some(&hint),"10.0.1.2").len(),ENTRIES.len());assert_eq!(discovery_entries("",Some(&hint),"").len(),ENTRIES.len());
+  assert_eq!(discovery_entries("http://aaa.cqust.edu.cn/",Some(&hint),"10.0.0.2"),vec!["http://aaa.cqust.edu.cn/"]);
+  let unsafe_hint=DiscoveryHint{page:Url::parse("https://example.com/?wlanuserip=demo").unwrap(),ip:hint.ip.clone()};assert_eq!(discovery_entries("",Some(&unsafe_hint),"10.0.0.2").len(),ENTRIES.len());
+ }
+
  #[test]fn captcha_address_and_image_detection(){let page=Url::parse("http://aaa.cqust.edu.cn/eportal/index.jsp?wlanuserip=demo").unwrap();assert!(captcha_url(&page,"").is_none());assert!(captcha_url(&page,"  ").is_none());assert!(captcha_url(&page,"https://example.com/image").is_none());assert_eq!(captcha_url(&page,"./validcode").unwrap().path(),"/eportal/validcode");assert_eq!(image_mime(b"\x89PNG\r\n\x1a\nimage"),Some("image/png"));assert_eq!(image_mime(&[255,216,255,224]),Some("image/jpeg"));assert_eq!(image_mime(b"<html>login</html>"),None);}
 
  #[test]fn js_encoding(){assert_eq!(twice("互联网"),"%25E4%25BA%2592%25E8%2581%2594%25E7%25BD%2591");assert_eq!(mac("x=1&MAC=aa%3Abb"),"aa%3Abb");assert_eq!(mac("x=1"),"111111111");}
