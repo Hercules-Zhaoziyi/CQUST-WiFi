@@ -152,11 +152,37 @@ class GuiSmokeTests(unittest.TestCase):
         delete.assert_not_called()
 
     def test_theme_icons_are_on_main_page(self):
-        self.assertEqual(set(self.app.theme_buttons), {'light','dark','system'})
-        self.app.theme_buttons['dark'].invoke()
+        self.app.set_theme('light')
+        self.app.theme_button.invoke()
         self.assertEqual(self.app.local.settings['theme'], 'dark')
-        self.app.theme_buttons['system'].invoke()
+        self.app.theme_button.invoke()
+        self.assertEqual(self.app.local.settings['theme'], 'light')
+        self.app.set_theme('system')
         self.assertEqual(self.app.local.settings['theme'], 'system')
+
+    def test_narrow_dashboard_preserves_border_and_header(self):
+        self.app.geometry('760x660')
+        self.app.show_dashboard()
+        self.app.update()
+        center = self.app.power_button.master
+        card = center.master
+        self.assertGreaterEqual(center.winfo_x(), 2)
+        self.assertLessEqual(center.winfo_x()+center.winfo_width(), card.winfo_width()-2)
+        self.assertTrue(self.app.theme_button.winfo_ismapped())
+        self.assertGreaterEqual(self.app.theme_button.winfo_rootx(), self.app.winfo_rootx())
+        self.assertLessEqual(self.app.theme_button.winfo_rootx()+self.app.theme_button.winfo_width(), self.app.winfo_rootx()+self.app.winfo_width())
+        self.app.geometry('1040x660')
+
+    def test_online_help_requires_explicit_action_and_keeps_inputs(self):
+        from auth_adapter import AlreadyOnline
+        self.app.username_var.set('demo')
+        self.app.password_var.set('example')
+        with patch.object(self.app.auth, 'disconnect_discovered') as disconnect:
+            self.app.open_auth_help(AlreadyOnline('http://aaa.cqust.edu.cn/eportal/success.jsp', 'test-index'))
+            self.app.update()
+            disconnect.assert_not_called()
+            self.assertTrue(self.app.online_switch_button.winfo_ismapped())
+        self.assertEqual(self.app.password_var.get(), 'example')
 
     def test_wide_window_and_metrics(self):
         self.app.connected = True

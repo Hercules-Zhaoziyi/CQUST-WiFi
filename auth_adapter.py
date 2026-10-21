@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from html import unescape
 from html.parser import HTMLParser
 from pathlib import Path
-from urllib.parse import quote, urljoin, urlsplit
+from urllib.parse import quote, urljoin, urlsplit, parse_qs
 import requests
 
 PORTAL_ROOT = 'http://172.28.228.2'
@@ -20,7 +20,7 @@ PORTAL_HOSTS = {'172.28.228.2', 'aaa.cqust.edu.cn'}
 LOGIN_URL = PORTAL_ROOT + '/eportal/InterFace.do?method=login'
 STATUS_URL = PORTAL_ROOT + '/eportal/InterFace.do?method=getOnlineUserInfo'
 LOGOUT_URL = PORTAL_ROOT + '/eportal/InterFace.do?method=logout'
-DISCOVERY_URLS = ('http://www.msftconnecttest.com/redirect', 'http://aaa.cqust.edu.cn/',
+DISCOVERY_URLS = ('http://aaa.cqust.edu.cn/', 'http://www.msftconnecttest.com/redirect',
                   PORTAL_ROOT+'/', 'http://123.123.123.123/')
 
 class AuthenticationError(RuntimeError):
@@ -31,6 +31,11 @@ class NetworkError(AuthenticationError):
 
 class ContextRequired(AuthenticationError):
     pass
+
+class AlreadyOnline(ContextRequired):
+    def __init__(self, page_url, index):
+        super().__init__('学校入口检测到当前设备已有在线会话。确认下线后，程序会自动重新获取登录网址，无需手填参数。')
+        self.page_url, self.index = page_url, index
 
 class ServiceRequired(AuthenticationError):
     def __init__(self, services):
@@ -197,7 +202,8 @@ class AuthAdapter:
             visited.add(url)
             if url not in DISCOVERY_URLS and not trusted_url(url):
                 break
-            r = client.get(url, timeout=(3, 5), allow_redirects=False)
+            r = client.get(url, timeout=(3, 5), allow_redirects=False,
+                           headers={'User-Agent': 'Mozilla/5.0', 'Cache-Control': 'no-cache'})
             if 300 <= r.status_code < 400:
                 target = r.headers.get('Location')
                 if not target:
@@ -209,6 +215,10 @@ class AuthAdapter:
             parser = PageFields()
             parser.feed(html)
             query, _mac = extract_auth_query(url)
+            if trusted_url(url) and urlsplit(url).path.lower().endswith('/success.jsp'):
+                index = parse_qs(query).get('userIndex', [''])[0]
+                if re.fullmatch('[A-Za-z0-9_.:-]{1,1024}', index):
+                    raise AlreadyOnline(url, index)
             if trusted_url(url) and re.search(r'(?:^|&)wlanuserip=', query, re.I) and ('passwordEncrypt' in html or 'AuthInterFace' in html):
                 return url, html, parser
             target = self._redirect(html, parser)
@@ -216,6 +226,17 @@ class AuthAdapter:
                 break
             url = urljoin(url, target)
         return None
+    def disconnect_discovered(self, online):
+        """Only called after explicit UI confirmation; verify the current session first."""
+        if not isinstance(online, AlreadyOnline) or not trusted_url(online.page_url):
+            raise AuthenticationError('当前会话信息无效，请重新探测。')
+        with requests.Session() as client:
+            client.trust_env = False
+            context = PortalContext(client, online.page_url,
+                                    urljoin(online.page_url, './InterFace.do'), '', '', False)
+            session = CampusSession(client, online.index, '', context=context)
+            if self.check_status(session, {}, lambda _: None)['online']:
+                self.disconnect(session, {}, lambda _: None)
     def discover_context(self, client, settings, log):
         manual = str(settings.get('login_page_url', '')).strip()
         if manual and not trusted_url(manual):

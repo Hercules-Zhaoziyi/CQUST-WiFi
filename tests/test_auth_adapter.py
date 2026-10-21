@@ -6,7 +6,7 @@ from unittest.mock import patch
 from urllib.parse import unquote
 import requests
 from auth_adapter import (AuthAdapter, AuthenticationError, ContextRequired, ChallengeRequired,
-    ServiceRequired, NetworkError, PortalContext, CampusSession, encode_twice, extract_auth_query)
+    ServiceRequired, NetworkError, AlreadyOnline, PortalContext, CampusSession, encode_twice, extract_auth_query)
 
 MODULUS = 'c4'+'19'*127
 QUERY = 'wlanuserip=10.1.2.3&MAC=aa%3Abb&url=http%3A%2F%2Fa.test%2Fa%2520b&x=1'
@@ -82,6 +82,25 @@ class AuthTests(unittest.TestCase):
         self.auth.profile = {'dataLogin': {'queryString': QUERY, 'password': 'historical'}}
         with self.assertRaises(ContextRequired):
             self.auth.discover_context(Client(), {}, lambda x: None)
+    def test_school_entry_first_and_existing_session_not_a_manual_url_error(self):
+        client = Client([Response(status=302, headers={'Location':'/eportal/success.jsp?userIndex=current-demo'}), Response(text=HTML)])
+        with self.assertRaises(AlreadyOnline) as error:
+            self.auth.discover_context(client, {}, lambda _: None)
+        self.assertEqual(client.requested[0], 'http://aaa.cqust.edu.cn/')
+        self.assertEqual(error.exception.index, 'current-demo')
+        self.assertNotIn('current-demo', str(error.exception))
+        self.assertFalse(client.sent)
+
+    def test_confirmed_switch_checks_then_logs_out_current_index(self):
+        client = Client(posts=[{'result':'success'}, {'result':'success'}])
+        from unittest.mock import MagicMock
+        manager = MagicMock()
+        manager.__enter__.return_value = client
+        with patch('auth_adapter.requests.Session', return_value=manager):
+            self.auth.disconnect_discovered(AlreadyOnline('http://aaa.cqust.edu.cn/eportal/success.jsp', 'current-demo'))
+        self.assertIn('getOnlineUserInfo', client.sent[0][0])
+        self.assertIn('logout', client.sent[1][0])
+        self.assertEqual(client.sent[1][1]['data'], b'userIndex=current-demo')
     def test_untrusted_url_rejected_before_any_request(self):
         client = Client()
         with self.assertRaises(ContextRequired):
