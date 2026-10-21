@@ -161,7 +161,7 @@ class GuiSmokeTests(unittest.TestCase):
         self.assertEqual(self.app.local.settings['theme'], 'system')
 
     def test_narrow_dashboard_preserves_border_and_header(self):
-        self.app.geometry('760x660')
+        self.app.geometry('660x660')
         self.app.show_dashboard()
         self.app.update()
         center = self.app.power_button.master
@@ -171,7 +171,23 @@ class GuiSmokeTests(unittest.TestCase):
         self.assertTrue(self.app.theme_button.winfo_ismapped())
         self.assertGreaterEqual(self.app.theme_button.winfo_rootx(), self.app.winfo_rootx())
         self.assertLessEqual(self.app.theme_button.winfo_rootx()+self.app.theme_button.winfo_width(), self.app.winfo_rootx()+self.app.winfo_width())
-        self.app.geometry('1040x660')
+        self.app.geometry('700x820')
+
+    def test_about_links_and_embedded_page_preserve_input(self):
+        self.app.password_var.set('example-only')
+        self.app.open_about()
+        self.app.update()
+        self.assertIsNotNone(self.app.overlay)
+        with patch('webbrowser.open') as opened:
+            self.app.website_link.invoke()
+            opened.assert_called_once_with('https://ziyis.cn')
+        self.assertEqual(self.app.password_var.get(), 'example-only')
+        self.app.close_overlay()
+
+    def test_vector_brand_is_generated_with_transparent_corners(self):
+        image = gui.wifi_brand(184)
+        self.assertEqual(image.size, (184,184))
+        self.assertEqual(image.getpixel((0,0))[3], 0)
 
     def test_online_help_requires_explicit_action_and_keeps_inputs(self):
         from auth_adapter import AlreadyOnline
@@ -184,17 +200,26 @@ class GuiSmokeTests(unittest.TestCase):
             self.assertTrue(self.app.online_switch_button.winfo_ismapped())
         self.assertEqual(self.app.password_var.get(), 'example')
 
-    def test_wide_window_and_metrics(self):
+    def test_portrait_window_and_metrics(self):
+        self.app.geometry('700x820')
         self.app.connected = True
         self.app.connected_since = time.monotonic()-3661
         self.app.show_dashboard()
         self.app.update_idletasks()
-        self.assertGreater(self.app.winfo_width(), self.app.winfo_height()*1.4)
+        self.assertGreater(self.app.winfo_height(), self.app.winfo_width())
         self.assertTrue(self.app.ip_label.winfo_exists())
         if self.app.metrics_after_id:
             self.app.after_cancel(self.app.metrics_after_id)
         self.app._update_metrics()
         self.assertEqual(self.app.duration_label.cget('text'), '01:01:01')
+
+    def test_fullscreen_disabled_but_resize_allowed(self):
+        self.app.state('zoomed')
+        self.app.attributes('-fullscreen', True)
+        self.app.update()
+        self.assertNotEqual(self.app.state(), 'zoomed')
+        self.assertFalse(self.app.attributes('-fullscreen'))
+        self.assertTrue(all(self.app.resizable()))
 
     def test_pulse_animation_advances(self):
         self.app.show_dashboard()

@@ -12,11 +12,11 @@ if errorlevel 1 exit /b 1
 if errorlevel 1 exit /b 1
 "%PYTHON%" -m unittest discover -s tests -v
 if errorlevel 1 exit /b 1
-"%PYTHON%" -m PyInstaller --noconfirm --clean --onefile --windowed --name CQUST_Wifi_v3_1 --icon assets\wifi.ico --add-data "assets;assets" --collect-all customtkinter --collect-all keyring gui.py
+"%PYTHON%" -m PyInstaller --noconfirm --clean --onefile --windowed --name CQUST_Wifi_v3_2 --icon assets\wifi.ico --add-data "assets/wifi.ico;assets" --add-data "assets/wifi.svg;assets" --add-data "assets/school_logo.png;assets" --collect-all customtkinter --collect-all keyring gui.py
 if errorlevel 1 (
   echo.
   echo Build failed. Read the error above.
   exit /b 1
 )
 echo.
-echo Build complete: dist\CQUST_Wifi_v3_1.exe
+echo Build complete: dist\CQUST_Wifi_v3_2.exe

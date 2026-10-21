@@ -7,6 +7,27 @@ import customtkinter as ctk
 from PIL import Image, ImageDraw
 
 
+def wifi_brand(size=256):
+    """Render the matching SVG geometry at output resolution, never upscale a bitmap."""
+    scale = size * 4 / 96
+    image = Image.new('RGBA', (size * 4, size * 4))
+    d = ImageDraw.Draw(image)
+    d.rounded_rectangle((0, 0, size*4-1, size*4-1), radius=20*scale, fill='#2563EB')
+    for points in (((25,40),(38,27),(58,27),(71,40)),
+                   ((32,49),(41,40),(55,40),(64,49)),
+                   ((40,59),(45,54),(51,54),(56,59))):
+        curve = []
+        for i in range(65):
+            t = i/64
+            curve.append(tuple(scale*((1-t)**3*points[0][j]+3*(1-t)**2*t*points[1][j]+3*(1-t)*t*t*points[2][j]+t**3*points[3][j]) for j in (0,1)))
+        d.line(curve, fill='white', width=round(4.5*scale))
+        for x,y in (curve[0], curve[-1]):
+            r=2.25*scale
+            d.ellipse((x-r,y-r,x+r,y+r), fill='white')
+    d.ellipse((45.6*scale,66.6*scale,50.4*scale,71.4*scale), fill='white')
+    return image.resize((size,size), Image.Resampling.LANCZOS)
+
+
 def draw_icon(name, color, size=96):
     im = Image.new("RGBA", (96, 96))
     d = ImageDraw.Draw(im)

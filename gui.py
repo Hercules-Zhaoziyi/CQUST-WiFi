@@ -13,11 +13,13 @@ import tkinter.messagebox as messagebox
 import customtkinter as ctk
 import keyring
 from PIL import Image
-from widgets import icon, AnimatedSwitch, PulsePower
+from widgets import icon, AnimatedSwitch, PulsePower, wifi_brand
 
 from auth_adapter import AuthAdapter, AuthenticationError, ContextRequired, AlreadyOnline, ServiceRequired, ChallengeRequired, trusted_url, lan_ip
 
 APP_NAME = "CQUST Wi-Fi"
+APP_VERSION = '3.2'
+GITHUB_URL = 'https://github.com/Hercules-Zhaoziyi/CQUST-WiFi'
 APP_DIR = Path(os.environ.get("APPDATA", str(Path.home() / ".config"))) / "CQUST Wifi"
 ACCOUNTS_FILE = APP_DIR / "accounts.json"
 SETTINGS_FILE = APP_DIR / "settings.json"
@@ -135,8 +137,12 @@ class CQUSTWifiApp(ctk.CTk):
         ctk.set_appearance_mode(str(self.local.settings.get("theme", "system")))
         ctk.set_default_color_theme("blue")
         self.title(APP_NAME)
-        self.geometry("1040x660")
-        self.minsize(760, 640)
+        self.geometry("700x820")
+        self.minsize(660, 640)
+        self.resizable(True, True)
+        self.bind('<Map>', lambda event: self.after_idle(self._disable_maximize) if event.widget is self else None, add='+')
+        self.bind('<F11>', lambda event: 'break')
+        self.bind('<Alt-Return>', lambda event: 'break')
         app_icon = Path(__file__).parent / "assets" / "wifi.ico"
         if app_icon.exists():
             self.after(250, lambda: self.iconbitmap(str(app_icon)) if self.winfo_exists() else None)
@@ -186,6 +192,37 @@ class CQUSTWifiApp(ctk.CTk):
         self.metrics_after_id = self.after(1000, self._update_metrics)
 
     # ---------- UI utilities ----------
+    def _disable_maximize(self):
+        if os.name != 'nt' or not self.winfo_exists():
+            return
+        import ctypes
+        from ctypes import wintypes
+        user32 = ctypes.windll.user32
+        user32.GetAncestor.argtypes = [wintypes.HWND, wintypes.UINT]
+        user32.GetAncestor.restype = wintypes.HWND
+        user32.GetWindowLongW.argtypes = [wintypes.HWND, ctypes.c_int]
+        user32.SetWindowLongW.argtypes = [wintypes.HWND, ctypes.c_int, wintypes.LONG]
+        user32.GetSystemMenu.argtypes = [wintypes.HWND, wintypes.BOOL]
+        user32.GetSystemMenu.restype = wintypes.HMENU
+        user32.EnableMenuItem.argtypes = [wintypes.HMENU, wintypes.UINT, wintypes.UINT]
+        user32.SetWindowPos.argtypes = [wintypes.HWND, wintypes.HWND, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, wintypes.UINT]
+        hwnd = user32.GetAncestor(self.winfo_id(), 2)
+        style = user32.GetWindowLongW(hwnd, -16)
+        user32.SetWindowLongW(hwnd, -16, style & ~0x00010000)  # WS_MAXIMIZEBOX only; retain resize borders.
+        user32.EnableMenuItem(user32.GetSystemMenu(hwnd, False), 0xF030, 1)  # SC_MAXIMIZE disabled.
+        user32.SetWindowPos(hwnd, None, 0, 0, 0, 0, 0x0037)
+
+    def state(self, new_state=None):
+        return super().state('normal' if new_state == 'zoomed' else new_state)
+
+    wm_state = state
+
+    def attributes(self, *args):
+        if len(args) > 1 and args[0] == '-fullscreen':
+            args = ('-fullscreen', False)
+        return super().attributes(*args)
+
+    wm_attributes = attributes
     def log(self, message: str) -> None:
         line = f"[{datetime.now().strftime('%H:%M:%S')}] {message}"
         self.logs.append(line)
@@ -225,8 +262,7 @@ class CQUSTWifiApp(ctk.CTk):
         icon.pack(side="left", padx=(0, 12))
         icon.pack_propagate(False)
         from widgets import icon as make_icon
-        supplied = Image.open(Path(__file__).parent / 'assets' / 'wifi_reference.jpg')
-        self.brand_image = ctk.CTkImage(supplied, size=(46, 45))
+        self.brand_image = ctk.CTkImage(wifi_brand(184), size=(46, 46))
         ctk.CTkLabel(icon, text="", image=self.brand_image).pack(expand=True)
         labels = ctk.CTkFrame(brand, fg_color="transparent")
         labels.pack(side="left")
@@ -865,10 +901,10 @@ class CQUSTWifiApp(ctk.CTk):
     def open_auth_help(self, error=None):
         panel = self._open_overlay('认证帮助')
         explanation = str(error) if error else '自动探测失败时，可粘贴浏览器当前校园认证登录页的完整网址。仅在内存中使用，不记录到日志或配置。'
-        ctk.CTkLabel(panel, text=explanation, text_color=MUTED, wraplength=610, justify='left').pack(anchor='w', padx=26, pady=(0,18))
+        ctk.CTkLabel(panel, text=explanation, text_color=MUTED, wraplength=510, justify='left').pack(anchor='w', padx=26, pady=(0,18))
         if isinstance(error, AlreadyOnline):
             ctk.CTkLabel(panel, text='此操作会暂时中断当前设备的校园网连接。账号和密码输入会保留。',
-                         text_color=MUTED, wraplength=610).pack(anchor='w', padx=26, pady=12)
+                         text_color=MUTED, wraplength=510).pack(anchor='w', padx=26, pady=12)
             self.online_switch_button = ctk.CTkButton(panel, text='确认下线当前会话并继续登录',
                 command=lambda: self._switch_discovered_session(error), height=42, fg_color=BLUE)
             self.online_switch_button.pack(anchor='w', padx=26, pady=12)
@@ -1000,6 +1036,43 @@ class CQUSTWifiApp(ctk.CTk):
         self.save_settings_button = ctk.CTkButton(win, text="保存设置", command=save, height=44, corner_radius=13, fg_color=BLUE,
                       hover_color=BLUE_HOVER, font=ctk.CTkFont(size=14, weight="bold"))
         self.save_settings_button.pack(fill="x", padx=22, pady=(0, 22))
+        ctk.CTkButton(win, text='关于 · 更新日志', command=self.open_about, height=28,
+                      fg_color='transparent', text_color=MUTED, hover_color=PANEL_ALT).pack(anchor='e', padx=22)
+
+    def open_about(self):
+        import webbrowser
+        panel = self._open_overlay('关于')
+        body = ctk.CTkScrollableFrame(panel, fg_color='transparent', corner_radius=0)
+        body.pack(fill='both', expand=True, padx=20, pady=(0,20))
+        ctk.CTkLabel(body, text=f'{APP_NAME}  ·  {APP_VERSION}', text_color=TEXT,
+                     font=ctk.CTkFont(size=19, weight='bold')).pack(anchor='w', padx=8, pady=(8,4))
+        ctk.CTkLabel(body, text='校园网连接助手', text_color=MUTED).pack(anchor='w', padx=8)
+        ctk.CTkLabel(body, text='@十七号旅客', text_color=MUTED,
+                     font=ctk.CTkFont(size=12)).pack(anchor='w', padx=8, pady=(16,2))
+        links = ctk.CTkFrame(body, fg_color='transparent')
+        links.pack(anchor='w', padx=0, pady=(0,18))
+        self.website_link = ctk.CTkButton(links, text='ziyis.cn ↗', width=90, height=26,
+            fg_color='transparent', hover_color=PANEL_ALT, text_color=MUTED,
+            command=lambda: webbrowser.open('https://ziyis.cn'))
+        self.website_link.pack(side='left')
+        self.github_link = ctk.CTkButton(links, text='GitHub ↗' if GITHUB_URL else 'GitHub · 待配置',
+            width=115, height=26, fg_color='transparent', hover_color=PANEL_ALT, text_color=MUTED,
+            state='normal' if GITHUB_URL else 'disabled', command=lambda: webbrowser.open(GITHUB_URL))
+        self.github_link.pack(side='left', padx=4)
+        ctk.CTkLabel(body, text='项目仓库地址已预留，暂未创建或发布。', text_color=MUTED,
+                     font=ctk.CTkFont(size=11)).pack(anchor='w', padx=8, pady=(0,8))
+        ctk.CTkLabel(body, text='更新日志', text_color=TEXT,
+                     font=ctk.CTkFont(size=14, weight='bold')).pack(anchor='w', padx=8, pady=(4,8))
+        entries = [
+            ('3.2 · 2026-10-21', '重绘矢量 Wi-Fi 图标；新增关于页与更新日志；默认竖向窗口，支持缩放，禁用最大化与全屏。'),
+            ('3.1 · 2026-10-21', '合并亮暗切换按钮；修复卡片描边；自动识别已有校园网会话，确认后切换登录。'),
+            ('3.0 · 2026-10-21', '更新认证参数获取与密码转换；增加圆形连接按钮、动态波纹、IP 和连接时长；内嵌设置与保存轻提示。'),
+            ('2.0 · 2026-10-21', '账号管理、主题切换、在线检测、自动重连及界面内日志。')]
+        for title, description in entries:
+            ctk.CTkLabel(body, text=title, text_color=TEXT, font=ctk.CTkFont(size=12, weight='bold')).pack(anchor='w', padx=8, pady=(10,3))
+            label = ctk.CTkLabel(body, text=description, text_color=MUTED, justify='left', wraplength=490)
+            label.pack(fill='x', padx=8, anchor='w')
+            label.bind('<Configure>', lambda event, item=label: item.configure(wraplength=max(180,event.width-12)))
 
     def _setting_row(self, parent: Any, title: str, description: str, variable: ctk.BooleanVar) -> None:
         row = ctk.CTkFrame(parent, fg_color="transparent")
@@ -1078,16 +1151,22 @@ def main() -> None:
             app.show_dashboard()
             app.update()
             report['circle_actual_square'] = app.power_button.winfo_width() == app.power_button.winfo_height()
-            report['wide_window'] = app.winfo_width() > app.winfo_height()*1.4
+            report['portrait_window'] = app.winfo_height() > app.winfo_width()
+            app.state('zoomed')
+            app.attributes('-fullscreen', True)
+            report['fullscreen_disabled'] = app.state() != 'zoomed' and not app.attributes('-fullscreen')
             report['metrics_present'] = app.ip_label.winfo_exists() and app.duration_label.winfo_exists()
             app.set_theme('light')
             app.theme_button.invoke()
             report['single_theme_toggle'] = app.local.settings['theme'] == 'dark'
-            app.geometry('760x660')
+            app.geometry('660x660')
             app.update()
             center = app.power_button.master
             report['narrow_border_inset'] = center.winfo_x() >= 2 and center.winfo_x()+center.winfo_width() <= center.master.winfo_width()-2
-            report['supplied_wifi_loaded'] = hasattr(app, 'brand_image')
+            report['vector_wifi_loaded'] = hasattr(app, 'brand_image')
+            app.open_about()
+            app.update()
+            report['about_embedded'] = app.overlay is not None and app.website_link.winfo_ismapped()
             app.on_close()
             Path(sys.argv[2]).write_text(json.dumps(report), encoding="utf-8")
         return
