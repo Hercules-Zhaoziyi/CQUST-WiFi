@@ -1,0 +1,142 @@
+[
+  {
+    "id": "campus-home",
+    "name": "学校官网",
+    "icon": "sites/school-seal.png",
+    "url": "https://www.cqust.edu.cn/",
+    "viaPortal": false
+  },
+  {
+    "id": "campus-portal",
+    "name": "信息门户",
+    "icon": "sites/portal.svg",
+    "url": "https://casp.cqust.edu.cn/",
+    "viaPortal": false
+  },
+  {
+    "id": "campus-0",
+    "name": "教务系统",
+    "icon": "sites/serviceIcon_887656964325142528.png",
+    "url": "http://jwnew.cqust.edu.cn/",
+    "viaPortal": false
+  },
+  {
+    "id": "campus-1",
+    "name": "科研系统",
+    "icon": "sites/serviceIcon_940200712325849088.png",
+    "url": "https://casp.cqust.edu.cn/index.html#/",
+    "viaPortal": true
+  },
+  {
+    "id": "campus-2",
+    "name": "学工系统",
+    "icon": "sites/学生组织管理-1184165712839319552.png",
+    "url": "https://xgfw.cqust.edu.cn/",
+    "viaPortal": false
+  },
+  {
+    "id": "campus-3",
+    "name": "实践教学",
+    "icon": "sites/serviceIcon_940201635458605056.png",
+    "url": "https://casp.cqust.edu.cn/index.html#/",
+    "viaPortal": true
+  },
+  {
+    "id": "campus-4",
+    "name": "毕业论文",
+    "icon": "sites/serviceIcon_940201809199259648.png",
+    "url": "https://casp.cqust.edu.cn/index.html#/",
+    "viaPortal": true
+  },
+  {
+    "id": "campus-5",
+    "name": "邮件系统",
+    "icon": "sites/serviceIcon_940202170962173952.png",
+    "url": "https://casp.cqust.edu.cn/index.html#/",
+    "viaPortal": true
+  },
+  {
+    "id": "campus-6",
+    "name": "课程中心",
+    "icon": "sites/serviceIcon_940202403502776320.png",
+    "url": "https://casp.cqust.edu.cn/index.html#/",
+    "viaPortal": true
+  },
+  {
+    "id": "campus-7",
+    "name": "心理健康",
+    "icon": "sites/serviceIcon_966024540092178432.png",
+    "url": "https://casp.cqust.edu.cn/index.html#/",
+    "viaPortal": true
+  },
+  {
+    "id": "campus-8",
+    "name": "运维中心",
+    "icon": "sites/serviceIcon_940208869332770816.png",
+    "url": "https://casp.cqust.edu.cn/index.html#/",
+    "viaPortal": true
+  },
+  {
+    "id": "campus-9",
+    "name": "学生收费系统",
+    "icon": "sites/serviceIcon_1032329883344248832.png",
+    "url": "https://casp.cqust.edu.cn/index.html#/",
+    "viaPortal": true
+  },
+  {
+    "id": "campus-10",
+    "name": "软件正版化",
+    "icon": "sites/serviceIcon_1047467011807977472.png",
+    "url": "https://ms.cqust.edu.cn/",
+    "viaPortal": false
+  },
+  {
+    "id": "campus-11",
+    "name": "师生数据服务中心",
+    "icon": "sites/serviceIcon_1081247968876634112.png",
+    "url": "https://casp.cqust.edu.cn/index.html#/",
+    "viaPortal": true
+  },
+  {
+    "id": "campus-12",
+    "name": "图书馆",
+    "icon": "sites/重要文件-1152218926029742080.png",
+    "url": "http://lib.cqust.edu.cn/",
+    "viaPortal": false
+  },
+  {
+    "id": "campus-13",
+    "name": "研究生教育管理系统",
+    "icon": "sites/研究生投票答辩系统-1184165794238177280.png",
+    "url": "https://casp.cqust.edu.cn/index.html#/",
+    "viaPortal": true
+  },
+  {
+    "id": "campus-14",
+    "name": "实验室安全考试系统",
+    "icon": "sites/考试安排-1184165794519195648.png",
+    "url": "http://sysaqks.cqust.edu.cn/lab-study-front/home",
+    "viaPortal": false
+  },
+  {
+    "id": "campus-15",
+    "name": "科研设备共享",
+    "icon": "sites/红色-1364190593625628672.png",
+    "url": "https://yq.cqust.edu.cn/",
+    "viaPortal": false
+  },
+  {
+    "id": "campus-16",
+    "name": "实验室安全智管",
+    "icon": "sites/9141684c-f49f-47a0-b5ed-347b7f909449-1520083105931497472.png",
+    "url": "https://casp.cqust.edu.cn/index.html#/",
+    "viaPortal": true
+  },
+  {
+    "id": "campus-17",
+    "name": "学生电子证明",
+    "icon": "sites/印章目录-1184165754201608192.png",
+    "url": "https://casp.cqust.edu.cn/index.html#/",
+    "viaPortal": true
+  }
+]

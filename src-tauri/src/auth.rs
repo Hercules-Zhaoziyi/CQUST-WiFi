@@ -8,6 +8,9 @@ use serde_json::Value;
 #[cfg(test)]use serde_json::json;
 use std::{collections::HashSet,time::{Duration,Instant}};
 use url::Url;
+use std::io::Read;
+fn captcha_url(page:&Url,path:&str)->Option<Url>{let path=path.trim();if path.is_empty(){return None}page.join(path).ok().filter(trusted)}
+fn image_mime(bytes:&[u8])->Option<&'static str>{if bytes.starts_with(b"\x89PNG\r\n\x1a\n"){Some("image/png")}else if bytes.starts_with(&[255,216,255]){Some("image/jpeg")}else if bytes.starts_with(b"GIF87a")||bytes.starts_with(b"GIF89a"){Some("image/gif")}else if bytes.starts_with(b"BM"){Some("image/bmp")}else if bytes.len()>12&&bytes.starts_with(b"RIFF")&&&bytes[8..12]==b"WEBP"{Some("image/webp")}else{None}}
 
 const ENTRIES:[&str;4]=["http://aaa.cqust.edu.cn/","http://www.msftconnecttest.com/redirect","http://172.28.228.2/","http://123.123.123.123/"];
 #[derive(Clone,Debug,Serialize,Deserialize)]
@@ -96,13 +99,33 @@ impl Auth{
   let service=if services.iter().any(|s|s==selected){selected.to_string()}else if services.len()==1{services[0].clone()}else if services.is_empty(){return Err(Error::new("context","未取得认证服务列表，请重新探测。"))}else{let mut error=Error::new("services","请选择当前页面提供的校园网服务。");error.services=services;return Err(error)};
   for key in ["isOperatorPwd","isOperatorUserId"]{if field(&info,key)=="true"{return Err(Error::new("context","当前服务需要运营商账号，请选择普通校园网服务。"))}}
   let prefix=if rx(r#"(?i)<[^>]+id=["']Tj_yes["'][^>]+style=["'][^"']*display\s*:\s*block"#).is_match(&html){capture(r#"prefixValue\s*=\s*["']([^"']*)"#,&html).unwrap_or_default()}else{String::new()};
-  let captcha=info["validCodeUrl"].as_str().and_then(|s|page.join(s).ok());
+  let captcha=info["validCodeUrl"].as_str().and_then(|s|captcha_url(&page,s));
   Ok(Context{client,page,api,mac:mac(&query),query,encrypt,exponent,modulus,service,prefix,captcha})
  }
  fn challenge_error(&self,c:&Context)->Error{
-  let mut error=Error::new("captcha","请输入校园认证图片中的验证码。");
-  if let Some(url)=&c.captcha{if trusted(url){if let Ok(response)=c.client.get(url.clone()).send(){let mime=response.headers().get("Content-Type").and_then(|s|s.to_str().ok()).unwrap_or("").split(';').next().unwrap_or("").to_string();if ["image/png","image/jpeg","image/gif"].contains(&mime.as_str())&&response.status().is_success(){if let Ok(bytes)=response.bytes(){if bytes.len()<1_000_000{error.image=Some(format!("data:{mime};base64,{}",base64::engine::general_purpose::STANDARD.encode(bytes)));}}}}}}
+  let mut error=Error::new("captcha","请输入图片中的验证码。可点击刷新更换图片。");
+  let image=(||->Option<String>{
+   let mut url=c.captcha.clone()?;
+   let nonce=std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).ok()?.as_nanos().to_string();
+   url.query_pairs_mut().append_pair("_captcha", &nonce);
+   for _ in 0..5{
+    if !trusted(&url){return None}
+    let response=c.client.get(url.clone()).header("Referer",c.page.as_str()).header("Accept","image/png,image/jpeg,image/gif,image/webp,image/bmp;q=0.9,*/*;q=0.1").header("Cache-Control","no-cache").send().ok()?;
+    if response.status().is_redirection(){url=url.join(response.headers().get("Location")?.to_str().ok()?).ok()?;continue}
+    if !response.status().is_success(){return None}
+    let mut bytes=Vec::new();response.take(1_000_001).read_to_end(&mut bytes).ok()?;
+    if bytes.len()>1_000_000{return None}
+    let mime=image_mime(&bytes)?;
+    return Some(format!("data:{mime};base64,{}",base64::engine::general_purpose::STANDARD.encode(bytes)))
+   }None
+  })();
+  error.image=image;
+  if error.image.is_none(){error.message="验证码图片加载失败，请点击刷新重试；请保持连接校园网。".into()}
   error
+ }
+ pub fn refresh_captcha(&self)->Result<Value>{
+  let c=self.challenge.as_ref().ok_or_else(||Error::new("context","认证会话已失效，请重新登录获取验证码。"))?;
+  Ok(serde_json::to_value(self.challenge_error(c)).unwrap())
  }
  pub fn login(&mut self,user:&str,password:&str,args:&Value,service:&str)->Result<Session>{
   let c=if args["challenge"]==true{self.challenge.take().map(Ok).unwrap_or_else(||self.discover(args["url"].as_str().unwrap_or(""),service))?}else{self.challenge=None;self.discover(args["url"].as_str().unwrap_or(""),service)?};
@@ -111,7 +134,7 @@ impl Auth{
   let body=login_body(user,password,&c,captcha)?;
   let result=post(&c.client,&endpoint(&c.api,"login"),body,&c.page)?;
   if result["result"]!="success"{
-   if let Some(path)=result["validCodeUrl"].as_str(){let mut c=c;c.captcha=c.page.join(path).ok();let error=self.challenge_error(&c);self.challenge=Some(c);return Err(error)}
+   if let Some(url)=result["validCodeUrl"].as_str().and_then(|path|captcha_url(&c.page,path)){let mut c=c;c.captcha=Some(url);let error=self.challenge_error(&c);self.challenge=Some(c);return Err(error)}
    let msg=field(&result,"message").to_lowercase();
    return Err(Error::new("error",if ["password","密码","用户不存在","账号不存在"].iter().any(|s|msg.contains(s)){"服务器拒绝账号或密码，请核对输入。"}else if ["在线","online"].iter().any(|s|msg.contains(s)){"服务器提示当前账号或设备已在线，请先下线。"}else{"校园认证未通过，请核对账号权限和服务。"}))
   }
@@ -151,6 +174,8 @@ impl Session{
 
 #[cfg(test)]mod tests{
  use super::*;
+ #[test]fn captcha_address_and_image_detection(){let page=Url::parse("http://aaa.cqust.edu.cn/eportal/index.jsp?wlanuserip=demo").unwrap();assert!(captcha_url(&page,"").is_none());assert!(captcha_url(&page,"  ").is_none());assert!(captcha_url(&page,"https://example.com/image").is_none());assert_eq!(captcha_url(&page,"./validcode").unwrap().path(),"/eportal/validcode");assert_eq!(image_mime(b"\x89PNG\r\n\x1a\nimage"),Some("image/png"));assert_eq!(image_mime(&[255,216,255,224]),Some("image/jpeg"));assert_eq!(image_mime(b"<html>login</html>"),None);}
+
  #[test]fn js_encoding(){assert_eq!(twice("互联网"),"%25E4%25BA%2592%25E8%2581%2594%25E7%25BD%2591");assert_eq!(mac("x=1&MAC=aa%3Abb"),"aa%3Abb");assert_eq!(mac("x=1"),"111111111");}
  #[test]fn restrict_server(){assert!(trusted(&Url::parse("http://aaa.cqust.edu.cn/eportal/").unwrap()));for u in ["http://evil.test/","http://aaa.cqust.edu.cn@evil.test/","http://aaa.cqust.edu.cn:9999/"]{assert!(!trusted(&Url::parse(u).unwrap()))}}
  #[test]fn parse_fields(){let (v,s,_)=page_fields("<input id='passwordEncrypt' value='true'><select id='service'><option value='互联网'>上网</option></select>");assert_eq!(v["passwordEncrypt"],"true");assert_eq!(s,vec!["互联网"]);}

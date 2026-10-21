@@ -40,6 +40,7 @@ impl Service{
  pub fn command(&mut self,app:&AppHandle,method:&str,args:Value)->Result<Value,Error>{
   match method{
    "snapshot"=>Ok(self.snapshot()),
+   "captcha"=>self.auth.refresh_captcha(),
    "login"=>self.login(app,args,false,false),
    "reconnect"=>self.login(app,args,true,false),
    "disconnect"|"logout"=>{

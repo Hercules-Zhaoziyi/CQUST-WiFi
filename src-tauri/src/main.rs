@@ -23,15 +23,16 @@ async fn request(app:tauri::AppHandle,method:String,args:Value)->Result<Value,St
 #[tauri::command]
 async fn desktop(app:tauri::AppHandle,window:tauri::WebviewWindow,command:String,value:Option<Value>)->Result<Value,String>{
  let value=value.unwrap_or(Value::Null);
- #[cfg(feature="verify-ui")]if app.state::<Backend>().1{if command=="startup"{return Ok(json!({"ok":true,"value":value}))}if command=="link"{return Ok(json!(true))}}
+ #[cfg(feature="verify-ui")]if app.state::<Backend>().1{if command=="startup"{return Ok(json!({"ok":true,"value":value}))}if command=="link"||command=="campus"{return Ok(json!(true))}}
  match command.as_str(){
-  "info"=>Ok(json!({"startup":startup::enabled(),"theme":if window.theme().ok()==Some(tauri::Theme::Dark){"dark"}else{"light"},"version":"5.0.0","packaged":true})),
+  "info"=>Ok(json!({"startup":startup::enabled(),"theme":if window.theme().ok()==Some(tauri::Theme::Dark){"dark"}else{"light"},"version":"5.0.1","packaged":true})),
   "startup"=>{let enabled=value.as_bool().ok_or("设置无效")?;match startup::set(enabled){Ok(value)=>Ok(json!({"ok":true,"value":value})),Err(message)=>Ok(json!({"ok":false,"message":message}))}},
   "theme"=>{let mode=value.as_str().unwrap_or("system");let theme=match mode{"light"=>Some(tauri::Theme::Light),"dark"=>Some(tauri::Theme::Dark),_=>None};window.set_theme(theme).map_err(|_|"主题设置失败")?;Ok(json!(if window.theme().ok()==Some(tauri::Theme::Dark){"dark"}else{"light"}))},
   "hide"=>{window.hide().map_err(|_|"隐藏窗口失败")?;Ok(json!(true))},
   "minimize"=>{window.minimize().map_err(|_|"最小化失败")?;Ok(json!(true))},
   "close"=>{window.hide().map_err(|_|"隐藏窗口失败")?;Ok(json!(true))},
   "quit"=>{app.exit(0);Ok(json!(true))},
+  "campus"=>{let id=value.as_str().ok_or("链接无效")?;let sites:Vec<Value>=serde_json::from_str(include_str!("../../ui/sites.json")).map_err(|_|"网站清单无效")?;let url=sites.iter().find(|site|site["id"]==id).and_then(|site|site["url"].as_str()).ok_or("链接无效")?;let parsed=url::Url::parse(url).map_err(|_|"链接无效")?;if !matches!(parsed.scheme(),"http"|"https")||!parsed.host_str().map(|host|host=="cqust.edu.cn"||host.ends_with(".cqust.edu.cn")).unwrap_or(false)||!matches!(parsed.port_or_known_default(),Some(80|443))||!parsed.username().is_empty()||parsed.password().is_some(){return Err("链接无效".into())}std::process::Command::new("rundll32.exe").arg("url.dll,FileProtocolHandler").arg(url).spawn().map_err(|_|"打开链接失败")?;Ok(json!(true))},
   "link"=>{let url=match value.as_str(){Some("website")=>"https://ziyis.cn",Some("github")=>"https://github.com/Hercules-Zhaoziyi",Some("source")=>"https://github.com/Hercules-Zhaoziyi/CQUST-WiFi",Some("thanks")=>"https://github.com/Gloridust/RuijieWIFI-AutoLogin",_=>return Err("链接无效".into())};std::process::Command::new("rundll32.exe").arg("url.dll,FileProtocolHandler").arg(url).spawn().map_err(|_|"打开链接失败")?;Ok(json!(true))},
   _=>Err("不支持的窗口操作".into())
  }

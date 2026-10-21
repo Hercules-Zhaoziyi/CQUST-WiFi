@@ -11,6 +11,8 @@ names=['package.json','package-lock.json','README.md','.gitignore','build-local.
  'src-tauri/src/main.rs','src-tauri/src/auth.rs','src-tauri/src/service.rs','src-tauri/src/startup.rs','src-tauri/src/vault.rs','src-tauri/src/verify.rs','src-tauri/src/rsa_vectors.json',
  'ui/index.html','ui/renderer.js','ui/style.css','ui/bridge.js','ui/wifi.svg','ui/school_logo.png',
  'verification/native.js','verification/frontend.cjs','verification/preload.cjs','verification/vectors.cjs']
+names+=['ui/sites.json','prepare-installer-assets.ps1','src-tauri/icons/school-seal.png','src-tauri/icons/installer-header.bmp','src-tauri/icons/installer-school.ico']
+names+=[path.relative_to(root).as_posix() for path in sorted((root/'ui/sites').glob('*')) if path.is_file()]
 original=Path.home()/'Desktop'/'CQUST Wifi'/'config.py'
 profile={}
 if original.exists():
@@ -26,7 +28,7 @@ payload=binary.read_bytes()
 if any(secret and secret in payload for secret in secrets):raise RuntimeError('Private data found in executable; release rejected')
 for synthetic in ('synthetic-secret','test-only','测试同学'):
     if synthetic.encode() in payload:raise RuntimeError('Verification backend or fixture found in release executable')
-output=root.parent.parent/'outputs'/'CQUST_Wifi_Tauri_v5_Source.zip'
+output=root.parent.parent/'outputs'/'CQUST_Wifi_Tauri_v5.0.1_Source.zip'
 with zipfile.ZipFile(output,'w',zipfile.ZIP_DEFLATED) as archive:
     for name in names:archive.write(root/name,'CQUST_Wifi_Tauri/'+name)
 print('Source archive and release executable passed credential/verification-backend scan.')
