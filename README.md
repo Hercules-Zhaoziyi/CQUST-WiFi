@@ -1,54 +1,54 @@
-# CQUST Wi-Fi 4.1 · Electron
+# CQUST Wi-Fi 5.0 · Tauri 2 / Rust
 
-4.1：连接时长移至连接状态下方，底部仅账号与 IP；默认 600 像素宽、最低 460；
-亮暗主题采用整页交叉渐变，开关弹性滑动，检测间隔改为无原生下拉菜单的三选一控件。
-保存设置按钮无勾号。断开后点击连接使用当前账号后台内存/Windows 凭据重新连接，不跳回登录页。
-旧账号仍来自本机原有账号列表及 Windows 凭据管理器，不是安装包内置账号。
-界面动效默认开启，可在设置中单独关闭。这是应用自身的偏好，不修改 Windows 的减少动画设置。
+前端沿用现有 HTML/CSS/SVG，桌面运行时改为 Tauri 2，认证、凭据、偏好与在线检测全部由 Rust 实现。
+发布包不包含 Electron、Chromium、Python 或认证子进程。使用系统 WebView2；缺少时安装器可安装微软运行时。
 
-重写的 Electron GUI，保留 3.2 的 auth_adapter.py 认证协议，不把账号、密码、历史 queryString 或 userIndex 内置在程序中。
+## 本版变化
 
-## 使用
+- 融合标题栏，可调整窗口大小，保持竖向布局并禁止最大化/全屏；关闭到托盘。
+- 顶部品牌区和导航固定，内容独立滚动，预留稳定滚动条空间；窄窗口下校徽和检测间隔保持同排。
+- 设置即时生效，无保存按钮。开机自启使用当前用户 Run 启动项，写入后回读验证。
+- 显示认证接口返回的姓名；没有姓名时显示“校园网用户”。账号和局域网 IP 居中。
+- 电源按钮负责连接/断开；退出登录先注销网络会话，再清除当前进程中的密码，返回登录页。
+- 问候语按早上、中午、下午、晚上和深夜切换。
+- 页面禁止复制与图片拖拽；仍可在输入框中输入和粘贴账号密码。
+- 关于页署名为“@ 十七号旅客”，最底部居中展示学校标识，并感谢 Gloridust 的锐捷认证脚本项目。
 
-安装 CQUST-WiFi-4.1.0-Setup.exe 后打开软件。不要同时运行旧版的自动重连功能，避免两个客户端互相干扰。
-首次未保存密码时填写学号和密码。已有账号仍使用原来的 Windows 凭据管理器条目；密码留空可使用保存值。
+GitHub 主页：https://github.com/Hercules-Zhaoziyi
+开源项目：https://github.com/Hercules-Zhaoziyi/CQUST-WiFi
+特别鸣谢：https://github.com/Gloridust/RuijieWIFI-AutoLogin
 
-- 设置中的开机自启默认关闭。开启并保存后，登录 Windows 时启动并隐藏到托盘；自动连接需另外开启“自动登录”。
-- 关闭窗口默认隐藏到系统托盘，状态检测与自动重连继续运行。双击托盘图标恢复，右键菜单完全退出。
-- 退出软件不会主动注销校园网，也不会继续保活或重连。下一次启动需重新识别当前网络会话。
-- 状态检查为 5 秒、10 秒、2 分钟。旧版的 7 秒自动迁移为 10 秒；学校要求的保活独立于检测周期。
-- 手动断开后不会自动重连。开启始终保持连接时掉线不弹提示；凭据错误和验证码需要人工处理，避免反复登录。
-- 默认竖向窗口，可缩放到 460 像素宽，禁止最大化/全屏；关于页包含署名、网站、GitHub 图标链接与更新日志。
-- GitHub 项目链接显示在关于页面。没有自动更新功能。
+## 认证与凭据
 
-## 架构与安全
+Rust 实现保留已验证的学校协议：当前登录页参数、同一 Cookie 会话、页面加密开关、公钥、ASCII 无填充 RSA、密码拼接 MAC 后反转与小端分块，学号/密码/服务/queryString 各进行两次 encodeURIComponent 兼容编码。
+不使用历史 queryString、密文或 userIndex；普通登录只接受新返回的会话标识，并再次查询在线状态。
+学校服务使用 HTTP，此协议限制没有因更换 GUI 而改变。
 
-本地 HTML/CSS/SVG + Electron 主进程 + PyInstaller 认证服务。前端没有 Node 权限，启用 contextIsolation 和 sandbox，CSP 不允许外部脚本、网络连接或内嵌对象。
-主进程只暴露固定 IPC 操作，校验来源，只允许打开两个明确的网站地址。
-认证通过子进程匿名管道通信，不使用命令行传密码，不启动本机 TCP 服务。密码仅在当前进程内存和 Windows 凭据管理器中存在；不写入配置或日志。
-原认证模块只允许学校服务器，并拒绝 POST 重定向。学校 HTTP 协议的限制仍然存在，不声称是 HTTPS 认证。
-页面参数探测失败仍允许手填当前网址；验证码需用户填写。已在线时必须确认下线才继续换号。
+继承本机原有非敏感账号列表及偏好。密码通过 Win32 Credential Manager 读取，兼容旧版 python-keyring 的服务目标名与 user@service 目标名；不会把已保存密码发送回前端。
+密码不写入日志或配置；进程内密码使用 zeroize 管理。真实凭据不在源码包和 EXE 中。
+
+安装新版本前，请从托盘退出旧版，避免两版同时重连。新版不会为测试主动注销当前校园网。
 
 ## 构建
 
-需要 Node.js、Windows Python、requests/keyring/pyinstaller。Electron 45.0.0 与 electron-builder 26.15.3 已锁定到 package-lock.json。
+需要 Rust MSVC 工具链、Microsoft C++ 编译器/Windows SDK、Node.js 和 WebView2。
 
 ```powershell
-python -m pip install requests keyring pyinstaller
-python -m unittest discover -s tests -v
-python -m PyInstaller --noconfirm --onefile --console --name auth-service --distpath backend-dist --workpath backend-build --collect-all keyring backend/service.py
 npm ci
-npm run smoke
+cargo test --manifest-path src-tauri/Cargo.toml
 npm run build
 ```
 
-GitHub 下载不可达时可对安装命令设置 ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/；下载校验必须保留。
-认证服务的控制台由主进程 windowsHide 隐藏，不在用户桌面弹出命令行。
-签名证书未配置，安装包未签名；不建议绕过组织安全策略。卸载时移除本应用开机启动项，保留用户配置与凭据。
+输出位于 src-tauri/target/release/bundle/nsis。
+Rust 单元测试包含学校原始 security.js 生成的七组 RSA 对照向量、编码规则、学校地址限制、真实姓名字段、配置迁移和启动项回读。
+启动项测试会暂时读写本应用自己的 Run 条目，并以清理保护恢复测试前的值，不会开启用户的开机自启偏好。
+verification 目录的开发用浏览器测试不进入发布包，也不表示应用依赖 Electron。
 
 ## 验证边界
 
-测试使用隔离配置和虚构凭据。smoke 模式不进行真实登录、不修改启动注册表，验证界面、主题、窄窗口、设置停留、托盘与进程隔离。
-未为测试注销当前用户网络；另一个账号的真实登录、真实开机启动和其他设备挤下线仍需现场验证。
+浏览器模拟测试使用虚构账号，仅验证布局和交互。真实认证与 Windows 启动结果需要分别验证；构建通过不代表另一个真实账号的校园网登录或重启电脑后的自启已经现场完成。
+安装包没有数字签名。未自动发布到 GitHub。
 
-作者：@十七号旅客 · https://ziyis.cn · https://github.com/Hercules-Zhaoziyi/CQUST-WiFi
+2026-10-21 验证：8 项 Rust 测试全部通过，包含启动项实际读写并恢复原值；真实 Tauri/WebView2 窗口的 20 项隔离检查全部通过。
+发布安装包 3,196,751 字节（约 3.05 MiB），相比 Electron 4.1 安装包约 120 MiB 大幅缩小。
+未为测试中断当前校园网，未现场测试另一个真实账号登录，也未实际重启 Windows 测试自启。

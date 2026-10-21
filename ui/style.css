@@ -37,3 +37,65 @@
 :root[data-motion=off] *,:root[data-motion=off] *:before,:root[data-motion=off] *:after{animation:none!important;transition:none!important}
 :root[data-motion=off]::view-transition-old(root),:root[data-motion=off]::view-transition-new(root){animation:none!important}
 
+/* Tauri 5: one fixed application header and one stable scrolling content area. */
+html,body{height:100%;overflow:hidden;user-select:none;-webkit-user-select:none}
+input,textarea{user-select:text;-webkit-user-select:text}
+img{-webkit-user-drag:none;user-select:none;pointer-events:none}
+.shell{height:100dvh;min-height:0;padding:0 24px;overflow:hidden}
+.sticky-top{flex:0 0 auto;background:var(--bg);z-index:2}
+.titlebar{height:29px;display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:10px;letter-spacing:.4px;margin:0 -24px;padding-left:18px;cursor:default}
+.window-controls{display:flex;align-self:stretch}
+.window-controls button{border:0;background:transparent;color:var(--muted);width:42px;display:grid;place-items:center;border-radius:0}
+.window-controls button svg{width:14px;height:14px}
+.window-controls button:hover{background:var(--accent-soft);color:var(--text)}
+.window-controls #window-close:hover{background:#d94050;color:white}
+header{margin:12px 0 20px}
+nav{margin-bottom:20px}
+main{overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable both-edges;min-height:0;padding-bottom:8px;overscroll-behavior:contain}
+.page{padding:0 0 12px}
+.app-footer{flex:0 0 auto;padding:13px 0;font-size:9px}
+.card-heading{flex-direction:row;align-items:center;gap:12px}
+.card-heading>div{min-width:0;flex:1}
+.school-logo{margin:0;width:132px;max-width:37%;flex:0 0 auto;opacity:.95}
+.card-heading h1{font-size:24px;white-space:nowrap}
+.card-heading p{font-size:11px}
+.login-card{padding:27px 24px 22px}
+.signed-in{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);min-width:0}
+.signed-in svg{width:19px;height:19px;color:var(--accent)}
+#display-name{max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.metrics{text-align:center}
+.metrics>div{display:flex;flex-direction:column;align-items:center}
+.connection-card{padding-top:22px}
+.power-stage{height:218px}
+.power-stage:before{width:190px;height:190px}.power-stage:after{width:212px;height:212px}
+#power{width:143px;height:143px}
+.ripple{width:158px;height:158px}
+.connection-card h1{font-size:23px}
+.duration{margin-top:13px}
+.metrics{margin-top:20px}
+.setting{flex-wrap:nowrap}
+.setting>div:first-child{min-width:0;flex:1}
+.setting:has(.interval-picker){flex-direction:row;align-items:center}
+.interval-picker{gap:2px;padding:3px}
+.interval-picker button{min-width:41px;padding:8px 6px;font-size:10px;white-space:nowrap}
+.settings-note{margin-bottom:6px}
+.links{flex-wrap:wrap;gap:10px 20px}
+.acknowledgements{text-align:center;margin:26px 8px 20px}
+.acknowledgements h3{font-size:12px;color:var(--muted)}
+.acknowledgements p{font-size:10px}
+.acknowledgements .text-button{font-size:10px;display:inline;padding:0;overflow-wrap:anywhere}
+.about-school{display:flex;justify-content:center;padding:8px 0 24px}
+.about-school img{width:min(230px,75%);height:auto;opacity:.85}
+:root[data-theme=dark] .about-school img{filter:brightness(1.7)}
+@media(max-width:540px){
+ .shell{padding:0 18px}.titlebar{margin:0 -18px}.brand strong{font-size:18px}
+ .card-heading{flex-direction:row;gap:8px}.card-heading h1{font-size:21px;letter-spacing:-.6px}.card-heading p{font-size:10px}
+ .school-logo{width:120px;max-width:36%;margin:0}
+ .login-card{padding:24px 19px 20px}.settings-card{padding:0 16px}.setting{padding:16px 0;gap:9px}
+ .setting:has(.interval-picker){flex-direction:row;align-items:center}.setting:has(.interval-picker) p{max-width:130px;font-size:9px}
+ .setting h3{font-size:12px}.setting p{font-size:10px}
+ .metrics{padding:15px 0}.power-stage{height:218px}
+ .home-footer{margin:18px 0}.privacy{font-size:9px}.changelog article{gap:8px}
+}
+
+

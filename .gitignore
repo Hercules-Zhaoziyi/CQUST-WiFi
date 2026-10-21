@@ -1,10 +1,8 @@
 node_modules/
-release/
-backend-build/
-backend-dist/
-__pycache__/
-*.spec
+src-tauri/target/
+src-tauri/gen/
+verification/output/
+verification/native-output/
 *.log
-smoke-output/
-config.py
 .env
+config.py

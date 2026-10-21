@@ -1,0 +1,38 @@
+[package]
+name = "cqust-wifi"
+version = "5.0.0"
+edition = "2021"
+description = "CQUST campus network client"
+authors = ["十七号旅客"]
+
+[features]
+verify-ui = ["dep:webview2-com", "dep:windows"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "image-ico"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "cookies", "rustls-tls", "gzip"] }
+url = "2"
+regex = "1"
+scraper = "0.24"
+num-bigint = "0.4"
+encoding_rs = "0.8"
+flate2 = "1"
+base64 = "0.22"
+chrono = "0.4"
+zeroize = "1"
+winreg = "0.55"
+windows-sys = { version = "0.61", features = ["Win32_Security_Credentials", "Win32_Foundation"] }
+webview2-com = { version = "0.39", optional = true }
+windows = { version = "0.62", optional = true }
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
