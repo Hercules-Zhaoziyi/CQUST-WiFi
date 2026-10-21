@@ -28,6 +28,28 @@ class Tests(unittest.TestCase):
     def test_snapshot_never_exposes_password(self):
         self.s.password='synthetic-secret'
         self.assertNotIn('synthetic-secret',str(self.s.snapshot()))
+    def test_reconnect_reuses_memory_even_without_remember(self):
+        self.s.username='demo';self.s.password='synthetic-secret';self.s.remember=False
+        with patch.object(self.s.auth,'authenticate',return_value=self.connected()) as auth,patch('service.keyring.delete_password'),patch('service.keyring.set_password') as save:
+            result=self.s.command('reconnect',{'username':'different','password':'wrong'})
+            self.assertEqual(auth.call_args.args[:2],('demo','synthetic-secret'))
+            self.assertTrue(result['connected'])
+            save.assert_not_called()
+    def test_reconnect_can_use_keyring_if_memory_missing(self):
+        self.s.username='demo'
+        with patch.object(self.s,'saved_password',return_value='saved-example'),patch.object(self.s.auth,'authenticate',return_value=self.connected()) as auth,patch('service.keyring.set_password'):
+            self.s.command('reconnect',{})
+            self.assertEqual(auth.call_args.args[1],'saved-example')
+    def test_animation_preference_persists(self):
+        self.assertTrue(self.s.settings['animations'])
+        self.s.command('settings',{'animations':False})
+        self.assertFalse(Service(self.temp.name).settings['animations'])
+    def test_confirmed_online_reconnect_keeps_unsaved_memory_password(self):
+        self.s.username='demo';self.s.password='memory-only';self.s.remember=False
+        self.s.online=AlreadyOnline('http://aaa.cqust.edu.cn/eportal/success.jsp','test-index')
+        with patch.object(self.s.auth,'disconnect_discovered'),patch('service.time.sleep'),patch.object(self.s.auth,'authenticate',return_value=self.connected()) as auth,patch('service.keyring.delete_password'):
+            self.s.command('switchOnline',{'reconnect':True,'password':''})
+            self.assertEqual(auth.call_args.args[:2],('demo','memory-only'))
     def test_original_interval_migrated_without_changing_file_on_read(self):
         path=Path(self.temp.name)/'settings.json'
         path.write_text('{"check_interval":7}')

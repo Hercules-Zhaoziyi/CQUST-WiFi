@@ -10,7 +10,7 @@ import time
 import keyring
 from auth_adapter import AuthAdapter, AuthenticationError, AlreadyOnline, ContextRequired, ServiceRequired, ChallengeRequired, trusted_url, lan_ip
 
-DEFAULTS = dict(keep_connected=False, auto_login=False, check_interval=10, theme='system', service='')
+DEFAULTS = dict(keep_connected=False, auto_login=False, check_interval=10, theme='system', service='', animations=True)
 
 class Service:
     def __init__(self, folder=None):
@@ -117,6 +117,12 @@ class Service:
     def command(self,method,args):
         if method=='snapshot': return self.snapshot()
         if method=='login': return self.login(args)
+        if method=='reconnect':
+            # Reuse only this account's in-memory credential (or its keyring entry).
+            # Never round-trip a saved password through the renderer.
+            if self.session: return self.snapshot()
+            return self.login(dict(username=self.username,password=self.password,
+                                   remember=self.remember,**{k:args[k] for k in ('url','captcha','challenge') if k in args}))
         if method=='disconnect':
             self.manual=True
             self.next_retry=float('inf')
@@ -131,9 +137,10 @@ class Service:
             self.auth.disconnect_discovered(self.online)
             self.online=None
             time.sleep(1)
+            if args.get('reconnect'): return self.command('reconnect',args)
             return self.login(args)
         if method=='settings':
-            for key in ('keep_connected','auto_login'):
+            for key in ('keep_connected','auto_login','animations'):
                 if key in args and isinstance(args[key],bool): self.settings[key]=args[key]
             if args.get('check_interval') in (5,10,120): self.settings['check_interval']=args['check_interval']
             if args.get('theme') in ('system','light','dark'): self.settings['theme']=args['theme']
@@ -202,11 +209,11 @@ def main():
             continue
         if message is None: break
         method=message.get('method')
-        if method in ('login','disconnect','switchOnline'): service.emit('busy',True)
+        if method in ('login','reconnect','disconnect','switchOnline'): service.emit('busy',True)
         try: reply=dict(id=message.get('id'),ok=True,data=service.command(method,message.get('args',{})))
         except Exception as exc: reply=dict(id=message.get('id'),ok=False,error=service.error(exc))
         print(json.dumps(reply,ensure_ascii=False),flush=True)
-        if method in ('login','disconnect','switchOnline'): service.emit('busy',False)
+        if method in ('login','reconnect','disconnect','switchOnline'): service.emit('busy',False)
     service.clear_challenge()
     if service.session: service.session.client.close()
 

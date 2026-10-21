@@ -9,7 +9,7 @@ let win,tray,child,quitting=false,sequence=0,latest=null,backendError=false;
 const pending=new Map();
 const external={website:'https://ziyis.cn',github:'https://github.com/Hercules-Zhaoziyi/CQUST-WiFi'};
 const html=path.join(__dirname,'ui','index.html');
-const allowed=new Set(['snapshot','login','disconnect','switchOnline','settings','forget']);
+const allowed=new Set(['snapshot','login','reconnect','disconnect','switchOnline','settings','forget']);
 if(smoke) app.setPath('userData',path.join(app.getPath('temp'),'cqust-electron-smoke'));
 if(!app.requestSingleInstanceLock()) app.quit();
 else {
@@ -28,7 +28,7 @@ function request(method,args={}){
   if(!allowed.has(method)||!args||typeof args!=='object'||Array.isArray(args)||JSON.stringify(args).length>24000) return Promise.resolve({ok:false,error:{message:'请求无效。'}});
   if(smoke){
     if(method==='settings')latest.settings={...latest.settings,...args};
-    if(method==='login'){latest.connected=true;latest.started=Date.now()/1000;latest.username='demo';}
+    if(method==='login'||method==='reconnect'){latest.connected=true;latest.started=Date.now()/1000;latest.username='demo';}
     if(method==='disconnect'){latest.connected=false;latest.started=0;}
     send('state',latest);return Promise.resolve({ok:true,data:latest});
   }
@@ -76,10 +76,10 @@ function updateTray(){
 }
 async function start(){
   app.setAppUserModelId('cn.ziyis.cqustwifi');Menu.setApplicationMenu(null);
-  win=new BrowserWindow({width:720,height:860,minWidth:560,minHeight:650,show:false,
+  win=new BrowserWindow({width:600,height:820,minWidth:460,minHeight:650,show:false,
     title:'CQUST Wi-Fi',icon:path.join(__dirname,'assets','wifi.ico'),backgroundColor:'#f5f7fb',
     maximizable:false,fullscreenable:false,resizable:true,autoHideMenuBar:true,
-    webPreferences:{preload:path.join(__dirname,'preload.cjs'),nodeIntegration:false,contextIsolation:true,sandbox:true}});
+    webPreferences:{preload:path.join(__dirname,'preload.cjs'),nodeIntegration:false,contextIsolation:true,sandbox:true,backgroundThrottling:!smoke}});
   win.webContents.setWindowOpenHandler(()=>({action:'deny'}));
   win.webContents.on('will-navigate',event=>event.preventDefault());
   win.webContents.session.setPermissionRequestHandler((_wc,_permission,callback)=>callback(false));
@@ -117,11 +117,19 @@ async function runSmoke(){
   const report=await win.webContents.executeJavaScript(`(async()=>{
     const result={bridge:!!window.cqust,nodeHidden:typeof require==='undefined'};
     document.querySelector('[data-page="settings"]').click();
-    document.querySelector('#interval').value='120';
+    document.querySelector('[data-interval="120"]').click();
     document.querySelector('#save-settings').click();
     await new Promise(r=>setTimeout(r,150));
     result.settingsStay=document.querySelector('#settings').classList.contains('active');
-    result.interval=document.querySelector('#interval').value==='120';
+    result.savePlainText=document.querySelector('#save-settings').textContent==='保存设置'&&!document.querySelector('#save-settings svg');
+    result.noNativeIntervalSelect=document.querySelector('#interval').tagName==='DIV';
+    const toggle=document.querySelector('#keep-connected');
+    const knob=()=>getComputedStyle(toggle.nextElementSibling,'::after').transform;
+    const before=knob();toggle.click();await new Promise(r=>setTimeout(r,100));
+    const middle=knob();await new Promise(r=>setTimeout(r,400));
+    result.switchAnimated=before!==middle&&middle!==knob();
+    result.switchFrames=JSON.stringify({before,middle,after:knob(),duration:getComputedStyle(toggle.nextElementSibling,'::after').transitionDuration,reduced:matchMedia('(prefers-reduced-motion: reduce)').matches});
+    result.interval=document.querySelector('[data-interval="120"]').getAttribute('aria-checked')==='true';
     document.querySelector('[data-page="about"]').click();
     result.githubIcon=!!document.querySelector('#github svg');
     document.querySelector('[data-page="home"]').click();
@@ -132,15 +140,23 @@ async function runSmoke(){
   const folder=path.join(app.isPackaged?path.dirname(process.execPath):__dirname,'smoke-output');fs.mkdirSync(folder,{recursive:true});
   await new Promise(r=>setTimeout(r,400));
   fs.writeFileSync(path.join(folder,'light.png'),(await win.webContents.capturePage()).toPNG());
-  await win.webContents.executeJavaScript(`document.querySelector('#theme-toggle').click()`);
-  await new Promise(r=>setTimeout(r,350));
+  report.themeFade=await win.webContents.executeJavaScript(`(async()=>{document.querySelector('#theme-toggle').click();await new Promise(r=>setTimeout(r,100));return document.getAnimations().some(animation=>animation.animationName==='theme-in');})()`);
+  await new Promise(r=>setTimeout(r,650));
   fs.writeFileSync(path.join(folder,'dark.png'),(await win.webContents.capturePage()).toPNG());
-  win.setSize(560,760);await new Promise(r=>setTimeout(r,350));
+  win.setSize(460,760);await new Promise(r=>setTimeout(r,550));
   report.noHorizontalOverflow=await win.webContents.executeJavaScript(`document.documentElement.scrollWidth<=innerWidth`);
   fs.writeFileSync(path.join(folder,'narrow.png'),(await win.webContents.capturePage()).toPNG());
   await win.webContents.executeJavaScript(`document.getElementById('username').value='demo';document.getElementById('password').value='test-only';document.getElementById('login-form').requestSubmit()`);
   await new Promise(r=>setTimeout(r,500));
   report.dashboard=await win.webContents.executeJavaScript(`!document.getElementById('dashboard').hidden`);
+  report.reconnectStays=await win.webContents.executeJavaScript(`(async()=>{
+    document.getElementById('power').click(); await new Promise(r=>setTimeout(r,100));
+    const stayed=!document.getElementById('dashboard').hidden;
+    document.getElementById('power').click(); await new Promise(r=>setTimeout(r,150));
+    return stayed&&!document.getElementById('dashboard').hidden&&document.getElementById('status-title').textContent==='已连接';
+  })()`);
+  report.durationCentered=await win.webContents.executeJavaScript(`document.getElementById('metric-time').closest('.duration')!==null`);
+  report.dashboardFits=await win.webContents.executeJavaScript(`document.documentElement.scrollWidth<=innerWidth && document.querySelector('.duration').getBoundingClientRect().bottom<document.querySelector('.metrics').getBoundingClientRect().top`);
   fs.writeFileSync(path.join(folder,'dashboard.png'),(await win.webContents.capturePage()).toPNG());
   await win.webContents.executeJavaScript(`document.querySelector('[data-page="about"]').click()`);
   await new Promise(r=>setTimeout(r,350));
