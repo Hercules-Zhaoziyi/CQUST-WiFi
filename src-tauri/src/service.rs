@@ -62,6 +62,7 @@ impl Service{
     if let Some(v)=args["service"].as_str(){if v.len()<512{self.settings.service=v.into()}}
     if let Err(error)=self.write("settings.json",&self.settings){self.settings=old;return Err(error)}
     app.state::<crate::Snapping>().enabled.store(self.settings.window_snapping,std::sync::atomic::Ordering::Relaxed);
+    app.state::<crate::Snapping>().animations.store(self.settings.animations,std::sync::atomic::Ordering::Relaxed);
     self.next_poll=Instant::now()+Duration::from_secs(self.settings.check_interval);if !self.settings.keep_connected{self.next_retry=None}self.emit(app);Ok(self.snapshot())
    },
    "forget"=>{

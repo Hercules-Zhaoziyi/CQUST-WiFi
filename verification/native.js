@@ -2,12 +2,13 @@
 const wait=ms=>new Promise(r=>setTimeout(r,ms)),$=id=>document.getElementById(id),r={nativeTauri:!!window.__TAURI__,noSaveButton:!document.getElementById('save-settings')};
 try{
  r.dynamicBrowserRedirect=await window.cqust.desktop('verifyPortalRedirect');
- r.nativeSnappingOnAndOff=await window.cqust.desktop('verifySnapping');
+ const snapping=await window.cqust.desktop('verifySnapping');for(const [key,value]of Object.entries(snapping))r['edgeDock_'+key]=value;r.edgeDockCheckCount=Object.keys(snapping).length===9;
  r.singlePasswordReveal=[...document.styleSheets].some(sheet=>[...sheet.cssRules].some(rule=>rule.selectorText?.includes('::-ms-reveal')&&rule.style.display==='none'))&&document.querySelectorAll('#eye').length===1;
  const initialWidth=window.innerWidth,initialHeight=window.innerHeight;r.fixedWidthNoSystemResize=desktop.resizable===false;await window.cqust.desktop('resizeHeight',initialHeight+20);await wait(250);r.heightResizeKeepsWidth=Math.abs(window.innerWidth-initialWidth)<=2;await window.cqust.desktop('resizeHeight',initialHeight);await wait(250);
- document.querySelector('[data-page=settings]').click();r.updateCardFirst=document.querySelector('#settings>.card')===document.querySelector('.update-card');$('keep-connected').click();await wait(180);r.instantSetting=$('keep-connected').checked;
+ document.querySelector('[data-page=settings]').click();r.updateCardLast=[...document.querySelectorAll('#settings>.card')].at(-1)===document.querySelector('.update-card');$('keep-connected').click();await wait(180);r.instantSetting=$('keep-connected').checked;
  r.snappingDefaultOn=$('window-snapping').checked;$('window-snapping').click();await wait(200);r.snappingCanDisable=state.settings.window_snapping===false;$('window-snapping').click();await wait(200);r.snappingCanEnable=state.settings.window_snapping===true;
  $('check-updates').click();await wait(250);r.updateNotesVisible=!$('update-result').hidden&&$('update-status').textContent.includes('5.2.0')&&$('update-notes').textContent.includes('第二项改进')&&!$('update-download').hidden;
+ r.markdownFormatting=['h1','strong','ul','pre code','table','a[href]'].every(selector=>$('update-notes').querySelector(selector));r.markdownSanitized=!$('update-notes').querySelector('img,script,iframe,style,svg,input')&&![...$('update-notes').querySelectorAll('a')].some(a=>(a.getAttribute('href')||'').startsWith('javascript:'))&&!window.markdownUnsafe;
  document.querySelector('[data-interval="120"]').click();await wait(180);r.instantInterval=document.querySelector('[data-interval="120"]').getAttribute('aria-checked')==='true';
  await wait(400);r.settingsCapture=await window.__TAURI__.core.invoke('verification_capture',{name:'settings'});
  document.querySelector('.update-card').scrollIntoView({block:'start'});await wait(400);r.updatesCapture=await window.__TAURI__.core.invoke('verification_capture',{name:'updates'});

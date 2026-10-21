@@ -94,7 +94,7 @@ $('download-site').onclick=()=>window.cqust.desktop('link','downloadSite').catch
 let checkingUpdate=false;
 $('check-updates').onclick=async()=>{
  if(checkingUpdate)return;checkingUpdate=true;const button=$('check-updates');button.disabled=true;button.textContent='正在检查…';$('update-status').textContent='正在连接 GitHub…';$('update-result').hidden=true;
- try{const update=await window.cqust.desktop('checkUpdates');$('update-status').textContent=update.available?`发现新版本 ${update.latest}`:`当前已是最新正式版本（${update.current}）`;$('update-status').classList.toggle('has-update',update.available);$('update-notes').textContent=update.notes||'暂无更新说明。';$('update-download').hidden=!update.available;$('update-result').hidden=false;$('update-result').querySelector('details').open=update.available;}
+ try{const update=await window.cqust.desktop('checkUpdates');$('update-status').textContent=update.available?`发现新版本 ${update.latest}`:`当前已是最新正式版本（${update.current}）`;$('update-status').classList.toggle('has-update',update.available);window.cqustMarkdown.render($('update-notes'),update.notes,update.url);$('update-download').hidden=!update.available;$('update-result').hidden=false;$('update-result').querySelector('details').open=update.available;}
  catch(error){$('update-status').textContent=typeof error==='string'?error:'检查失败，请稍后重试。';$('update-status').classList.remove('has-update');}
  finally{checkingUpdate=false;button.disabled=false;button.textContent='重新检查';}
 };
@@ -108,3 +108,7 @@ $('height-resize').addEventListener('pointerdown',event=>{if(event.button!==0)re
 $('height-resize').addEventListener('pointermove',event=>{if(!resizeStart)return;resizeTarget=Math.max(650,Math.round(resizeStart.height+event.screenY-resizeStart.y));if(!resizeFrame)resizeFrame=requestAnimationFrame(()=>{resizeFrame=0;sendHeight();});});
 $('height-resize').addEventListener('pointerup',()=>{resizeStart=null;sendHeight();});$('height-resize').addEventListener('pointercancel',()=>{resizeStart=null;});
 $('height-resize').addEventListener('keydown',event=>{if(['ArrowUp','ArrowDown'].includes(event.key)){event.preventDefault();window.cqust.desktop('resizeHeight',window.innerHeight+(event.key==='ArrowDown'?20:-20));}});
+// Keep authentication dialogs and focused text fields available while editing.
+let dockHoldValue=null;
+function syncDockHold(){const hold=busy||!!document.querySelector('dialog[open]')||!!document.activeElement?.matches('input:not([type=checkbox]):not([type=radio]),textarea');if(hold!==dockHoldValue){dockHoldValue=hold;window.cqust.desktop('dockHold',hold).catch(()=>{});}}
+document.addEventListener('focusin',syncDockHold);document.addEventListener('focusout',()=>queueMicrotask(syncDockHold));new MutationObserver(syncDockHold).observe(document.body,{subtree:true,attributes:true,attributeFilter:['open','class']});syncDockHold();

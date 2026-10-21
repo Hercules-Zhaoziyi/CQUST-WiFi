@@ -1,6 +1,6 @@
 # CQUST Wi-Fi
 
-重庆科技大学校园网 Windows 客户端。当前推荐版本：**v5.1.0**，使用 **Tauri 2 + Rust**。
+重庆科技大学校园网 Windows 客户端。当前推荐版本：**v5.1.1**，使用 **Tauri 2 + Rust**。
 
 [软件介绍与下载](https://cqust-wifi.ziyis.cn/)
 
@@ -8,7 +8,7 @@
 
 ## 下载与安装
 
-- [最新版本 v5.1.0](https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases/tag/v5.1.0)
+- [最新版本 v5.1.1](https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases/tag/v5.1.1)
 - [全部历史版本](https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases)
 - [版本索引与架构演进](docs/HISTORY.md)
 
@@ -26,8 +26,12 @@
 - 亮暗主题、动效、开机自启、系统托盘、实时日志。
 - 20 项本地化图标的校园常用网站。
 - 固定窄窗口宽度，底部拉柄可调整高度；固定导航和自动隐藏滚动条。
-- 可即时开关的屏幕工作区边缘吸附，默认开启；不改变窗口宽度，不启用全屏。
-- GitHub 正式版更新检测、纯文本更新说明与新安装包下载。
+- 可即时开关的屏幕工作区边缘吸附，默认开启；贴边收起、悬停滑出、拖离解除，支持平滑动效。
+- 设置底部的 GitHub 正式版更新检测、安全 Markdown 更新简介与新安装包下载。
+
+## v5.1.1 更新
+
+更新检测移回设置底部，更新简介支持标题、列表、代码块、表格和链接；使用本地解析与净化，不执行脚本、不加载远程图片。窗口贴边自动收起，悬停边缘平滑滑出，拖离即可解除；关闭吸附和托盘恢复均可回到屏内。v5.1.0 保留不变。
 
 ## v5.1.0 更新
 

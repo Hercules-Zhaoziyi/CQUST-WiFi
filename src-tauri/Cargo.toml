@@ -1,6 +1,6 @@
 [package]
 name = "cqust-wifi"
-version = "5.1.0"
+version = "5.1.1"
 edition = "2021"
 description = "CQUST campus network client"
 authors = ["十七号旅客"]
@@ -27,7 +27,7 @@ base64 = "0.22"
 chrono = "0.4"
 zeroize = "1"
 winreg = "0.55"
-windows-sys = { version = "0.61", features = ["Win32_Security_Credentials", "Win32_Foundation", "Win32_UI_Input_KeyboardAndMouse"] }
+windows-sys = { version = "0.61", features = ["Win32_Security_Credentials", "Win32_Foundation", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_WindowsAndMessaging", "Win32_Graphics_Gdi"] }
 webview2-com = { version = "0.39", optional = true }
 windows = { version = "0.62", optional = true }
 
