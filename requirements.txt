@@ -1,5 +1,0 @@
-customtkinter>=5.2.2
-keyring>=25.0.0
-pyinstaller>=6.0.0
-requests>=2.31.0
-Pillow>=10

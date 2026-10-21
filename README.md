@@ -1,75 +1,48 @@
-# CQUST Wi-Fi v3.2
+# CQUST Wi-Fi 4.0 · Electron
 
-v3.2：使用按参考图重绘的 SVG Wi-Fi 图标（assets/wifi.svg），GUI 按相同曲线几何渲染，ICO 由几何图形生成，不再贴 JPG。
-窗口支持 660 像素最小宽度。设置底部“关于 · 更新日志”打开内嵌页面，署名 @十七号旅客，链接 https://ziyis.cn。
-预留仓库：https://github.com/Hercules-Zhaoziyi/CQUST-WiFi 。按作者要求暂不创建或推送。
-默认窗口 700 × 820（竖向），可拖动调整大小，但禁用最大化和全屏。
-发布可执行文件为 CQUST_Wifi_v3_2.exe。
-
-此前 v3.1 使用参考图片（v3.2 已替换为矢量重绘）；主页只保留一个太阳/月亮切换按钮，设置内可恢复跟随系统。
-中央容器留出边距，避免覆盖卡片左右描边。
-优先访问 aaa.cqust.edu.cn 并跟随跳转自动取得参数。若入口返回已有会话的成功页，
-显示“确认下线当前会话并继续登录”，只有点击确认才下线；随后重新自动探测，不要求粘贴旧参数。
-只读实测确认本机入口目前返回此类成功页；没有为了测试而注销当前用户网络。
-
-Windows 校园网客户端。保留现有账号管理、Windows 凭据保存、自动登录、在线检测、静默重连及内嵌实时日志。
+重写的 Electron GUI，保留 3.2 的 auth_adapter.py 认证协议，不把账号、密码、历史 queryString 或 userIndex 内置在程序中。
 
 ## 使用
 
-启动 `CQUST_Wifi_v3_2.exe`，输入学号和密码。已保存的密码仍从 Windows 凭据管理器读取。
-新版不再重放原 config.py 的密码密文、queryString 或 userIndex；原文件本身不会被修改或删除。
-仅知道旧密文不能代表知道原始密码，因此首次迁移可能需要重新输入密码。
+安装 CQUST-WiFi-4.0.0-Setup.exe 后打开软件。不要同时运行旧版的自动重连功能，避免两个客户端互相干扰。
+首次未保存密码时填写学号和密码。已有账号仍使用原来的 Windows 凭据管理器条目；密码留空可使用保存值。
 
-认证探测在本机进行，绕过系统代理。在未登录的校园网环境下，程序跟随 HTTP、JS 字面量或 meta refresh 跳转获取当前页面。
-如果当前已经在线，会提示确认切换；只有跳转没有携带所需参数或探测失败时才提供手填网址兜底，不会自动采用旧样例。
-手动网址只在内存使用，成功登录后清除。多服务时显示选择项，保存真实 service value，不猜运营商。
-服务器要求图形验证码时显示验证码，必须由用户自行填写。
-要求独立运营商账号的服务、动态复杂跳转及非 ASCII 加密密码尚不支持自动完成，请使用官方认证页面。
+- 设置中的开机自启默认关闭。开启并保存后，登录 Windows 时启动并隐藏到托盘；自动连接需另外开启“自动登录”。
+- 关闭窗口默认隐藏到系统托盘，状态检测与自动重连继续运行。双击托盘图标恢复，右键菜单完全退出。
+- 退出软件不会主动注销校园网，也不会继续保活或重连。下一次启动需重新识别当前网络会话。
+- 状态检查为 5 秒、10 秒、2 分钟。旧版的 7 秒自动迁移为 10 秒；学校要求的保活独立于检测周期。
+- 手动断开后不会自动重连。开启始终保持连接时掉线不弹提示；凭据错误和验证码需要人工处理，避免反复登录。
+- 默认竖向窗口，可缩放到 560 像素宽，禁止最大化/全屏；关于页包含署名、网站、GitHub 图标链接与更新日志。
+- GitHub 链接为作者指定用户名下的预留仓库，目前未创建或推送。没有自动更新功能。
 
-## 界面
+## 架构与安全
 
-- 竖向 700 × 820 初始窗口，最窄 660；可缩放但禁止最大化/全屏；主页单个太阳/月亮按钮互切亮暗，设置里恢复跟随系统。
-- 固定正方形画布绘制圆形电源控件，带悬停变化及在线/连接中扩散波纹。
-- 底部显示账号、校园网/局域网 IP、本次连接时间；离线后停止累计，重新连接清零。
-- 内嵌设置保存后停留原页，以滑入 Toast 提示；账号密码输入保持不变。
-- 在线检测可选 5/7/10 秒。明确被挤下线时提示，开启始终保持连接则静默尝试重连。
-- 无效凭据、验证码或需要人工认证参数时不无限重试，避免反复请求；网络超时可继续重试。
+本地 HTML/CSS/SVG + Electron 主进程 + PyInstaller 认证服务。前端没有 Node 权限，启用 contextIsolation 和 sandbox，CSP 不允许外部脚本、网络连接或内嵌对象。
+主进程只暴露固定 IPC 操作，校验来源，只允许打开两个明确的网站地址。
+认证通过子进程匿名管道通信，不使用命令行传密码，不启动本机 TCP 服务。密码仅在当前进程内存和 Windows 凭据管理器中存在；不写入配置或日志。
+原认证模块只允许学校服务器，并拒绝 POST 重定向。学校 HTTP 协议的限制仍然存在，不声称是 HTTPS 认证。
+页面参数探测失败仍允许手填当前网址；验证码需用户填写。已在线时必须确认下线才继续换号。
 
-## 认证协议
+## 构建
 
-本次实现以学校当前 `login_bch.js`、`AuthInterFace.js`、`security.js` 为依据：
+需要 Node.js、Windows Python、requests/keyring/pyinstaller。Electron 45.0.0 与 electron-builder 26.15.3 已锁定到 package-lock.json。
 
-1. queryString 保留原始参数顺序及已有百分号编码；MAC 按不区分大小写的正则提取原值。
-2. 当前页面/`pageInfo` 决定是否加密，旧配置不得覆盖该开关。
-3. 加密时执行“密码 > MAC”拼接、反转、分块补零、小端整数、无标准填充 RSA、四位对齐十六进制。
-4. 学号（去首尾空白）、密码（不去空白）、service、queryString 各做两次 JavaScript 兼容 encodeURIComponent。
-5. 拼接字符串作为原始请求体发送，不再经过表单字典额外编码。普通登录不发送历史 userIndex。
-6. 保留同一 HTTP 会话及当前页面 Referer/Origin。接口取当前认证目录，只向学校域名/IP发送凭据，不跟随 POST 重定向。
-7. 登录成功后使用服务器新返回的 userIndex 确认在线。查询、保活和注销使用各自的单独参数规则。
-8. 学校 success.jsp 的保活间隔按 `keepaliveInterval * 60 * 1000` 处理，0 不发送保活。保活与在线查询分开调度，并串行访问同一会话。
-
-学校协议使用 HTTP；页面明确关闭密码加密时按其当前规则发送未加密密码，不应把这称作 HTTPS 安全传输。
-密码、完整请求体、会话标识和认证网址不进入日志。源码/EXE不内置真实用户凭据。
-
-## 运行和构建
-
-```bat
-python -m venv .venv
-.venv\Scripts\python -m pip install -r requirements.txt
-.venv\Scripts\python -m unittest discover -s tests -v
-.venv\Scripts\python gui.py
-build_windows.bat
+```powershell
+python -m pip install requests keyring pyinstaller
+python -m unittest discover -s tests -v
+python -m PyInstaller --noconfirm --onefile --console --name auth-service --distpath backend-dist --workpath backend-build --collect-all keyring backend/service.py
+npm ci
+npm run smoke
+npm run build
 ```
 
-输出 `dist\CQUST_Wifi_v3_2.exe`。`--self-test <报告路径>` 可运行隔离配置、不访问网络的打包自检。
+GitHub 下载不可达时可对安装命令设置 ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/；下载校验必须保留。
+认证服务的控制台由主进程 windowsHide 隐藏，不在用户桌面弹出命令行。
+签名证书未配置，安装包未签名；不建议绕过组织安全策略。卸载时移除本应用开机启动项，保留用户配置与凭据。
 
-## 验证范围（2026-10-21）
+## 验证边界
 
-认证 mock 测试覆盖双重编码、现有百分号保留、当前加密开关、缺少 MAC、多服务、验证码会话、禁止历史参数回退、超时/响应处理、在线分类、保活和注销。
-界面测试检查实际圆形宽高、横向窗口、波纹推进、主题切换、Toast 停留、输入保持和连接时间。
-在开发环境使用学校原始 security.js 与 Python 交叉核对 7 组 ASCII 密码/MAC，包含跨分块长度；并以 JS 对照中文 service 及编码 queryString。
-原始 JS 不放入发布包。跨语言测试需 Node.js 和源码上级 `protocol_reference/security.js`，缺少时会明确跳过。
+测试使用隔离配置和虚构凭据。smoke 模式不进行真实登录、不修改启动注册表，验证界面、主题、窄窗口、设置停留、托盘与进程隔离。
+未为测试注销当前用户网络；另一个账号的真实登录、真实开机启动和其他设备挤下线仍需现场验证。
 
-当前本机已在线，认证入口未给出新的未登录上下文。本次没有主动注销用户网络，也未现场完成另一个账号的登录。
-v2 曾经重放原配置成功，不能作为 v3 完整动态登录已成功的证据。真实多账号、验证码及其他设备挤下线仍需校园网现场验证。
-本轮没有截图视觉验收；布局验证依据实际控件尺寸，不冒充目视检查。
+作者：@十七号旅客 · https://ziyis.cn · https://github.com/Hercules-Zhaoziyi/CQUST-WiFi

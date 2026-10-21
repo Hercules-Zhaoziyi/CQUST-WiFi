@@ -1,0 +1,15 @@
+{
+  "name": "cqust-wifi", "version": "4.0.0", "private": true,
+  "description": "CQUST Wi-Fi campus network desktop client",
+  "author": "十七号旅客", "main": "main.cjs",
+  "scripts": {"start": "electron .", "smoke": "electron . --smoke", "build": "electron-builder --win nsis --x64"},
+  "devDependencies": {"electron": "45.0.0", "electron-builder": "26.15.3"},
+  "build": {
+    "appId": "cn.ziyis.cqustwifi", "productName": "CQUST Wi-Fi",
+    "directories": {"output": "release"},
+    "files": ["main.cjs", "preload.cjs", "ui/**/*", "assets/wifi.ico", "package.json"],
+    "extraResources": [{"from": "backend-dist", "to": "backend", "filter": ["auth-service.exe"]}],
+    "win": {"icon": "assets/wifi.ico", "signExecutable": false, "target": "nsis"},
+    "nsis": {"include": "installer.nsh", "oneClick": false, "perMachine": false, "allowToChangeInstallationDirectory": true, "deleteAppDataOnUninstall": false, "artifactName": "CQUST-WiFi-4.0.0-Setup.exe"}
+  }
+}
