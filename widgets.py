@@ -1,5 +1,7 @@
 """Resolution-independent, theme-aware icons and animated controls."""
 import time
+import math
+import tkinter as tk
 from functools import lru_cache
 import customtkinter as ctk
 from PIL import Image, ImageDraw
@@ -23,6 +25,22 @@ def draw_icon(name, color, size=96):
     elif name == "power":
         d.arc((18, 18, 78, 80), -55, 235, fill=color, width=7)
         d.line((48, 10, 48, 48), fill=color, width=7)
+    elif name == 'sun':
+        d.ellipse((30, 30, 66, 66), outline=color, width=5)
+        for i in range(8):
+            a = i*math.pi/4
+            d.line((48+29*math.cos(a), 48+29*math.sin(a), 48+39*math.cos(a), 48+39*math.sin(a)), fill=color, width=5)
+    elif name == 'moon':
+        points = []
+        for p0,p1,p2,p3 in [((61,13),(10,1),(0,71),(49,83)), ((49,83),(67,86),(82,73),(85,56)), ((85,56),(45,72),(24,37),(61,13))]:
+            for i in range(25):
+                t = i/24
+                points.append(tuple((1-t)**3*p0[j]+3*(1-t)**2*t*p1[j]+3*(1-t)*t*t*p2[j]+t**3*p3[j] for j in (0,1)))
+        d.line(points, fill=color, width=5, joint='curve')
+    elif name == 'system':
+        d.rounded_rectangle((14, 20, 82, 67), radius=7, outline=color, width=5)
+        d.line((48, 67, 48, 80), fill=color, width=5)
+        d.line((33, 80, 63, 80), fill=color, width=5)
     return im.resize((size, size), Image.Resampling.LANCZOS)
 
 
@@ -63,6 +81,83 @@ class AnimatedSwitch(ctk.CTkFrame):
             self.knob.place(x=4+22*self.position, y=4)
             self.animation = self.after(16, tick) if t < 1 else None
         tick()
+
+    def destroy(self):
+        if self.animation:
+            self.after_cancel(self.animation)
+        super().destroy()
+
+
+class PulsePower(ctk.CTkFrame):
+    """Fixed square canvas: icon/font geometry cannot stretch the circular control."""
+    def __init__(self, master, command, size=244, connected=False):
+        super().__init__(master, width=size, height=size, fg_color='transparent')
+        self.pack_propagate(False)
+        self.command, self.connected, self.busy = command, connected, False
+        self.hover = False
+        self.phase = 0.0
+        self.animation = None
+        self.canvas = tk.Canvas(self, highlightthickness=0, bd=0, takefocus=1, cursor='hand2')
+        self.canvas.place(x=0, y=0, relwidth=1, relheight=1)
+        self.canvas.bind('<Configure>', lambda e: self._paint())
+        self.canvas.bind('<Button-1>', self._click)
+        self.canvas.bind('<space>', lambda e: self.command() if not self.busy else None)
+        self.canvas.bind('<Enter>', lambda e: self._hover(True))
+        self.canvas.bind('<Leave>', lambda e: self._hover(False))
+        self._tick()
+
+    def _hover(self, value):
+        self.hover = value
+        self._paint()
+
+    def _click(self, event):
+        self.canvas.focus_set()
+        side = min(self.canvas.winfo_width(), self.canvas.winfo_height())
+        if not self.busy and math.hypot(event.x-side/2, event.y-side/2) <= side*.32:
+            self.command()
+
+    def set_status(self, connected):
+        self.connected = connected
+        self._paint()
+
+    def set_busy(self, busy):
+        self.busy = busy
+        self._paint()
+
+    def _set_appearance_mode(self, mode):
+        super()._set_appearance_mode(mode)
+        if hasattr(self, 'canvas'):
+            self._paint()
+
+    def _paint(self):
+        if not hasattr(self, 'canvas'):
+            return
+        side = min(self.canvas.winfo_width(), self.canvas.winfo_height())
+        mid, radius = side/2, side*(.323 if self.hover else .315)
+        bg = self._apply_appearance_mode(('#FFFFFF', '#111C30'))
+        color = '#3978F6' if self.busy else ('#20B58B' if self.connected else '#71819B')
+        self.canvas.configure(bg=bg)
+        self.canvas.delete('all')
+        self.circle_bounds = (mid-radius, mid-radius, mid+radius, mid+radius)
+        if self.connected or self.busy:
+            for offset in (0, .5):
+                p = (self.phase+offset) % 1
+                rr = side*(.34+.15*p)
+                fg = tuple(int(color[i:i+2], 16) for i in (1,3,5))
+                back = tuple(int(bg[i:i+2], 16) for i in (1,3,5))
+                tint = '#'+''.join(f'{round(a*(1-p)*.32+b*(1-(1-p)*.32)):02x}' for a,b in zip(fg,back))
+                self.canvas.create_oval(mid-rr, mid-rr, mid+rr, mid+rr, outline=tint, width=max(1, side*.007))
+        self.canvas.create_oval(*self.circle_bounds, fill=color, outline='')
+        r = radius*.35
+        self.canvas.create_arc(mid-r, mid-r, mid+r, mid+r, start=135, extent=270,
+                               style='arc', outline='white', width=max(2, side*.017))
+        self.canvas.create_line(mid, mid-r*1.3, mid, mid-r*.05, fill='white', width=max(2, side*.017), capstyle='round')
+
+    def _tick(self):
+        self.phase = (time.monotonic() % 2.4)/2.4
+        if self.winfo_ismapped():
+            self._paint()
+        self.animation = self.after(40, self._tick)
 
     def destroy(self):
         if self.animation:

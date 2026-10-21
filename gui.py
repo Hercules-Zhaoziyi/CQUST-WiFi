@@ -13,9 +13,9 @@ import tkinter.messagebox as messagebox
 import customtkinter as ctk
 import keyring
 from PIL import Image
-from widgets import icon, AnimatedSwitch
+from widgets import icon, AnimatedSwitch, PulsePower
 
-from auth_adapter import AuthAdapter, AuthenticationError
+from auth_adapter import AuthAdapter, AuthenticationError, ContextRequired, ServiceRequired, ChallengeRequired, trusted_url, lan_ip
 
 APP_NAME = "CQUST Wi-Fi"
 APP_DIR = Path(os.environ.get("APPDATA", str(Path.home() / ".config"))) / "CQUST Wifi"
@@ -43,6 +43,7 @@ DEFAULT_SETTINGS = {
     "auto_login": False,
     "check_interval": 7,
     "theme": "system",
+    "service": "",
 }
 
 
@@ -134,8 +135,8 @@ class CQUSTWifiApp(ctk.CTk):
         ctk.set_appearance_mode(str(self.local.settings.get("theme", "system")))
         ctk.set_default_color_theme("blue")
         self.title(APP_NAME)
-        self.geometry("920x700")
-        self.minsize(820, 700)
+        self.geometry("1040x660")
+        self.minsize(920, 640)
         app_icon = Path(__file__).parent / "assets" / "wifi.ico"
         if app_icon.exists():
             self.after(250, lambda: self.iconbitmap(str(app_icon)) if self.winfo_exists() else None)
@@ -147,8 +148,19 @@ class CQUSTWifiApp(ctk.CTk):
         self.remember_var = ctk.BooleanVar(value=True)
         self.overlay = None
         self.reconnect_after_id = None
+        self.keepalive_after_id = None
+        self.keepalive_inflight = False
+        self.last_lan_ip = lan_ip('172.28.228.2')
         self.closed = False
         self.generation = 0
+        self.login_page_url = ''
+        self.challenge_context = None
+        self.captcha_value = ''
+        self.metrics_after_id = None
+        self.connected_since = None
+        self.elapsed_seconds = 0
+        self.toast = None
+        self.toast_after_id = None
         self.session: Any = None
         self.current_username = ""
         self.current_password = ""
@@ -171,6 +183,7 @@ class CQUSTWifiApp(ctk.CTk):
         if self.auth.config_path:
             self.log("已读取本机原 config.py；未复制或显示其中的密码。")
         self.auto_login_after_id = self.after(500, self._try_auto_login)
+        self.metrics_after_id = self.after(1000, self._update_metrics)
 
     # ---------- UI utilities ----------
     def log(self, message: str) -> None:
@@ -198,6 +211,7 @@ class CQUSTWifiApp(ctk.CTk):
         self.log_textbox.configure(state="disabled")
 
     def _clear_view(self) -> None:
+        self._dismiss_toast()
         self.close_overlay()
         for child in self.root_frame.winfo_children():
             child.destroy()
@@ -222,6 +236,56 @@ class CQUSTWifiApp(ctk.CTk):
             for text, callback in right_widgets:
                 ctk.CTkButton(actions, text=text, command=callback, width=88, height=34, corner_radius=11,
                               fg_color=PANEL_ALT, hover_color=BORDER, text_color=TEXT).pack(side="left", padx=(8, 0))
+            self.theme_buttons = {}
+            for mode, glyph in [('light', 'sun'), ('dark', 'moon'), ('system', 'system')]:
+                button = ctk.CTkButton(actions, text='', image=make_icon(glyph, 21), width=34, height=34,
+                    corner_radius=17, fg_color=PANEL_ALT, hover_color=BORDER, border_width=1,
+                    border_color=BLUE if self.local.settings['theme'] == mode else PANEL_ALT,
+                    command=lambda m=mode: self.set_theme(m))
+                button.pack(side='left', padx=(6, 0))
+                self.theme_buttons[mode] = button
+
+    def set_theme(self, mode):
+        self.local.save_settings({'theme': mode})
+        ctk.set_appearance_mode(mode)
+        for name, button in self.theme_buttons.items():
+            if button.winfo_exists():
+                button.configure(border_color=BLUE if name == mode else PANEL_ALT)
+        self.show_toast('主题：'+THEME_LABELS[mode])
+
+    def _dismiss_toast(self):
+        if self.toast_after_id:
+            self.after_cancel(self.toast_after_id)
+            self.toast_after_id = None
+        if self.toast is not None:
+            self.toast.destroy()
+            self.toast = None
+
+    def show_toast(self, message):
+        self._dismiss_toast()
+        self.toast = ctk.CTkLabel(self.root_frame, text=message, height=38, corner_radius=19,
+                                  fg_color=('#173D36', '#D1FAE5'), text_color=('#FFFFFF', '#113B2B'))
+        self.toast.lift()
+        start = time.monotonic()
+        def animate():
+            if self.toast is None:
+                return
+            progress = min(1, (time.monotonic()-start)/.18)
+            self.toast.place(relx=.5, rely=1, y=-18-int(14*progress), anchor='s')
+            self.toast_after_id = self.after(16, animate) if progress < 1 else self.after(2000, self._dismiss_toast)
+        animate()
+
+    def _update_metrics(self):
+        if self.connected and self.connected_since is not None:
+            self.elapsed_seconds = max(0, int(time.monotonic()-self.connected_since))
+        if hasattr(self, 'duration_label') and self.duration_label.winfo_exists():
+            hours, rest = divmod(self.elapsed_seconds, 3600)
+            minutes, seconds = divmod(rest, 60)
+            self.duration_label.configure(text=f'{hours:02d}:{minutes:02d}:{seconds:02d}')
+            self.last_lan_ip = getattr(self.session, 'lan_ip', '') or self.last_lan_ip
+            self.ip_label.configure(text=self.last_lan_ip or '—')
+        if not self.closed:
+            self.metrics_after_id = self.after(1000, self._update_metrics)
 
     def _card(self, parent: Any, **kwargs: Any) -> ctk.CTkFrame:
         return ctk.CTkFrame(parent, fg_color=PANEL, corner_radius=22, border_width=1, border_color=BORDER, **kwargs)
@@ -229,6 +293,9 @@ class CQUSTWifiApp(ctk.CTk):
     def _set_busy(self, value: bool, button: ctk.CTkButton | None = None, busy_text: str = "正在处理…", normal_text: str = "登录") -> None:
         self.busy = value
         if button is not None and button.winfo_exists():
+            if isinstance(button, PulsePower):
+                button.set_busy(value)
+                return
             button.configure(state="disabled" if value else "normal", text=busy_text if value else normal_text)
 
     # ---------- Login view ----------
@@ -244,7 +311,7 @@ class CQUSTWifiApp(ctk.CTk):
         card = self._card(center, width=520)
         card.pack(anchor="center", pady=(10, 0), padx=10)
         card.pack_propagate(False)
-        card.configure(height=560)
+        card.configure(height=500)
 
         title_row = ctk.CTkFrame(card, fg_color="transparent")
         title_row.pack(fill="x", padx=32, pady=(30, 4))
@@ -302,10 +369,12 @@ class CQUSTWifiApp(ctk.CTk):
                                           corner_radius=14, fg_color=BLUE, hover_color=BLUE_HOVER,
                                           font=ctk.CTkFont(size=15, weight="bold"))
         self.login_button.pack(fill="x", padx=32, pady=(0, 14))
-        self.form_hint = ctk.CTkLabel(card, text="原配置账号可留空密码直接登录；输入新密码则替换本次认证" if self.auth.has_original_password(self.username_var.get()) else "保存的密码仅存放在 Windows 凭据管理器",
+        self.form_hint = ctk.CTkLabel(card, text="只需学号和密码 · 自动获取当前网络认证参数",
                                     font=ctk.CTkFont(size=11), text_color=MUTED, wraplength=450)
         self.form_hint.pack(pady=(0, 12))
         self.password_entry.bind("<Return>", lambda _e: self.login_from_form())
+        ctk.CTkButton(card, text='认证帮助 / 粘贴登录网址', width=190, height=26, fg_color='transparent',
+                      text_color=MUTED, hover_color=PANEL_ALT, command=self.open_auth_help).pack(pady=(0,8))
 
     def toggle_password_visibility(self) -> None:
         self.password_visible = not self.password_visible
@@ -330,11 +399,13 @@ class CQUSTWifiApp(ctk.CTk):
 
     def manage_accounts(self) -> None:
         if self.accounts_panel_visible:
-            self.accounts_panel.pack_forget()
+            self.accounts_panel.place_forget()
             self.accounts_panel_visible = False
             return
         self._render_accounts_panel()
-        self.accounts_panel.pack(fill="x", padx=32, pady=(0, 12), before=self.login_button)
+        # Account list overlays the lower card without changing the form geometry.
+        self.accounts_panel.place(relx=.5, rely=.42, anchor='n', relwidth=.87)
+        self.accounts_panel.lift()
         self.accounts_panel_visible = True
 
     def _render_accounts_panel(self) -> None:
@@ -398,11 +469,14 @@ class CQUSTWifiApp(ctk.CTk):
         self._set_busy(True, button)
         self.current_username, self.current_password = username, password
         generation = self.generation
+        settings = dict(self.local.settings)
+        settings.update(login_page_url=self.login_page_url, _challenge_context=self.challenge_context,
+                        captcha=self.captcha_value)
         self.log("正在向校园网服务器发起认证。")
 
         def work() -> None:
             try:
-                result = self.auth.authenticate(username, password, self.local.settings, self.log)
+                result = self.auth.authenticate(username, password, settings, self.log)
                 self._ui_queue.put((self._auth_result, (generation, username, password, remember, result, button, None, silent)))
             except Exception as exc:
                 self._ui_queue.put((self._auth_result, (generation, username, password, remember, None, button, exc, silent)))
@@ -433,6 +507,12 @@ class CQUSTWifiApp(ctk.CTk):
         self.current_password = password
         self.session = result
         self.connected = True
+        self.connected_since = time.monotonic()
+        self.elapsed_seconds = 0
+        self.challenge_context, self.captcha_value = None, ''
+        self.login_page_url = ''
+        if getattr(result, 'context', None):
+            self.local.save_settings({'service': result.context.service})
         self.log("认证成功，服务器已确认在线。")
         if login_view:
             self.show_dashboard(message="校园网已连接")
@@ -451,9 +531,17 @@ class CQUSTWifiApp(ctk.CTk):
         if not isinstance(error, AuthenticationError):
             error = AuthenticationError("登录处理出现异常，请查看网络连接后重试。")
         self.log(f"认证失败：{error}")
+        if isinstance(error, ChallengeRequired):
+            self.challenge_context = error.context
+        elif self.challenge_context is not None:
+            self.challenge_context = None
+            self.captcha_value = ''
         if not silent:
-            messagebox.showerror("连接失败", str(error), parent=self)
-        elif self.local.settings.get("keep_connected") and self.current_username:
+            if isinstance(error, (ContextRequired, ServiceRequired, ChallengeRequired)):
+                self.open_auth_help(error)
+            else:
+                messagebox.showerror("连接失败", str(error), parent=self)
+        elif getattr(error, 'retryable', False) and self.local.settings.get("keep_connected") and self.current_username:
             delay = int(self.local.settings.get("check_interval", 7)) * 1000
             self.reconnect_after_id = self.after(delay, self._retry_reconnect)
 
@@ -482,13 +570,8 @@ class CQUSTWifiApp(ctk.CTk):
 
         center = ctk.CTkFrame(card, fg_color="transparent")
         center.pack(fill="both", expand=True, pady=(6, 0))
-        self.power_button = ctk.CTkButton(center, text="", image=icon("power", 76, True), command=self.toggle_connection, width=190, height=190,
-                                          corner_radius=100, fg_color=GREEN if self.connected else "#28364D",
-                                          hover_color="#1BAA79" if self.connected else "#354760",
-                                          text_color="#071B18" if self.connected else "#D8E2F2",
-                                          font=ctk.CTkFont(size=60, weight="bold"), border_width=8,
-                                          border_color="#1B8C6A" if self.connected else "#354760")
-        self.power_button.pack(pady=(18, 18))
+        self.power_button = PulsePower(center, self.toggle_connection, size=244, connected=self.connected)
+        self.power_button.pack(pady=(0, 2))
         self.status_title = ctk.CTkLabel(center, text="已连接校园网" if self.connected else "连接已断开",
                                          font=ctk.CTkFont(size=25, weight="bold"), text_color=TEXT)
         self.status_title.pack(pady=(0, 6))
@@ -497,9 +580,15 @@ class CQUSTWifiApp(ctk.CTk):
         self.status_detail.pack()
 
         bottom = ctk.CTkFrame(card, fg_color=PANEL_ALT, corner_radius=15)
-        bottom.pack(fill="x", padx=24, pady=(0, 24))
-        ctk.CTkLabel(bottom, text="当前账号", font=ctk.CTkFont(size=11), text_color=MUTED).pack(anchor="w", padx=16, pady=(12, 2))
-        ctk.CTkLabel(bottom, text=self.current_username or "未登录", font=ctk.CTkFont(size=14, weight="bold"), text_color=TEXT).pack(anchor="w", padx=16, pady=(0, 12))
+        bottom.pack(fill="x", padx=24, pady=(12, 18))
+        bottom.grid_columnconfigure((0, 1, 2), weight=1, uniform='metrics')
+        for column, title in enumerate(('当前账号', '校园网 / 局域网 IP', '本次已连接')):
+            ctk.CTkLabel(bottom, text=title, font=ctk.CTkFont(size=11), text_color=MUTED).grid(row=0, column=column, sticky='w', padx=20, pady=(12,0))
+        ctk.CTkLabel(bottom, text=self.current_username or '未登录', text_color=TEXT, font=ctk.CTkFont(size=14, weight='bold')).grid(row=1, column=0, sticky='w', padx=20, pady=(0,12))
+        self.ip_label = ctk.CTkLabel(bottom, text=getattr(self.session, 'lan_ip', '') or self.last_lan_ip or '—', text_color=TEXT, font=ctk.CTkFont(size=14, weight='bold'))
+        self.ip_label.grid(row=1, column=1, sticky='w', padx=20, pady=(0,12))
+        self.duration_label = ctk.CTkLabel(bottom, text='00:00:00', text_color=TEXT, font=ctk.CTkFont(size=14, weight='bold'))
+        self.duration_label.grid(row=1, column=2, sticky='w', padx=20, pady=(0,12))
 
         foot = ctk.CTkFrame(self.root_frame, fg_color="transparent")
         foot.pack(fill="x", pady=(14, 0))
@@ -514,12 +603,12 @@ class CQUSTWifiApp(ctk.CTk):
             return
         if self.connected:
             self.status_pill.configure(text="● 已连接", fg_color="#123C36", text_color=GREEN)
-            self.power_button.configure(fg_color=GREEN, hover_color="#1BAA79", text_color="#071B18", border_color="#1B8C6A")
+            self.power_button.set_status(True)
             self.status_title.configure(text="已连接校园网")
             self.status_detail.configure(text=message or f"当前账号：{self.current_username}")
         else:
             self.status_pill.configure(text="● 已断开", fg_color="#3D2630", text_color=RED)
-            self.power_button.configure(fg_color="#28364D", hover_color="#354760", text_color="#D8E2F2", border_color="#354760")
+            self.power_button.set_status(False)
             self.status_title.configure(text="连接已断开")
             self.status_detail.configure(text=message or "点击中央按钮重新连接校园网")
 
@@ -607,6 +696,9 @@ class CQUSTWifiApp(ctk.CTk):
 
     # ---------- Monitoring and reconnect ----------
     def _cancel_monitor(self) -> None:
+        if self.keepalive_after_id is not None:
+            self.after_cancel(self.keepalive_after_id)
+            self.keepalive_after_id = None
         if self.reconnect_after_id is not None:
             self.after_cancel(self.reconnect_after_id)
             self.reconnect_after_id = None
@@ -621,6 +713,36 @@ class CQUSTWifiApp(ctk.CTk):
         self._cancel_monitor()
         seconds = int(self.local.settings.get("check_interval", 7))
         self.monitor_after_id = self.after(seconds * 1000, self._check_status)
+        self._schedule_keepalive()
+
+    def _schedule_keepalive(self):
+        if self.keepalive_after_id is not None:
+            self.after_cancel(self.keepalive_after_id)
+            self.keepalive_after_id = None
+        if self.keepalive_inflight or not self.connected or not getattr(self.session, 'keepalive_interval', 0):
+            return
+        delay = max(50, int((self.session.next_keepalive-time.monotonic())*1000))
+        self.keepalive_after_id = self.after(delay, self._keepalive_tick)
+
+    def _keepalive_tick(self):
+        self.keepalive_after_id = None
+        if not self.connected or not self.session:
+            return
+        session, generation = self.session, self.generation
+        self.keepalive_inflight = True
+        def work():
+            try:
+                self.auth.keepalive(session)
+            except AuthenticationError:
+                self.log('保活未确认，将继续检查在线状态。')
+                session.next_keepalive = time.monotonic()+max(1, session.keepalive_interval)
+            finally:
+                self._ui_queue.put((finished, ()))
+        def finished():
+            self.keepalive_inflight = False
+            if generation == self.generation and session is self.session:
+                self._schedule_keepalive()
+        threading.Thread(target=work, daemon=True).start()
 
     def _check_status(self) -> None:
         self.monitor_after_id = None
@@ -660,6 +782,7 @@ class CQUSTWifiApp(ctk.CTk):
             return
 
         reason = str(result.get("reason", "offline")).lower()
+        self._cancel_monitor()
         self.connected = False
         if self.session:
             self.session.client.close()
@@ -702,6 +825,77 @@ class CQUSTWifiApp(ctk.CTk):
             )
 
     # ---------- Settings and logs ----------
+    def open_auth_help(self, error=None):
+        panel = self._open_overlay('认证帮助')
+        explanation = str(error) if error else '自动探测失败时，可粘贴浏览器当前校园认证登录页的完整网址。仅在内存中使用，不记录到日志或配置。'
+        ctk.CTkLabel(panel, text=explanation, text_color=MUTED, wraplength=760, justify='left').pack(anchor='w', padx=26, pady=(0,18))
+        ctk.CTkLabel(panel, text='完整认证网址（包含 ? 后的参数）', text_color=TEXT).pack(anchor='w', padx=26)
+        url_var = ctk.StringVar(value=self.login_page_url)
+        ctk.CTkEntry(panel, textvariable=url_var, height=40, fg_color=FIELD, border_color=BORDER).pack(fill='x', padx=26, pady=(6,16))
+        service_var = ctk.StringVar(value=self.local.settings.get('service', ''))
+        if isinstance(error, ServiceRequired):
+            ctk.CTkLabel(panel, text='请选择页面实际提供的服务', text_color=TEXT).pack(anchor='w', padx=26)
+            self._choice_buttons(panel, error.services, service_var).pack(anchor='w', padx=26, pady=10)
+        captcha_var = ctk.StringVar(value='')
+        if isinstance(error, ChallengeRequired):
+            image_label = ctk.CTkLabel(panel, text='正在加载验证码…', text_color=MUTED)
+            image_label.pack(anchor='w', padx=26, pady=8)
+            ctk.CTkEntry(panel, textvariable=captcha_var, placeholder_text='请输入验证码', height=38).pack(anchor='w', padx=26, pady=8)
+            def load_image():
+                try:
+                    import io
+                    url = error.context.captcha_url
+                    if not trusted_url(url):
+                        raise ValueError('untrusted')
+                    response = error.context.client.get(url, timeout=(5,10), allow_redirects=False)
+                    response.raise_for_status()
+                    image = Image.open(io.BytesIO(response.content))
+                    image.load()
+                    self._ui_queue.put((show_image, (image,)))
+                except Exception:
+                    self._ui_queue.put((show_image, (None,)))
+            def show_image(image):
+                if not image_label.winfo_exists():
+                    return
+                if image is None:
+                    image_label.configure(text='验证码加载失败，请返回后刷新认证网址。')
+                else:
+                    preview = ctk.CTkImage(image, size=(160,60))
+                    image_label.configure(text='', image=preview)
+            threading.Thread(target=load_image, daemon=True).start()
+        def apply():
+            candidate = url_var.get().strip()
+            if candidate and not trusted_url(candidate):
+                self.show_toast('仅接受学校认证域名或 IP 的网址')
+                return
+            self.login_page_url = candidate
+            self.captcha_value = captcha_var.get().strip()
+            if service_var.get():
+                self.local.save_settings({'service': service_var.get()})
+            if not isinstance(error, ChallengeRequired) and self.challenge_context:
+                self.challenge_context.client.close()
+                self.challenge_context = None
+            self.close_overlay()
+            self.show_toast('已更新认证信息，请点击登录重试')
+        ctk.CTkButton(panel, text='使用这些信息', command=apply, height=40, fg_color=BLUE).pack(anchor='w', padx=26, pady=18)
+
+    def _choice_buttons(self, parent, values, variable):
+        row = ctk.CTkFrame(parent, fg_color='transparent')
+        buttons = {}
+        def choose(value):
+            variable.set(value)
+            for key, button in buttons.items():
+                button.configure(fg_color=BLUE if key == value else PANEL_ALT,
+                                 text_color='white' if key == value else TEXT)
+        for value in values:
+            button = ctk.CTkButton(row, text=value, width=62, height=34, corner_radius=17,
+                fg_color=BLUE if variable.get() == value else PANEL_ALT,
+                hover_color=BLUE_HOVER, text_color='white' if variable.get() == value else TEXT,
+                command=lambda v=value: choose(v))
+            button.pack(side='left', padx=4)
+            buttons[value] = button
+        return row
+
     def close_overlay(self):
         self.log_textbox = None
         if self.overlay is not None:
@@ -731,31 +925,17 @@ class CQUSTWifiApp(ctk.CTk):
         self._setting_row(body, "始终保持连接", "掉线后在后台自动尝试重新连接", keep_var)
         self._setting_row(body, "自动登录模式", "启动时使用最近一次保存的账号密码", auto_var)
 
-        theme_frame = ctk.CTkFrame(body, fg_color="transparent")
-        theme_frame.pack(fill="x", padx=18, pady=(16, 0))
-        theme_labels = ctk.CTkFrame(theme_frame, fg_color="transparent")
-        theme_labels.pack(side="left", fill="x", expand=True)
-        ctk.CTkLabel(theme_labels, text="界面主题", font=ctk.CTkFont(size=13, weight="bold"), text_color=TEXT).pack(anchor="w")
-        ctk.CTkLabel(theme_labels, text="默认跟随 Windows，也可手动选择", font=ctk.CTkFont(size=11), text_color=MUTED).pack(anchor="w", pady=(3, 0))
-        theme_var = ctk.StringVar(value=THEME_LABELS[str(self.local.settings.get("theme", "system"))])
-        ctk.CTkSegmentedButton(
-            theme_frame,
-            values=list(THEME_VALUES),
-            variable=theme_var,
-            height=34,
-            selected_color=BLUE, unselected_color=PANEL_ALT, text_color=TEXT,
-        ).pack(side="right")
+        ctk.CTkLabel(body, text='主题切换已移至主页右上角：太阳 / 月亮 / 跟随系统', text_color=MUTED).pack(anchor='w', padx=18, pady=(16,0))
 
         interval_frame = ctk.CTkFrame(body, fg_color="transparent")
         interval_frame.pack(fill="x", padx=18, pady=(10, 18))
         ctk.CTkLabel(interval_frame, text="状态检查间隔", font=ctk.CTkFont(size=13, weight="bold"), text_color=TEXT).pack(side="left")
-        interval_var = ctk.StringVar(value=str(self.local.settings.get("check_interval", 7)))
-        ctk.CTkSegmentedButton(interval_frame, values=["5", "7", "10"], variable=interval_var, height=34,
-                        selected_color=BLUE, unselected_color=PANEL_ALT, text_color=TEXT).pack(side="right")
+        interval_var = ctk.StringVar(value=str(self.local.settings.get("check_interval", 7))+' 秒')
+        self._choice_buttons(interval_frame, ['5 秒', '7 秒', '10 秒'], interval_var).pack(side='right')
 
         def save() -> None:
-            interval = int(interval_var.get())
-            theme = THEME_VALUES.get(theme_var.get(), "system")
+            interval = int(interval_var.get().split()[0])
+            theme = self.local.settings['theme']
             self.local.save_settings({
                 "keep_connected": bool(keep_var.get()),
                 "auto_login": bool(auto_var.get()),
@@ -764,14 +944,12 @@ class CQUSTWifiApp(ctk.CTk):
             })
             ctk.set_appearance_mode(theme)
             self.log(f"设置已保存：始终保持连接={'开启' if keep_var.get() else '关闭'}，自动登录={'开启' if auto_var.get() else '关闭'}，检查间隔={interval} 秒，主题={THEME_LABELS[theme]}。")
-            self.close_overlay()
+            self.show_toast('设置已保存')
             if self.connected:
                 self._schedule_monitor()
             elif not keep_var.get():
                 self._cancel_monitor()
-            if self.current_view == "login":
-                self.form_hint.configure(text="设置已保存；账号和密码输入已保留。")
-            elif hasattr(self, "footer_label") and self.footer_label.winfo_exists():
+            if hasattr(self, "footer_label") and self.footer_label.winfo_exists():
                 self.footer_label.configure(text=f"始终保持连接：{'开启' if keep_var.get() else '关闭'}    ·    启动自动登录：{'开启' if auto_var.get() else '关闭'}    ·    状态检查：每 {interval} 秒")
 
         self.save_settings_button = ctk.CTkButton(win, text="保存设置", command=save, height=44, corner_radius=13, fg_color=BLUE,
@@ -816,7 +994,10 @@ class CQUSTWifiApp(ctk.CTk):
         self.closed = True
         self.generation += 1
         self._cancel_monitor()
-        for after_id in (self.ui_queue_after_id, self.auto_login_after_id):
+        self._dismiss_toast()
+        if self.challenge_context:
+            self.challenge_context.client.close()
+        for after_id in (self.ui_queue_after_id, self.auto_login_after_id, self.metrics_after_id):
             if after_id is not None:
                 try:
                     self.after_cancel(after_id)
@@ -838,17 +1019,22 @@ def main() -> None:
             APP_DIR = Path(folder)
             ACCOUNTS_FILE, SETTINGS_FILE = APP_DIR / "accounts.json", APP_DIR / "settings.json"
             app = CQUSTWifiApp(auth=AuthAdapter(config_paths=[]))
-            app.withdraw()
+            app.update()
             app.username_var.set("test-only")
             app.password_var.set("test-only")
             app.open_settings()
             app.save_settings_button.invoke()
             app.update_idletasks()
             report = {"form_preserved": app.password_var.get() == "test-only",
-                      "settings_embedded": app.overlay is None,
+                      "settings_embedded": app.overlay is not None,
                       "logo_loaded": hasattr(app, "school_logo"),
                       "login_label": app.login_button.cget("text") == "登录",
                       "no_network": app.session is None}
+            app.show_dashboard()
+            app.update()
+            report['circle_actual_square'] = app.power_button.winfo_width() == app.power_button.winfo_height()
+            report['wide_window'] = app.winfo_width() > app.winfo_height()*1.4
+            report['metrics_present'] = app.ip_label.winfo_exists() and app.duration_label.winfo_exists()
             app.on_close()
             Path(sys.argv[2]).write_text(json.dumps(report), encoding="utf-8")
         return

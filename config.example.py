@@ -1,12 +1,12 @@
-"""Sanitized template. Rename to config.py and fill locally if needed.
-Never distribute a populated file. The GUI reads literals without executing it.
+"""Sanitized legacy reference only; the v3 GUI does not read this file.
+Do not copy old ciphertext or session identifiers into the new authentication flow.
+Never distribute a populated configuration file.
 """
 
 loginUrl = "http://172.28.228.2/eportal/InterFace.do?method=login"
 checkStatusUrl = "http://172.28.228.2/eportal/InterFace.do?method=getOnlineUserInfo"
 
-# These keys mirror the legacy config.py contract. Values are filled in memory
-# from your original config.py locally. A blank password uses the GUI input.
+# These keys document the original script contract, not the v3 request builder.
 dataLogin = {
     "userId": "",
     "password": "",

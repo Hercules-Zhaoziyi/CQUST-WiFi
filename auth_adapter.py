@@ -1,31 +1,51 @@
-"""Original CQUST ePortal protocol; no wire payloads in logs."""
+"""Local CQUST ePortal client. Fresh context, JS-compatible encoding, no secret logs."""
 from __future__ import annotations
 import ast
 import gzip
+import ipaddress
 import json
 import re
-import sys
-from dataclasses import dataclass
+import socket
+import time
+import threading
+from dataclasses import dataclass, field
 from html import unescape
+from html.parser import HTMLParser
 from pathlib import Path
-from urllib.parse import parse_qs, unquote, urlsplit
+from urllib.parse import quote, urljoin, urlsplit
 import requests
 
-PORTAL_ROOT = "http://172.28.228.2"
-LOGIN_URL = PORTAL_ROOT + "/eportal/InterFace.do?method=login"
-STATUS_URL = PORTAL_ROOT + "/eportal/InterFace.do?method=getOnlineUserInfo"
-LOGOUT_URL = PORTAL_ROOT + "/eportal/InterFace.do?method=logout"
-DISCOVERY_URLS = ("http://123.123.123.123/", "http://www.msftconnecttest.com/redirect")
-
+PORTAL_ROOT = 'http://172.28.228.2'
+PORTAL_HOSTS = {'172.28.228.2', 'aaa.cqust.edu.cn'}
+LOGIN_URL = PORTAL_ROOT + '/eportal/InterFace.do?method=login'
+STATUS_URL = PORTAL_ROOT + '/eportal/InterFace.do?method=getOnlineUserInfo'
+LOGOUT_URL = PORTAL_ROOT + '/eportal/InterFace.do?method=logout'
+DISCOVERY_URLS = ('http://www.msftconnecttest.com/redirect', 'http://aaa.cqust.edu.cn/',
+                  PORTAL_ROOT+'/', 'http://123.123.123.123/')
 
 class AuthenticationError(RuntimeError):
+    retryable = False
+
+class NetworkError(AuthenticationError):
+    retryable = True
+
+class ContextRequired(AuthenticationError):
     pass
 
+class ServiceRequired(AuthenticationError):
+    def __init__(self, services):
+        super().__init__('认证页面提供多个服务，请选择后重试。')
+        self.services = services
 
-def read_legacy_config(path: Path) -> dict:
-    """Read literal assignments without executing config.py."""
+class ChallengeRequired(AuthenticationError):
+    def __init__(self, context):
+        super().__init__('服务器要求验证码，请输入图片中的验证码后重试。')
+        self.context = context
+
+def read_legacy_config(path):
+    """Release scanner only; the authentication flow never replays this profile."""
     values = {}
-    for node in ast.parse(path.read_text(encoding="utf-8-sig")).body:
+    for node in ast.parse(Path(path).read_text(encoding='utf-8-sig')).body:
         if isinstance(node, ast.Assign):
             try:
                 value = ast.literal_eval(node.value)
@@ -34,203 +54,357 @@ def read_legacy_config(path: Path) -> dict:
             for target in node.targets:
                 if isinstance(target, ast.Name):
                     values[target.id] = value
-    if not isinstance(values.get("dataLogin"), dict):
-        raise ValueError("Missing dataLogin")
-    for name, default in (("loginUrl", LOGIN_URL), ("checkStatusUrl", STATUS_URL)):
-        url = urlsplit(values.get(name, default))
-        if url.scheme != "http" or url.hostname != "172.28.228.2" or url.port not in (None, 80, 8080):
-            raise ValueError("Unsupported portal")
     return values
 
+def encode_component(value):
+    return quote(str(value), safe="-_.!~*'()")
+
+def encode_twice(value):
+    return encode_component(encode_component(value))
+
+def extract_auth_query(url):
+    query = urlsplit(url).query
+    match = re.search(r'(?:^|&)mac=([^&]+)', query, re.I)
+    return query, match.group(1) if match else '111111111'
+
+def trusted_url(url):
+    p = urlsplit(url)
+    try:
+        return (p.scheme in ('http', 'https') and p.hostname in PORTAL_HOSTS
+                and p.port in (None, 80, 443, 8080) and not p.username and not p.password)
+    except ValueError:
+        return False
+
+def lan_ip(host):
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.connect((host, 80))  # Routing lookup; no UDP payload is sent.
+            return sock.getsockname()[0]
+    except OSError:
+        return ''
+
+class PageFields(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.fields, self.services, self.refresh = {}, [], ''
+        self.service_select = False
+    def handle_starttag(self, tag, attrs):
+        a = dict(attrs)
+        if tag == 'input':
+            self.fields[a.get('id', a.get('name', ''))] = a.get('value', '')
+        if tag == 'select':
+            self.service_select = a.get('id', a.get('name')) in ('net_access_type', 'service')
+        if tag == 'option' and self.service_select and a.get('value'):
+            self.services.append(a['value'])
+        if tag == 'meta' and a.get('http-equiv', '').lower() == 'refresh':
+            m = re.search(r'url\s*=\s*(.+)', a.get('content', ''), re.I)
+            if m:
+                self.refresh = m.group(1).strip().strip('\"\'')
+    def handle_endtag(self, tag):
+        if tag == 'select':
+            self.service_select = False
+
+@dataclass(repr=False)
+class PortalContext:
+    client: object
+    page_url: str
+    api_url: str
+    query_string: str
+    mac: str
+    encrypt: bool
+    exponent: str = ''
+    modulus: str = ''
+    service: str = '互联网'
+    prefix: str = ''
+    captcha_url: str = ''
 
 @dataclass(repr=False)
 class CampusSession:
     client: object
     user_index: str
     query_string: str
-    username: str = ""
-
+    username: str = ''
+    context: PortalContext | None = None
+    lan_ip: str = ''
+    connected_at: float = field(default_factory=time.monotonic)
+    keepalive_interval: float = 0
+    next_keepalive: float = float('inf')
+    request_lock: object = field(default_factory=threading.RLock, repr=False)
 
 class AuthAdapter:
-    timeout = 8
-
-    def __init__(self, config_paths: list[Path] | None = None):
-        base = Path(sys.executable).parent if getattr(sys, "frozen", False) else Path(__file__).parent
-        if config_paths is None:
-            desktop = Path.home() / "Desktop" / "CQUST Wifi"
-            config_paths = [base / "config.py", desktop / "config.py",
-                            desktop / "CQUST_Wifi_Python" / "config.py"]
-        self.profile = {}
-        self.config_path = None
-        for path in config_paths:
-            try:
-                self.profile = read_legacy_config(path)
-                self.config_path = path
-                break
-            except (OSError, ValueError, SyntaxError, TypeError):
-                continue
-
-    @property
-    def original_username(self):
-        return str(self.profile.get("dataLogin", {}).get("userId", ""))
-
+    timeout = (5, 15)
+    def __init__(self, config_paths=None):
+        # Signature retained for old callers/tests. No historical query/password/index.
+        self.config_path, self.profile = None, {}
+        self.original_username = ''
     def has_original_password(self, username):
-        return bool(username and username == self.original_username
-                    and self.profile.get("dataLogin", {}).get("password"))
-
-    def _headers(self):
-        headers = {"Accept": "application/json, */*", "Accept-Encoding": "gzip, deflate",
-                   "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-                   "Origin": PORTAL_ROOT, "Referer": PORTAL_ROOT + "/eportal/index.jsp",
-                   "User-Agent": "Mozilla/5.0"}
-        for k, v in self.profile.get("header", {}).items():
-            if k.lower() in {"user-agent", "accept", "accept-language", "content-type"}:
-                headers[k] = v
-        return headers
-
+        return False
     @staticmethod
     def _text(response):
         raw = response.content
-        if raw.startswith(b"\x1f\x8b"):
+        if raw.startswith(b'\x1f\x8b'):
             raw = gzip.decompress(raw)
         try:
-            return raw.decode("utf-8-sig")
+            return raw.decode('utf-8-sig')
         except UnicodeDecodeError:
-            return raw.decode("gb18030", errors="replace")
-
+            return raw.decode('gb18030', errors='replace')
     @classmethod
     def _response_data(cls, response):
         try:
             value = json.loads(cls._text(response))
-            if isinstance(value, dict):
+            if isinstance(value, (dict, list)):
                 return value
         except (ValueError, OSError):
             pass
-        raise AuthenticationError("认证服务器返回了无法识别的内容，请稍后重试。")
-
-    def _post(self, client, url, data):
-        try:
-            response = client.post(url, headers=self._headers(), data=data,
-                                   timeout=self.timeout, allow_redirects=False)
-            if 300 <= response.status_code < 400:
-                raise AuthenticationError("认证接口发生异常跳转，已停止发送凭据。")
-            response.raise_for_status()
-            return self._response_data(response)
-        except requests.RequestException:
-            raise AuthenticationError("无法连接校园网认证服务器，请检查校园 Wi-Fi 或有线网络。") from None
-
+        raise AuthenticationError('认证服务器返回了非 JSON 内容，未确认认证结果。')
     @staticmethod
-    def _query_from_url(url):
-        query = urlsplit(url).query
-        values = parse_qs(query, keep_blank_values=True)
-        if values.get("queryString"):
-            return unquote(values["queryString"][0])
-        return query if "wlanuserip=" in query.lower() else ""
-
-    def _discover_portal(self, client, log):
-        for url in DISCOVERY_URLS:
-            try:
-                response = client.get(url, timeout=3, allow_redirects=False)
-                targets = [response.headers.get("Location", "")]
-                targets += re.findall(r'https?://[^"\'<>\s]+', self._text(response))
-                for target in targets:
-                    if urlsplit(target).hostname == "172.28.228.2":
-                        query = self._query_from_url(unescape(target))
-                        if query:
-                            log("已获取本机校园网认证参数。")
-                            return query
-            except (requests.RequestException, OSError):
+    def _headers(page_url):
+        p = urlsplit(page_url)
+        return {'Accept': '*/*', 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                'Referer': page_url, 'Origin': f'{p.scheme}://{p.netloc}',
+                'User-Agent': 'Mozilla/5.0', 'Accept-Encoding': 'gzip, deflate'}
+    def _post(self, client, url, data, page_url=None):
+        if not trusted_url(url):
+            raise AuthenticationError('拒绝向非学校认证服务器发送请求。')
+        try:
+            r = client.post(url, data=data.encode('utf-8') if isinstance(data, str) else data,
+                            headers=self._headers(page_url or PORTAL_ROOT+'/eportal/index.jsp'),
+                            timeout=self.timeout, allow_redirects=False)
+            if 300 <= r.status_code < 400:
+                raise AuthenticationError('认证接口异常跳转，已停止发送凭据。')
+            r.raise_for_status()
+            return self._response_data(r)
+        except requests.Timeout:
+            raise NetworkError('认证服务器请求超时，请检查校园网连接后重试。') from None
+        except requests.RequestException:
+            raise NetworkError('校园认证服务器暂时不可达，请检查校园 Wi-Fi 或有线连接。') from None
+    @staticmethod
+    def _redirect(html, fields):
+        if fields.refresh:
+            return fields.refresh
+        patterns = [r'(?:window\.|top\.|self\.|document\.)?location(?:\.href)?\s*=\s*[\"\']([^\"\']+)',
+                    r'(?:window\.)?location\.(?:replace|assign)\(\s*[\"\']([^\"\']+)']
+        for pattern in patterns:
+            m = re.search(pattern, html, re.I)
+            if m:
+                return unescape(m.group(1))
+        return ''
+    def _follow(self, client, entry):
+        url, visited = entry, set()
+        for _ in range(7):
+            if url in visited:
+                break
+            visited.add(url)
+            if url not in DISCOVERY_URLS and not trusted_url(url):
+                break
+            r = client.get(url, timeout=(3, 5), allow_redirects=False)
+            if 300 <= r.status_code < 400:
+                target = r.headers.get('Location')
+                if not target:
+                    break
+                url = urljoin(url, target)
                 continue
-        return ""
-
+            r.raise_for_status()
+            html = self._text(r)
+            parser = PageFields()
+            parser.feed(html)
+            query, _mac = extract_auth_query(url)
+            if trusted_url(url) and re.search(r'(?:^|&)wlanuserip=', query, re.I) and ('passwordEncrypt' in html or 'AuthInterFace' in html):
+                return url, html, parser
+            target = self._redirect(html, parser)
+            if not target:
+                break
+            url = urljoin(url, target)
+        return None
+    def discover_context(self, client, settings, log):
+        manual = str(settings.get('login_page_url', '')).strip()
+        if manual and not trusted_url(manual):
+            raise ContextRequired('请输入 aaa.cqust.edu.cn 或 172.28.228.2 的完整校园认证网址。')
+        found = None
+        for entry in ([manual] if manual else DISCOVERY_URLS):
+            try:
+                found = self._follow(client, entry)
+                if found:
+                    break
+            except (requests.RequestException, OSError, ValueError):
+                continue
+        if not found:
+            raise ContextRequired('未获得本次网络的认证登录页。当前已在线或探测被拦截时，请在浏览器打开校园认证页，将包含 ? 后参数的完整登录网址粘贴到“认证帮助”；不会使用旧配置代替。')
+        page_url, html, parser = found
+        query, mac = extract_auth_query(page_url)
+        init = re.search(r'AuthInterFace\.init\(\s*[\"\']([^\"\']*)[\"\']\s*\)', html)
+        api = urljoin(page_url, (init.group(1) if init else './') + 'InterFace.do')
+        if not trusted_url(api):
+            raise ContextRequired('认证页面的接口指向非学校地址，已停止。')
+        info = self._post(client, api+'?method=pageInfo', 'queryString='+encode_component(query), page_url)
+        if not isinstance(info, dict):
+            raise ContextRequired('认证页面配置格式无效。')
+        values = dict(parser.fields)
+        for key in ('passwordEncrypt', 'publicKeyExponent', 'publicKeyModulus'):
+            if key in info:
+                values[key] = str(info[key]).lower() if isinstance(info[key], bool) else str(info[key])
+        encrypt = values.get('passwordEncrypt', '').lower()
+        if encrypt not in ('true', 'false'):
+            raise ContextRequired('当前页面未给出密码加密方式，已停止登录。')
+        exponent, modulus = values.get('publicKeyExponent', ''), values.get('publicKeyModulus', '')
+        if encrypt == 'true' and (not re.fullmatch('[0-9a-fA-F]+', exponent) or not re.fullmatch('[0-9a-fA-F]+', modulus)):
+            raise ContextRequired('当前页面没有有效 RSA 公钥，请刷新认证网址；不使用历史公钥。')
+        services = list(parser.services)
+        if not services:
+            data = self._post(client, api+'?method=getServices&queryString='+encode_component(query), '', page_url)
+            items = data if isinstance(data, list) else data.get('services', data.get('serviceList', []))
+            if isinstance(items, str):
+                try:
+                    items = json.loads(items)
+                except ValueError:
+                    items = []
+            if isinstance(items, list):
+                services = [str(x['serviceName']) for x in items if isinstance(x, dict) and x.get('serviceName')]
+        if not services and values.get('net_access_type'):
+            services = [values['net_access_type']]
+        services = list(dict.fromkeys(s for s in services if s))
+        if not services:
+            raise ContextRequired('未能取得当前页面的服务列表，请刷新认证网址。')
+        selected = settings.get('service', '')
+        if selected not in services:
+            if len(services) == 1:
+                selected = services[0]
+            else:
+                raise ServiceRequired(services)
+        context = PortalContext(client, page_url, api, query, mac, encrypt == 'true', exponent, modulus, selected)
+        # Prefix is only used when the page explicitly marks its prefix control selected.
+        prefix = re.search(r'prefixValue\s*=\s*[\"\']([^\"\']*)', html)
+        chosen = re.search(r'<[^>]+id=[\"\']Tj_yes[\"\'][^>]+style=[\"\'][^\"\']*display\s*:\s*block', html, re.I)
+        if prefix and chosen:
+            context.prefix = prefix.group(1)
+        if info.get('validCodeUrl'):
+            context.captcha_url = urljoin(page_url, str(info['validCodeUrl']))
+        if any(str(info.get(k, '')).lower() == 'true' for k in ('isOperatorPwd', 'isOperatorUserId')):
+            raise ContextRequired('此服务要求独立运营商账号信息，请选择普通校园网服务或使用官方认证页。')
+        log('已取得当前认证页面、服务及密码处理方式；未使用历史认证参数。')
+        return context
     @staticmethod
     def encrypt_password(password, mac, exponent, modulus):
-        """School login_bch.js/RSAUtils: reverse UTF-16 units and raw RSA."""
-        n, e = int(modulus, 16), int(exponent, 16)
-        chunk = 2 * ((n.bit_length() - 1) // 16)
-        if chunk < 2 or e < 3:
-            raise AuthenticationError("服务器的密码加密参数无效。")
-        raw = (password + ">" + (mac or "111111111")).encode("utf-16-le")
-        units = [int.from_bytes(raw[i:i+2], "little") for i in range(0, len(raw), 2)][::-1]
-        units += [0] * ((-len(units)) % chunk)
-        blocks = []
-        for start in range(0, len(units), chunk):
-            part = units[start:start+chunk]
-            value = sum((part[i] + (part[i+1] << 8)) << (8*i) for i in range(0, chunk, 2))
-            encrypted = format(pow(value, e, n), "x")
-            blocks.append(encrypted.zfill(((len(encrypted)+3)//4)*4))
-        return " ".join(blocks)
-
-    def authenticate(self, username, password, settings, log):
-        client = requests.Session()
-        client.trust_env = False
-        original = dict(self.profile.get("dataLogin", {}))
-        use_original = not password and self.has_original_password(username)
+        # The supplied browser algorithm has nonstandard UTF-16 word arithmetic.
+        # Only ASCII is accepted until non-ASCII parity is verified.
         try:
-            query = str(original.get("queryString", "")) or self._discover_portal(client, log)
-            if not query:
-                raise AuthenticationError("未取得认证参数。请将原 config.py 放在程序旁，或连接校园网络后重试。")
-            data = {k: original.get(k, "") for k in (
-                "userId", "password", "service", "queryString", "operatorPwd",
-                "operatorUserId", "validcode", "passwordEncrypt", "userIndex")}
-            data.update(userId=username, queryString=query)
-            if use_original:
-                log("已对接原配置：保留服务、加密密码与认证参数。")
-            else:
-                if not password:
-                    raise AuthenticationError("请输入密码，或使用原配置对应的账号。")
-                info = self._post(client, PORTAL_ROOT + "/eportal/InterFace.do?method=pageInfo",
-                                  {"queryString": query})
-                encrypt = str(info.get("passwordEncrypt", "")).lower()
-                # Preserve the original config's RSA mode instead of downgrading
-                # because the browser page's default encryption flag is false.
-                if str(original.get("passwordEncrypt", "")).lower() == "true":
-                    encrypt = "true"
-                if encrypt not in {"true", "false"}:
-                    raise AuthenticationError("未取得密码加密方式，已停止登录以保护密码。")
-                data.update(passwordEncrypt=encrypt, password=password, userIndex="")
-                if encrypt == "true":
-                    mac = parse_qs(query).get("mac", ["111111111"])[0]
-                    try:
-                        data["password"] = self.encrypt_password(password, mac,
-                            info["publicKeyExponent"], info["publicKeyModulus"])
-                    except (KeyError, ValueError, TypeError):
-                        raise AuthenticationError("无法取得服务器密码公钥，请重试。") from None
-            result = self._post(client, LOGIN_URL, data)
-            if str(result.get("result", "")).lower() != "success":
-                msg = str(result.get("message", ""))
-                if any(w in msg for w in ("密码", "password", "账号")):
-                    raise AuthenticationError("认证服务器拒绝了账号或密码，请核对后重试。")
-                raise AuthenticationError("服务器未接受登录。请核对账号、服务和原配置认证参数是否仍有效。")
-            index = str(result.get("userIndex") or "")
-            if not index:
-                raise AuthenticationError("服务器未返回有效会话，不能确认登录成功。")
-            session = CampusSession(client, index, query, username)
-            if not self.check_status(session, settings, log)["online"]:
-                raise AuthenticationError("登录请求已提交，但在线状态未确认，请重试。")
+            data = (password+'>'+(mac or '111111111'))[::-1].encode('ascii')
+        except UnicodeEncodeError:
+            raise AuthenticationError('当前校园算法仅验证了 ASCII 密码；含中文等字符请使用官方页面登录。') from None
+        n, e = int(modulus, 16), int(exponent, 16)
+        chunk = 2*((n.bit_length()-1)//16)
+        if chunk < 2 or chunk > 1024 or e <= 0:
+            raise AuthenticationError('RSA 公钥参数无效。')
+        data += b'\0' * (-len(data) % chunk)
+        blocks = []
+        for offset in range(0, len(data), chunk):
+            encrypted = format(pow(int.from_bytes(data[offset:offset+chunk], 'little'), e, n), 'x')
+            blocks.append(encrypted.zfill(((len(encrypted)+3)//4)*4))
+        return ' '.join(blocks)
+    def build_login_body(self, username, password, context, captcha=''):
+        if not username.strip() or not password:
+            raise AuthenticationError('请输入学号和密码。')
+        value = self.encrypt_password(password, context.mac, context.exponent, context.modulus) if context.encrypt else password
+        fields = [('userId', context.prefix+username.strip()), ('password', value), ('service', context.service),
+                  ('queryString', context.query_string), ('operatorPwd', ''), ('operatorUserId', '')]
+        body = '&'.join(k+'='+encode_twice(v) for k, v in fields)
+        # Browser sends the normal alphanumeric captcha unencoded.
+        if captcha and not re.fullmatch('[A-Za-z0-9]{1,16}', captcha):
+            raise AuthenticationError('验证码应为图片中的字母或数字。')
+        return body+'&validcode='+captcha+'&passwordEncrypt='+str(context.encrypt).lower()
+    def authenticate(self, username, password, settings, log):
+        context = settings.get('_challenge_context')
+        client = context.client if isinstance(context, PortalContext) else requests.Session()
+        client.trust_env = False
+        retain = False
+        try:
+            context = context or self.discover_context(client, settings, log)
+            captcha = str(settings.get('captcha', '')).strip()
+            if context.captcha_url and not captcha:
+                retain = True
+                raise ChallengeRequired(context)
+            body = self.build_login_body(username, password, context, captcha)
+            result = self._post(client, context.api_url+'?method=login', body, context.page_url)
+            if not isinstance(result, dict):
+                raise AuthenticationError('登录响应格式异常。')
+            if result.get('validCodeUrl') and result.get('result') != 'success':
+                context.captcha_url = urljoin(context.page_url, str(result['validCodeUrl']))
+                retain = True
+                raise ChallengeRequired(context)
+            if str(result.get('result', '')).lower() != 'success':
+                msg = str(result.get('message', '')).lower()
+                if any(x in msg for x in ('密码', 'password', '用户不存在', '账号不存在')):
+                    raise AuthenticationError('服务器拒绝账号或密码，请核对输入。')
+                if any(x in msg for x in ('在线', 'online')):
+                    raise AuthenticationError('服务器提示账号或设备已在线，请先在原客户端下线再登录。')
+                if any(x in msg for x in ('验证码', 'validcode')):
+                    raise AuthenticationError('验证码错误或失效，请刷新官方认证页后重试。')
+                raise AuthenticationError('学校服务器拒绝认证，可能是账号权限或服务限制；请在官方页面核对。未记录服务器返回的敏感内容。')
+            index = str(result.get('userIndex') or '')
+            if not re.fullmatch('[A-Za-z0-9_.:-]{1,1024}', index):
+                raise AuthenticationError('服务器未返回有效会话，不能确认登录成功。')
+            session = CampusSession(client, index, context.query_string, context.prefix+username.strip(), context,
+                                    lan_ip(urlsplit(context.api_url).hostname))
+            self._update_keepalive(session, result)
+            if not self.check_status(session, settings, log)['online']:
+                raise AuthenticationError('认证响应成功，但后续在线状态未确认。')
             return session
         except Exception:
-            client.close()
+            if not retain:
+                client.close()
             raise
-
+    @staticmethod
+    def _update_keepalive(session, result):
+        if 'keepaliveInterval' not in result:
+            return
+        try:
+            value = float(result['keepaliveInterval'])
+        except (ValueError, TypeError):
+            return
+        # Actual success.jsp schedules keepaliveInterval * 60 * 1000 (minutes).
+        session.keepalive_interval = value*60 if 0 < value <= 1440 else 0
+        session.next_keepalive = time.monotonic()+session.keepalive_interval if session.keepalive_interval else float('inf')
+    def _session_post(self, session, method):
+        api = session.context.api_url if session.context else PORTAL_ROOT+'/eportal/InterFace.do'
+        page = session.context.page_url if session.context else PORTAL_ROOT+'/eportal/index.jsp'
+        if not re.fullmatch('[A-Za-z0-9_.:-]{1,1024}', session.user_index):
+            raise AuthenticationError('会话标识无效，请重新登录。')
+        with session.request_lock:
+            return self._post(session.client, api+'?method='+method, 'userIndex='+session.user_index, page)
     def check_status(self, session, settings, log):
-        result = self._post(session.client, STATUS_URL, {"userIndex": session.user_index})
-        state = str(result.get("result", "")).lower()
-        if state in {"success", "wait"}:
-            if session.username and result.get("userId") and result["userId"] != session.username:
-                return {"online": False, "reason": "offline"}
-            session.user_index = str(result.get("userIndex") or session.user_index)
-            return {"online": True, "reason": "online"}
-        if state not in {"fail", "failure", "offline"}:
-            raise AuthenticationError("在线状态暂时无法确认。")
-        msg = str(result.get("message", "")).lower()
-        kicked = any(w in msg for w in ("其他设备", "其它设备", "另一", "顶替", "挤下", "replaced", "another device"))
-        return {"online": False, "reason": "kicked" if kicked else "offline"}
-
+        result = self._session_post(session, 'getOnlineUserInfo')
+        if not isinstance(result, dict):
+            raise AuthenticationError('在线状态响应无效。')
+        state = str(result.get('result', '')).lower()
+        if state in ('success', 'wait'):
+            if session.username and result.get('userId') and result['userId'] != session.username:
+                return {'online': False, 'reason': 'offline'}
+            try:
+                ip = str(result.get('userIp', ''))
+                ipaddress.ip_address(ip)
+                session.lan_ip = ip
+            except ValueError:
+                pass
+            # Do not reset next_keepalive on each poll; doing so would starve it.
+            if not session.keepalive_interval and result.get('keepaliveInterval'):
+                self._update_keepalive(session, result)
+            return {'online': True, 'reason': 'online'}
+        if state not in ('fail', 'failure', 'offline'):
+            raise NetworkError('在线状态暂时无法确认。')
+        msg = str(result.get('message', '')).lower()
+        reason = 'kicked' if any(w in msg for w in ('其他设备', '其它设备', '顶替', '挤下', 'another device', 'replaced')) else 'offline'
+        return {'online': False, 'reason': reason}
+    def keepalive(self, session):
+        if not session.keepalive_interval or time.monotonic() < session.next_keepalive:
+            return
+        result = self._session_post(session, 'keepalive')
+        session.next_keepalive = time.monotonic()+session.keepalive_interval
+        if not isinstance(result, dict) or result.get('result') not in ('success', 'wait'):
+            raise NetworkError('保活未确认，将继续查询在线状态。')
     def disconnect(self, session, settings, log):
         if session is None:
             return
-        result = self._post(session.client, LOGOUT_URL, {"userIndex": session.user_index})
-        if str(result.get("result", "")).lower() != "success":
-            raise AuthenticationError("服务器未确认下线，保留当前连接状态。")
+        result = self._session_post(session, 'logout')
+        if not isinstance(result, dict) or result.get('result') != 'success':
+            raise AuthenticationError('服务器未确认下线，保留当前连接状态。')
         session.client.close()

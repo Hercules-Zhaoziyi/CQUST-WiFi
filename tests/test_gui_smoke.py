@@ -21,7 +21,8 @@ class GuiSmokeTests(unittest.TestCase):
         gui.SETTINGS_FILE = app_dir / "settings.json"
         with patch("gui.AuthAdapter", return_value=gui.AuthAdapter(config_paths=[])), patch.object(gui.LocalConfig, "get_password", return_value=""):
             cls.app = gui.CQUSTWifiApp()
-        cls.app.withdraw()
+        cls.app.deiconify()
+        cls.app.update()
         cls.app.update_idletasks()
 
     @classmethod
@@ -36,6 +37,7 @@ class GuiSmokeTests(unittest.TestCase):
         self.app.busy = False
         self.app.local.settings.update(gui.DEFAULT_SETTINGS)
         self.app.show_login_view()
+        self.app.update()
         self.app.update_idletasks()
 
     def test_default_theme_and_password_eye(self):
@@ -59,10 +61,12 @@ class GuiSmokeTests(unittest.TestCase):
         self.app.connected = True
         self.app.current_username = "test-user"
         self.app.show_dashboard()
-        self.app.update_idletasks()
-        self.assertEqual(self.app.power_button.cget("width"), 190)
-        self.assertEqual(self.app.power_button.cget("height"), 190)
-        self.assertEqual(self.app.power_button.cget("corner_radius"), 95)
+        self.app.update()
+        button = self.app.power_button
+        self.assertIsInstance(button, gui.PulsePower)
+        self.assertEqual(button.winfo_width(), button.winfo_height())
+        x1,y1,x2,y2 = button.circle_bounds
+        self.assertAlmostEqual(x2-x1, y2-y1)
 
     def test_settings_save_preserves_form_and_creates_no_window(self):
         self.app.username_var.set("example-user")
@@ -74,7 +78,8 @@ class GuiSmokeTests(unittest.TestCase):
         self.assertIs(self.app.password_entry, original_entry)
         self.assertEqual(self.app.password_var.get(), "unsaved-input")
         self.assertEqual(self.app.username_var.get(), "example-user")
-        self.assertIsNone(self.app.overlay)
+        self.assertIsNotNone(self.app.overlay)
+        self.assertEqual(self.app.toast.cget('text'), '设置已保存')
 
     def test_log_return_preserves_input(self):
         self.app.password_var.set("draft")
@@ -145,6 +150,33 @@ class GuiSmokeTests(unittest.TestCase):
             self.app.local.remember_account("test-original", "", True)
         save.assert_not_called()
         delete.assert_not_called()
+
+    def test_theme_icons_are_on_main_page(self):
+        self.assertEqual(set(self.app.theme_buttons), {'light','dark','system'})
+        self.app.theme_buttons['dark'].invoke()
+        self.assertEqual(self.app.local.settings['theme'], 'dark')
+        self.app.theme_buttons['system'].invoke()
+        self.assertEqual(self.app.local.settings['theme'], 'system')
+
+    def test_wide_window_and_metrics(self):
+        self.app.connected = True
+        self.app.connected_since = time.monotonic()-3661
+        self.app.show_dashboard()
+        self.app.update_idletasks()
+        self.assertGreater(self.app.winfo_width(), self.app.winfo_height()*1.4)
+        self.assertTrue(self.app.ip_label.winfo_exists())
+        if self.app.metrics_after_id:
+            self.app.after_cancel(self.app.metrics_after_id)
+        self.app._update_metrics()
+        self.assertEqual(self.app.duration_label.cget('text'), '01:01:01')
+
+    def test_pulse_animation_advances(self):
+        self.app.show_dashboard()
+        button = self.app.power_button
+        old = button.phase
+        time.sleep(.05)
+        self.app.update()
+        self.assertNotEqual(button.phase,old)
 
 
 if __name__ == "__main__":
