@@ -1,0 +1,10 @@
+node_modules/
+release/
+backend-build/
+backend-dist/
+__pycache__/
+*.spec
+*.log
+smoke-output/
+config.py
+.env

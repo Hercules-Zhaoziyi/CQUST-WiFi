@@ -1,0 +1,242 @@
+[
+  {
+    "version": "1.0.0",
+    "tag": "v1.0.0",
+    "architecture": "Python GUI",
+    "commit": "93fba4d12ba43471162becabc03d7c2c67768a94",
+    "url": "https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases/tag/v1.0.0",
+    "assets": [
+      {
+        "name": "CQUST-WiFi-v1.0.0-Source.zip",
+        "size": 17527,
+        "sha256": "9a49483366b1e38e63d45aa50b4b859288de865c8b17235e405935908e03a40d"
+      },
+      {
+        "name": "CQUST_Wifi.exe",
+        "size": 16567552,
+        "sha256": "9409e1c16fcb6909e4b97fb330934e90b132cae3fa8ea85c2f1c6a4febf5b854"
+      },
+      {
+        "name": "SHA256SUMS.txt",
+        "size": 178,
+        "sha256": "5926d521b7ef509a1153659699bc18451dedd9ec508f3d7f89ebab4042a5d587"
+      }
+    ]
+  },
+  {
+    "version": "2.0.0",
+    "tag": "v2.0.0",
+    "architecture": "Python GUI",
+    "commit": "a92d0e2f07f4d4de4836c1dff62459e667a53d9d",
+    "url": "https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases/tag/v2.0.0",
+    "assets": [
+      {
+        "name": "CQUST-WiFi-v2.0.0-Source.zip",
+        "size": 723636,
+        "sha256": "133a6a47a4f370ae9c0d74a126da653397bf064e608ab24be178d280a95cb5eb"
+      },
+      {
+        "name": "CQUST_Wifi_v2.exe",
+        "size": 24694940,
+        "sha256": "c8d031a64b4454cbce3513a72cce7ce6ff895eeca226bfe8fe3f6ec9089a637b"
+      },
+      {
+        "name": "SHA256SUMS.txt",
+        "size": 181,
+        "sha256": "436c918009e0242a8c18d39f01105b19a96d7e0167efecb1c062499eacdcb7d5"
+      }
+    ]
+  },
+  {
+    "version": "3.0.0",
+    "tag": "v3.0.0",
+    "architecture": "Python GUI",
+    "commit": "7adad6eeafd8bc0c0e0e2a0eaf9fe3c0f14632a9",
+    "url": "https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases/tag/v3.0.0",
+    "assets": [
+      {
+        "name": "CQUST-WiFi-v3.0.0-Source.zip",
+        "size": 733781,
+        "sha256": "fb0cbbb1de111a593c535f0f62ca5d79237c7b305f523a6d4ed13d0b5ac74ae8"
+      },
+      {
+        "name": "CQUST_Wifi_v3.exe",
+        "size": 24726076,
+        "sha256": "f668dddeb80da32d1e42b2ceffe4b422a04e7abf2396bc40df52e2e497687cb5"
+      },
+      {
+        "name": "SHA256SUMS.txt",
+        "size": 181,
+        "sha256": "0dc54d155745986352a5dafc7a690f556875075e4c7f6a1d34bcdcf2a70bfb86"
+      }
+    ]
+  },
+  {
+    "version": "3.1.0",
+    "tag": "v3.1.0",
+    "architecture": "Python GUI",
+    "commit": "c31b9cc12586607dc361d7265057372ab3a3e9fb",
+    "url": "https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases/tag/v3.1.0",
+    "assets": [
+      {
+        "name": "CQUST-WiFi-v3.1.0-Source.zip",
+        "size": 755043,
+        "sha256": "44563f9e6a4ad2deaf4c9d3614636b5c30d4b89768ddb1d1782bd1ae2d7dd3f8"
+      },
+      {
+        "name": "CQUST_Wifi_v3_1.exe",
+        "size": 24757457,
+        "sha256": "8eaa25fe9013e400777491bd7bb4f9e8d3d2f71c8e76f8424b1245fe99e31449"
+      },
+      {
+        "name": "SHA256SUMS.txt",
+        "size": 183,
+        "sha256": "b93b99bdc0dc0a14f988df10ccb3a9f1b7da1fc9fcc98aea447dee774ec50bf4"
+      }
+    ]
+  },
+  {
+    "version": "3.2.0",
+    "tag": "v3.2.0",
+    "architecture": "Python GUI",
+    "commit": "e92814bc2cea5c5547099b112d5db677bd546ea5",
+    "url": "https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases/tag/v3.2.0",
+    "assets": [
+      {
+        "name": "CQUST-WiFi-v3.2.0-Source.zip",
+        "size": 742224,
+        "sha256": "cdde6cc247305409eb5599be79bc99d14d96337525fe21ff544b994d16eb7320"
+      },
+      {
+        "name": "CQUST_Wifi_v3_2.exe",
+        "size": 24741401,
+        "sha256": "5badb52bc78ecbdd8ccf0aa7b04541edaa2a7d5179f2cb5e241058b7854d2d24"
+      },
+      {
+        "name": "SHA256SUMS.txt",
+        "size": 183,
+        "sha256": "54f2bf64203a1fbfa862c0a754d80269cf8d8b60013a09be26772ad6efa7315d"
+      }
+    ]
+  },
+  {
+    "version": "4.0.0",
+    "tag": "v4.0.0",
+    "architecture": "Electron",
+    "commit": "fabf7b1bfb153cb0735f7084c6d757122db8a72b",
+    "url": "https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases/tag/v4.0.0",
+    "assets": [
+      {
+        "name": "CQUST-WiFi-v4.0.0-Source.zip",
+        "size": 767525,
+        "sha256": "b30368d58fe62f4c3bee498389e8f2a1eec9a0a55b03fa2fff83be35e1b7ee12"
+      },
+      {
+        "name": "CQUST-WiFi-4.0.0-Setup.exe",
+        "size": 125516660,
+        "sha256": "6d1f13ad68108e1a7f91db6cdb8e875fabbe47de636e162d05f92ca106f84d1e"
+      },
+      {
+        "name": "SHA256SUMS.txt",
+        "size": 190,
+        "sha256": "ceace452b3d0e843265ff526bf816ddbbdadb52f1ea216d6af33d4c87361db68"
+      }
+    ]
+  },
+  {
+    "version": "4.1.0",
+    "tag": "v4.1.0",
+    "architecture": "Electron",
+    "commit": "046a5629e3b5c0002135f15595e072795a42a42d",
+    "url": "https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases/tag/v4.1.0",
+    "assets": [
+      {
+        "name": "CQUST-WiFi-v4.1.0-Source.zip",
+        "size": 769948,
+        "sha256": "d64c3efc918bc10c02a0c8a2ece7603ed728ff4c7b4e1d36a9bfdcb1c649ff5f"
+      },
+      {
+        "name": "CQUST-WiFi-4.1.0-Setup.exe",
+        "size": 125519292,
+        "sha256": "478e4d00ea63be89a1666d4cb764e2d3504ada741ede6a45b29e8827aff24aff"
+      },
+      {
+        "name": "SHA256SUMS.txt",
+        "size": 190,
+        "sha256": "fa934533c7c5d57a8bb19a5af0fc7a6bccfc10ca926a8508e22bbaa853ece7ff"
+      }
+    ]
+  },
+  {
+    "version": "5.0.0",
+    "tag": "v5.0.0",
+    "architecture": "Tauri 2 / Rust",
+    "commit": "dbdea9ce6659d683c01cd2ac84082160e32e9292",
+    "url": "https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases/tag/v5.0.0",
+    "assets": [
+      {
+        "name": "CQUST-WiFi-v5.0.0-Source.zip",
+        "size": 779959,
+        "sha256": "7edd7183b3e574fc11ac94be9a0d61e831c088ff2a435220833eade9228e2a21"
+      },
+      {
+        "name": "CQUST-WiFi-5.0.0-Tauri-Setup.exe",
+        "size": 3196751,
+        "sha256": "790454c01f0352bffbb166f88d3e65534a057e4043bd4cc1dbb9b8acf39e2aa8"
+      },
+      {
+        "name": "SHA256SUMS.txt",
+        "size": 196,
+        "sha256": "45f0a6384366bce1c8f54413ecff3140d75afa4d040b1d3f9429e8115cc77c3b"
+      }
+    ]
+  },
+  {
+    "version": "5.0.1",
+    "tag": "v5.0.1",
+    "architecture": "Tauri 2 / Rust",
+    "commit": "6fb8f31887c7a26c1b60830539f4c72b9d3e44c5",
+    "url": "https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases/tag/v5.0.1",
+    "assets": [
+      {
+        "name": "CQUST-WiFi-v5.0.1-Source.zip",
+        "size": 1841775,
+        "sha256": "246cfb5f70afae92a9b1de686ae2d3b407f9249680bc6a37b1aabbf76778df3e"
+      },
+      {
+        "name": "CQUST-WiFi-5.0.1-Tauri-Setup.exe",
+        "size": 3812831,
+        "sha256": "cde765f23b43d8e277f20c0d25485380ccb95265376b00ba07235f1f5d9da4ff"
+      },
+      {
+        "name": "SHA256SUMS.txt",
+        "size": 196,
+        "sha256": "f4da957e3d755035b5e3b2e7f9439ffc8265b04fb0b2d017fa3e3b8e7354716a"
+      }
+    ]
+  },
+  {
+    "version": "5.0.2",
+    "tag": "v5.0.2",
+    "architecture": "Tauri 2 / Rust",
+    "commit": "dee48c188251dfb668b4713484350984bdc8e29c",
+    "url": "https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases/tag/v5.0.2",
+    "assets": [
+      {
+        "name": "CQUST-WiFi-v5.0.2-Source.zip",
+        "size": 1849858,
+        "sha256": "f8c68b07e50991fd0d9ce0db430ad21e30d20ff773fa901be558ecafc4d41259"
+      },
+      {
+        "name": "CQUST-WiFi-5.0.2-Tauri-Setup.exe",
+        "size": 3820579,
+        "sha256": "fd811d58a652e618d684e68c1cc20ad994b527a74b4c884f9fbfa3cdb465a390"
+      },
+      {
+        "name": "SHA256SUMS.txt",
+        "size": 196,
+        "sha256": "06db63a314d3dc2473149ced21df1eac3595c00132e646a5b3f6f94aa9f6966b"
+      }
+    ]
+  }
+]

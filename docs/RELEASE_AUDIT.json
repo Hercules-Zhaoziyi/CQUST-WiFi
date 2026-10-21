@@ -1,0 +1,11 @@
+{
+  "passed": true,
+  "versions": 10,
+  "counts": {
+    "files": 10591,
+    "pyinstaller_members": 10193,
+    "nsis_files": 191
+  },
+  "findings": [],
+  "scope": "Known original campus credentials plus GitHub-token/private-key patterns; installers unpacked and PyInstaller member bytes examined without execution."
+}

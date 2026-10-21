@@ -1,61 +1,74 @@
-# CQUST Wi-Fi 5.0.2 · Tauri 2 / Rust
+# CQUST Wi-Fi
 
-5.0.1：验证码通过当前认证会话获取并以本地 data URL 显示，可刷新及重试；锁定最窄 440 宽度，高度可调整；安装器使用学校校徽；新增 20 项常用网站和本地图标；8 项使用用户确认的直达网址，其余 12 项按用户要求进入官方信息门户。
+重庆科技大学校园网 Windows 客户端。当前推荐版本：**v5.0.2**，使用 **Tauri 2 + Rust**，安装包约 3.64 MiB。
 
-前端沿用现有 HTML/CSS/SVG，桌面运行时改为 Tauri 2，认证、凭据、偏好与在线检测全部由 Rust 实现。
-发布包不包含 Electron、Chromium、Python 或认证子进程。使用系统 WebView2；缺少时安装器可安装微软运行时。
+本项目为非官方工具，不代表学校。需要连接学校校园网，且使用本人有权限的账号。
 
-## 本版变化
+## 下载与安装
 
-- 融合标题栏，可调整窗口大小，保持竖向布局并禁止最大化/全屏；关闭到托盘。
-- 顶部品牌区和导航固定，内容独立滚动，预留稳定滚动条空间；窄窗口下校徽和检测间隔保持同排。
-- 设置即时生效，无保存按钮。开机自启使用当前用户 Run 启动项，写入后回读验证。
-- 显示认证接口返回的姓名；没有姓名时显示“校园网用户”。账号和局域网 IP 居中。
-- 电源按钮负责连接/断开；退出登录先注销网络会话，再清除当前进程中的密码，返回登录页。
-- 问候语按早上、中午、下午、晚上和深夜切换。
-- 页面禁止复制与图片拖拽；仍可在输入框中输入和粘贴账号密码。
-- 关于页署名为“@ 十七号旅客”，最底部居中展示学校标识，并感谢 Gloridust 的锐捷认证脚本项目。
+- [最新版本 v5.0.2](https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases/tag/v5.0.2)
+- [全部历史版本](https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases)
+- [版本索引与架构演进](docs/HISTORY.md)
 
-GitHub 主页：https://github.com/Hercules-Zhaoziyi
-开源项目：https://github.com/Hercules-Zhaoziyi/CQUST-WiFi
-特别鸣谢：https://github.com/Gloridust/RuijieWIFI-AutoLogin
+每个 Release 提供对应 Windows EXE、源码 ZIP 和 `SHA256SUMS.txt`。安装器未签名，Windows 可能提示未知发行者。升级前请在系统托盘菜单中完全退出旧版，再运行安装包。
 
-## 认证与凭据
+历史版本仅供归档，建议日常使用最新版本。不要在公开 Issue 中粘贴密码、验证码、完整认证网址、Cookie 或 `userIndex`。
 
-Rust 实现保留已验证的学校协议：当前登录页参数、同一 Cookie 会话、页面加密开关、公钥、ASCII 无填充 RSA、密码拼接 MAC 后反转与小端分块，学号/密码/服务/queryString 各进行两次 encodeURIComponent 兼容编码。
-不使用历史 queryString、密文或 userIndex；普通登录只接受新返回的会话标识，并再次查询在线状态。
-学校服务使用 HTTP，此协议限制没有因更换 GUI 而改变。
+## 功能
 
-继承本机原有非敏感账号列表及偏好。密码通过 Win32 Credential Manager 读取，兼容旧版 python-keyring 的服务目标名与 user@service 目标名；不会把已保存密码发送回前端。
-密码不写入日志或配置；进程内密码使用 zeroize 管理。真实凭据不在源码包和 EXE 中。
+- 手动登录、自动登录、内嵌账号管理与 Windows 凭据管理器。
+- 圆形连接按钮、连接状态检测、可选静默重连、IP 与单次连接时长。
+- 自动探测认证入口；必要时显示官方认证页面跳转按钮和完整网址填入引导。
+- CAPTCHA 图片显示和会话内刷新，由用户手动填写；不绕过验证码。
+- 亮暗主题、动效、开机自启、系统托盘、实时日志。
+- 20 项本地化图标的校园常用网站。
+- 固定窄窗口宽度，底部拉柄可调整高度；固定导航和自动隐藏滚动条。
 
-安装新版本前，请从托盘退出旧版，避免两版同时重连。新版不会为测试主动注销当前校园网。
+## 界面预览
 
-## 构建
+以下截图使用隔离测试账号与虚构网络信息，不包含实际校园网账号。
 
-需要 Rust MSVC 工具链、Microsoft C++ 编译器/Windows SDK、Node.js 和 WebView2。
+![连接界面](docs/screenshots/dashboard.png)
+
+![认证引导](docs/screenshots/auth-help.png)
+
+## 源码结构
+
+```text
+ui/                         HTML、CSS、JavaScript、SVG 与本地图片
+src-tauri/                  Rust 认证、凭据、窗口和系统托盘后端
+verification/               隔离原生界面验证与协议测试向量
+legacy/python-v3.2.0/       最后一个 Python GUI 版本
+legacy/electron-v4.1.0/     最后一个 Electron 版本
+docs/                       版本、安全说明与验证记录
+```
+
+全部 10 个版本的准确源码快照另见 Git 标签 `v1.0.0` 至 `v5.0.2`，以及各 Release 的源码 ZIP。历史版本在本次发布时导入，Git 提交时间不是原始开发日期。初始未标号 GUI 文件使用 `v1.0.0` 作为归档标签。
+
+## 从源码构建
+
+需要 Windows x64、Node.js/npm、Rust stable MSVC 工具链、Visual Studio C++ Build Tools 和 Windows SDK。运行时使用系统 WebView2；缺少时安装器可引导安装。
 
 ```powershell
 npm ci
-cargo test --manifest-path src-tauri/Cargo.toml
+cargo test --release --manifest-path src-tauri/Cargo.toml
 npm run build
 ```
 
-输出位于 src-tauri/target/release/bundle/nsis。
-Rust 单元测试包含学校原始 security.js 生成的七组 RSA 对照向量、编码规则、学校地址限制、真实姓名字段、配置迁移和启动项回读。
-启动项测试会暂时读写本应用自己的 Run 条目，并以清理保护恢复测试前的值，不会开启用户的开机自启偏好。
-verification 目录的开发用浏览器测试不进入发布包，也不表示应用依赖 Electron。
+安装器位于 `src-tauri/target/release/bundle/nsis/`。`build-local.ps1` 可使用已配置的本机工具链；仓库不包含工具链缓存、`node_modules` 或构建产物。
 
-## 验证边界
+仅用于隔离界面验证的 `verify-ui` 功能不应加入发布构建。正式发布使用默认 features；验证模式不会操作真实用户配置、启动项或校园账号。
 
-浏览器模拟测试使用虚构账号，仅验证布局和交互。真实认证与 Windows 启动结果需要分别验证；构建通过不代表另一个真实账号的校园网登录或重启电脑后的自启已经现场完成。
-安装包没有数字签名。未自动发布到 GitHub。
+## 安全与归档
 
-2026-10-21 验证：8 项 Rust 测试全部通过，包含启动项实际读写并恢复原值；真实 Tauri/WebView2 窗口的 20 项隔离检查全部通过。
-发布安装包 3,196,751 字节（约 3.05 MiB），相比 Electron 4.1 安装包约 120 MiB 大幅缩小。
-未为测试中断当前校园网，未现场测试另一个真实账号登录，也未实际重启 Windows 测试自启。
+密码由 Windows 凭据管理器保存，认证参数不进入公开源码。发布前对源码、安装器内层文件和 PyInstaller 解压成员做已知凭据及令牌模式检查，详见 [安全说明](docs/SECURITY.md) 和 [本次审计记录](docs/RELEASE_AUDIT.json)。检查不等于完整安全审计。
 
+本次验证：10 项 Rust 测试与 45 项原生 Tauri 界面检查通过。没有为公开发布断开真实校园网或代用户提交账号密码。
 
-5.0.2：同一网络重连时，在正常发现之后补充重新探测上次成功的认证登录页；只保存当前进程内的发现提示，网络 IP 改变或退出登录即失效，页面公钥、服务及认证参数仍从重新获取的页面读取。不存储完整认证网址到配置，不直接重用旧凭据请求。
-认证帮助提供官方入口和三步复制填入指南；只填首页时会提示补齐跳转后的 query。滚动条留白、滚动停止约 1.8 秒后隐藏且布局宽度不变；状态标题正字距；网站标题留白；署名连接小红书主页并使用用户提供的本地 SVG。
-窗口保持最窄宽度，禁用原生边框调整；可用底部细小拉柄或其上下方向键调整高度，避免 Windows 高 DPI 下首次边框缩放导致尺寸突变。
+## 作者与鸣谢
+
+@ 十七号旅客 · [ziyis.cn](https://ziyis.cn) · [GitHub](https://github.com/Hercules-Zhaoziyi)
+
+感谢 [AutoLogin](https://github.com/Gloridust/RuijieWIFI-AutoLogin) 项目提供的锐捷认证脚本。
+
+校徽、校园门户图标和小红书标识用于界面识别，第三方权利与原有声明不因本仓库公开而改变。详见 [第三方说明](docs/THIRD_PARTY_NOTICES.md)。此批归档未额外添加统一开源许可证。
