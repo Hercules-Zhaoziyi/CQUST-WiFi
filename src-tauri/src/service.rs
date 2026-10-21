@@ -2,15 +2,16 @@ use crate::{auth::{self,Auth,Error,Session},vault};
 use serde::{Serialize,Deserialize};
 use serde_json::{json,Value};
 use std::{path::PathBuf,time::{Duration,Instant,SystemTime,UNIX_EPOCH}};
-use tauri::{Emitter,AppHandle};
+use tauri::{Emitter,AppHandle,Manager};
 use zeroize::Zeroizing;
 
 #[derive(Clone,Serialize,Deserialize)]#[serde(default)]
-pub struct Settings{pub keep_connected:bool,pub auto_login:bool,pub check_interval:u64,pub theme:String,pub service:String,pub animations:bool}
-impl Default for Settings{fn default()->Self{Self{keep_connected:false,auto_login:false,check_interval:10,theme:"system".into(),service:String::new(),animations:true}}}
+pub struct Settings{pub keep_connected:bool,pub auto_login:bool,pub check_interval:u64,pub theme:String,pub service:String,pub animations:bool,pub window_snapping:bool}
+impl Default for Settings{fn default()->Self{Self{keep_connected:false,auto_login:false,check_interval:10,theme:"system".into(),service:String::new(),animations:true,window_snapping:true}}}
 #[derive(Default,Serialize,Deserialize)]pub struct Accounts{pub accounts:Vec<String>,pub last_username:String}
 pub struct Service{pub settings:Settings,pub accounts:Vec<String>,pub username:String,pub display_name:String,password:Zeroizing<String>,remember:bool,folder:PathBuf,auth:Auth,session:Option<Session>,started:f64,ip:String,logs:Vec<String>,manual:bool,next_poll:Instant,next_retry:Option<Instant>,isolated:bool}
 impl Service{
+ pub fn enable_browser_probe(&mut self,app:AppHandle){self.auth.browser_probe=Some(std::sync::Arc::new(move||crate::portal_browser::discover(&app)));}
  pub fn new(custom:Option<PathBuf>)->Self{
   let isolated=custom.is_some();let folder=custom.unwrap_or_else(||PathBuf::from(std::env::var_os("APPDATA").unwrap_or_default()).join("CQUST Wifi"));let _=std::fs::create_dir_all(&folder);
   let mut settings:Settings=read(&folder.join("settings.json")).unwrap_or_default();if ![5,10,120].contains(&settings.check_interval){settings.check_interval=10}if !["system","light","dark"].contains(&settings.theme.as_str()){settings.theme="system".into()}
@@ -46,7 +47,7 @@ impl Service{
    "disconnect"|"logout"=>{
     if let Some(session)=&self.session{session.logout()?}
     self.session=None;self.manual=true;self.next_retry=None;self.started=0.;
-    if method=="logout"{self.password=Zeroizing::new(String::new());self.display_name.clear();self.auth=Auth::default();}
+    if method=="logout"{self.password=Zeroizing::new(String::new());self.display_name.clear();self.auth.clear_account();}
     self.log(app,if method=="logout"{"已退出登录。"}else{"已手动断开，点击连接可重新连接。"});self.emit(app);Ok(self.snapshot())
    },
    "switchOnline"=>{self.auth.logout_discovered()?;std::thread::sleep(Duration::from_secs(1));let reconnect=args["reconnect"].as_bool().unwrap_or(false);self.login(app,args,reconnect,false)},
@@ -55,10 +56,12 @@ impl Service{
     if let Some(v)=args["keep_connected"].as_bool(){self.settings.keep_connected=v}
     if let Some(v)=args["auto_login"].as_bool(){self.settings.auto_login=v}
     if let Some(v)=args["animations"].as_bool(){self.settings.animations=v}
+    if let Some(v)=args["window_snapping"].as_bool(){self.settings.window_snapping=v}
     if let Some(v)=args["check_interval"].as_u64(){if [5,10,120].contains(&v){self.settings.check_interval=v}}
     if let Some(v)=args["theme"].as_str(){if ["light","dark","system"].contains(&v){self.settings.theme=v.into()}}
     if let Some(v)=args["service"].as_str(){if v.len()<512{self.settings.service=v.into()}}
     if let Err(error)=self.write("settings.json",&self.settings){self.settings=old;return Err(error)}
+    app.state::<crate::Snapping>().enabled.store(self.settings.window_snapping,std::sync::atomic::Ordering::Relaxed);
     self.next_poll=Instant::now()+Duration::from_secs(self.settings.check_interval);if !self.settings.keep_connected{self.next_retry=None}self.emit(app);Ok(self.snapshot())
    },
    "forget"=>{
@@ -87,5 +90,5 @@ impl Service{
 fn read<T:serde::de::DeserializeOwned>(path:&PathBuf)->Option<T>{std::fs::read(path).ok().and_then(|bytes|serde_json::from_slice(&bytes).ok())}
 #[cfg(test)]mod tests{
  use super::*;
- #[test]fn migration_and_no_password_export(){let folder=std::env::temp_dir().join(format!("cqust-rust-test-{}",std::process::id()));let _=std::fs::create_dir_all(&folder);std::fs::write(folder.join("settings.json"),r#"{"check_interval":7,"theme":"dark"}"#).unwrap();let mut service=Service::new(Some(folder));assert_eq!(service.settings.check_interval,10);assert_eq!(service.settings.theme,"dark");service.password=Zeroizing::new("synthetic-secret".into());assert!(!service.snapshot().to_string().contains("synthetic-secret"));assert!(service.next_retry.is_none());}
+ #[test]fn migration_and_no_password_export(){let folder=std::env::temp_dir().join(format!("cqust-rust-test-{}",std::process::id()));let _=std::fs::create_dir_all(&folder);std::fs::write(folder.join("settings.json"),r#"{"check_interval":7,"theme":"dark"}"#).unwrap();let mut service=Service::new(Some(folder));assert_eq!(service.settings.check_interval,10);assert_eq!(service.settings.theme,"dark");assert!(service.settings.window_snapping);service.password=Zeroizing::new("synthetic-secret".into());assert!(!service.snapshot().to_string().contains("synthetic-secret"));assert!(service.next_retry.is_none());}
 }

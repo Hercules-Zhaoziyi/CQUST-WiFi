@@ -119,3 +119,10 @@ button.signature:hover{color:var(--accent)}.signature img{width:29px;height:auto
 #height-resize:after{content:'';position:absolute;top:3px;left:22px;right:22px;height:2px;border-radius:3px;background:var(--muted);opacity:.35}#height-resize:hover:after,#height-resize:focus-visible:after{opacity:1;background:var(--accent)}
 #status-title{letter-spacing:.08em;line-height:1.45;font-weight:600;margin:10px 0 9px}.page h1{letter-spacing:0}#status-title+h1{letter-spacing:.08em}#status-detail{line-height:1.8}
 main{padding-left:12px;padding-right:12px;scrollbar-gutter:stable both-edges}
+/* WebView2 adds its own reveal button. Keep exactly one accessible app button. */
+input::-ms-reveal,input::-ms-clear{display:none!important}
+.about-download{display:inline-flex;align-items:center;justify-content:center;gap:8px;margin-top:18px;padding:11px 18px;background:var(--accent-soft);color:var(--accent)}.about-download svg{width:15px;height:15px}
+.update-card{margin-top:18px;padding:20px}.update-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.update-heading p,#update-status{font-size:11px}.has-update{color:var(--accent);font-weight:600}
+.update-card details{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}.update-card summary{cursor:pointer;color:var(--muted);font-size:11px}.update-card pre{font:inherit;font-size:11px;line-height:1.85;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--muted);margin:12px 0 0;user-select:text}
+.update-actions{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:15px}.update-actions .primary{width:auto;min-height:36px;padding:8px 14px;font-size:11px;gap:8px}.update-safety{font-size:10px;margin-top:12px}
+#settings>.update-card{margin:0 0 18px}

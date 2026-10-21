@@ -40,7 +40,7 @@ pub struct Context{pub client:Client,pub page:Url,pub api:Url,pub query:String,p
 pub struct Session{pub context:Context,pub index:String,pub username:String,pub display_name:String,pub ip:String,pub keepalive:f64,pub next_keepalive:Instant}
 #[derive(Clone)]pub struct Online{pub page:Url,pub index:String}
 #[derive(Clone)]struct DiscoveryHint{page:Url,ip:String}
-#[derive(Default)]pub struct Auth{pub challenge:Option<Context>,pub online:Option<Online>,hint:Option<DiscoveryHint>}
+#[derive(Default)]pub struct Auth{pub challenge:Option<Context>,pub online:Option<Online>,hint:Option<DiscoveryHint>,pub browser_probe:Option<std::sync::Arc<dyn Fn()->Option<Url>+Send+Sync>>}
 fn discovery_entries(manual:&str,hint:Option<&DiscoveryHint>,ip:&str)->Vec<String>{
  if !manual.is_empty(){return vec![manual.to_owned()]}
  let mut entries=ENTRIES.iter().map(|s|s.to_string()).collect::<Vec<_>>();
@@ -65,6 +65,7 @@ fn page_fields(html:&str)->(std::collections::HashMap<String,String>,Vec<String>
  (values,services,refresh)
 }
 impl Auth{
+ pub fn clear_account(&mut self){self.challenge=None;self.online=None;}
  fn follow(&mut self,client:&Client,entry:&str)->Result<Option<(Url,String)>>{
   let mut url=Url::parse(entry).map_err(|_|Error::new("context","请输入完整校园认证网址。"))?;let mut seen=HashSet::new();
   for _ in 0..7{
@@ -87,7 +88,10 @@ impl Auth{
   let client=client()?;if !manual.is_empty()&&!Url::parse(manual).map(|u|trusted(&u)).unwrap_or(false){return Err(Error::new("context","仅接受学校域名或认证 IP 的网址。"))}
   let current_ip=lan_ip();if self.hint.as_ref().map(|hint|hint.ip!=current_ip).unwrap_or(false){self.hint=None}let entries=discovery_entries(manual,self.hint.as_ref(),&current_ip);let mut found=None;
   for entry in entries{match self.follow(&client,&entry){Ok(Some(data))=>{found=Some(data);break},Err(error)if error.kind=="online"=>return Err(error),_=>()}}
-  let (page,html)=found.ok_or_else(||Error::new("context","未取得当前认证登录页。请确认连接校园网，或粘贴浏览器当前完整认证网址。"))?;
+  // HTTP cannot execute gateway JavaScript. Let an isolated WebView2 finish the
+  // redirect, then re-fetch the resulting allowlisted page in the HTTP session.
+  if found.is_none()&&manual.is_empty(){if let Some(probe)=self.browser_probe.clone(){if let Some(url)=probe(){match self.follow(&client,url.as_str()){Ok(data)=>found=data,Err(error)if error.kind=="online"=>return Err(error),_=>()}}}}
+  let (page,html)=found.ok_or_else(||Error::new("context","自动获取认证入口未完成。请确认已接入校园网；仍失败时，可打开官方页面粘贴跳转后的完整网址。"))?;
   let query=page.query().unwrap_or("").to_string();let (mut values,mut services,_)=page_fields(&html);
   let init=capture(r#"AuthInterFace\.init\(\s*["']([^"']*)["']"#,&html).unwrap_or_else(||"./".into());
   let api=page.join(&format!("{init}InterFace.do")).map_err(|_|network())?;if !trusted(&api){return Err(Error::new("context","当前页面的认证接口无效。"))}
@@ -108,6 +112,7 @@ impl Auth{
   for key in ["isOperatorPwd","isOperatorUserId"]{if field(&info,key)=="true"{return Err(Error::new("context","当前服务需要运营商账号，请选择普通校园网服务。"))}}
   let prefix=if rx(r#"(?i)<[^>]+id=["']Tj_yes["'][^>]+style=["'][^"']*display\s*:\s*block"#).is_match(&html){capture(r#"prefixValue\s*=\s*["']([^"']*)"#,&html).unwrap_or_default()}else{String::new()};
   let captcha=info["validCodeUrl"].as_str().and_then(|s|captcha_url(&page,s));
+  self.hint=Some(DiscoveryHint{page:page.clone(),ip:current_ip});
   Ok(Context{client,page,api,mac:mac(&query),query,encrypt,exponent,modulus,service,prefix,captcha})
  }
  fn challenge_error(&self,c:&Context)->Error{
@@ -182,6 +187,7 @@ impl Session{
 
 #[cfg(test)]mod tests{
  use super::*;
+ #[test]fn logout_keeps_only_network_discovery_hint(){let hint=DiscoveryHint{page:Url::parse("http://aaa.cqust.edu.cn/eportal/index.jsp?wlanuserip=demo").unwrap(),ip:"10.0.0.2".into()};let mut auth=Auth{hint:Some(hint.clone()),online:Some(Online{page:hint.page.clone(),index:"demo".into()}),..Auth::default()};auth.clear_account();assert!(auth.online.is_none());assert!(auth.challenge.is_none());assert_eq!(discovery_entries("",auth.hint.as_ref(),"10.0.0.2")[1],hint.page.as_str());assert_eq!(discovery_entries("",auth.hint.as_ref(),"10.0.0.3").len(),ENTRIES.len());}
  #[test]fn reconnect_reprobes_last_successful_entry_on_same_network(){
   let hint=DiscoveryHint{page:Url::parse("http://aaa.cqust.edu.cn/eportal/index.jsp?wlanuserip=demo&mac=aa").unwrap(),ip:"10.0.0.2".into()};
   let entries=discovery_entries("",Some(&hint),"10.0.0.2");assert_eq!(entries[0],ENTRIES[0]);assert_eq!(entries[1],hint.page.as_str());assert_eq!(entries.len(),ENTRIES.len()+1);

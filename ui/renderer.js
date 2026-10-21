@@ -31,7 +31,7 @@ function page(id){document.querySelector('main').scrollTop=0;document.querySelec
 document.querySelectorAll('[data-page]').forEach(node=>node.addEventListener('click',()=>page(node.dataset.page)));
 function apply(next){state=next;document.documentElement.dataset.motion=next.settings.animations===false?'off':'full';if(next.connected)showDashboard=true;$('login-card').hidden=showDashboard;$('dashboard').hidden=!showDashboard;$('dashboard').classList.toggle('online',next.connected);$('status-pill').textContent=next.connected?'● 已连接':'未连接';$('status-title').textContent=next.connected?'已连接':'已断开';$('status-detail').textContent=next.connected?greeting():'点击连接按钮，重新连接校园网。';$('display-name').textContent=next.display_name||'校园网用户';$('power').setAttribute('aria-label',next.connected?'断开校园网':'连接校园网');$('metric-user').textContent=next.username||'—';$('metric-ip').textContent=next.ip||'—';$('footer').textContent=`每 ${next.settings.check_interval===120?'2 分钟':next.settings.check_interval+' 秒'} 检查 · ${next.settings.keep_connected?'自动保持连接':'手动连接模式'}`;if(next.logs){logs=[...next.logs];drawLogs();}renderAccounts();clock();}
 function setBusy(value){busy=value;document.body.classList.toggle('busy',value);['login','power','switch-account','auth-submit'].forEach(id=>$(id).disabled=value);if(authKind==='captcha')$('auth-submit').disabled=value||!captchaReady;$('login').firstChild.textContent=value?'正在连接…':'登录';}
-function fillSettings(){if(!state||!desktop)return;$('startup').checked=desktop.startup;$('animations').checked=state.settings.animations!==false;$('auto-login').checked=state.settings.auto_login;$('keep-connected').checked=state.settings.keep_connected;setIntervalChoice(state.settings.check_interval);}
+function fillSettings(){if(!state||!desktop)return;$('startup').checked=desktop.startup;$('animations').checked=state.settings.animations!==false;$('window-snapping').checked=state.settings.window_snapping!==false;$('auto-login').checked=state.settings.auto_login;$('keep-connected').checked=state.settings.keep_connected;$('update-current').textContent=`当前版本 ${desktop.version}`;setIntervalChoice(state.settings.check_interval);}
 let intervalChoice=10;
 function setIntervalChoice(value){intervalChoice=Number(value);document.querySelectorAll('[data-interval]').forEach(button=>{const selected=Number(button.dataset.interval)===intervalChoice;button.setAttribute('aria-checked',String(selected));button.tabIndex=selected?0:-1;});}
 const intervalButtons=[...document.querySelectorAll('[data-interval]')];
@@ -65,7 +65,7 @@ let preferenceQueue=Promise.resolve();
 function savePreferences(patch){
  preferenceQueue=preferenceQueue.then(async()=>{const result=await call('settings',patch);if(result.ok){apply(result.data);toast('已生效');}else{fillSettings();toast(result.error.message);}});return preferenceQueue;
 }
-for(const [id,key] of [['auto-login','auto_login'],['keep-connected','keep_connected'],['animations','animations']]){
+for(const [id,key] of [['auto-login','auto_login'],['keep-connected','keep_connected'],['animations','animations'],['window-snapping','window_snapping']]){
  $(id).onchange=()=>{if(key==='animations')document.documentElement.dataset.motion=$(id).checked?'full':'off';savePreferences({[key]:$(id).checked});};
 }
 $('startup').onchange=async()=>{const toggle=$('startup');const desired=toggle.checked;toggle.disabled=true;try{const result=await window.cqust.desktop('startup',desired);if(result.ok){desktop.startup=result.value;toast(desired?'已开启开机自启':'已关闭开机自启');}else{toggle.checked=desktop.startup;toast(result.message);}}catch{toggle.checked=desktop.startup;toast('启动项操作失败，请稍后重试。');}finally{toggle.disabled=false;}};
@@ -90,6 +90,15 @@ $('auth-open').onclick=async()=>{try{await window.cqust.desktop('link','auth');}
 $('auth-url').addEventListener('input',()=>$('auth-url-tip').hidden=true);
 $('auth-url').addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();$('auth-submit').click();}});
 $('author').onclick=()=>window.cqust.desktop('link','author').catch(()=>toast('暂时无法打开个人主页。'));
+$('download-site').onclick=()=>window.cqust.desktop('link','downloadSite').catch(()=>toast('暂时无法打开官网。'));
+let checkingUpdate=false;
+$('check-updates').onclick=async()=>{
+ if(checkingUpdate)return;checkingUpdate=true;const button=$('check-updates');button.disabled=true;button.textContent='正在检查…';$('update-status').textContent='正在连接 GitHub…';$('update-result').hidden=true;
+ try{const update=await window.cqust.desktop('checkUpdates');$('update-status').textContent=update.available?`发现新版本 ${update.latest}`:`当前已是最新正式版本（${update.current}）`;$('update-status').classList.toggle('has-update',update.available);$('update-notes').textContent=update.notes||'暂无更新说明。';$('update-download').hidden=!update.available;$('update-result').hidden=false;$('update-result').querySelector('details').open=update.available;}
+ catch(error){$('update-status').textContent=typeof error==='string'?error:'检查失败，请稍后重试。';$('update-status').classList.remove('has-update');}
+ finally{checkingUpdate=false;button.disabled=false;button.textContent='重新检查';}
+};
+for(const [id,command] of [['update-download','updateDownload'],['update-release','updateRelease']])$(id).onclick=()=>window.cqust.desktop(command).catch(()=>toast('无法打开下载页面，请稍后重试。'));
 const scrollArea=document.querySelector('main');let scrollHideTimer;
 function revealScroll(){scrollArea.classList.add('scroll-active');clearTimeout(scrollHideTimer);scrollHideTimer=setTimeout(()=>scrollArea.classList.remove('scroll-active'),1800);}
 scrollArea.addEventListener('scroll',revealScroll,{passive:true});scrollArea.addEventListener('wheel',revealScroll,{passive:true});scrollArea.addEventListener('pointerdown',revealScroll);
