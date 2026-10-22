@@ -1,0 +1,26 @@
+{
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "CQUST Wi-Fi",
+        "width": 440,
+        "height": 820,
+        "minWidth": 440,
+        "maxWidth": 820,
+        "minHeight": 650,
+        "decorations": true,
+        "resizable": true,
+        "maximizable": true,
+        "fullscreen": false,
+        "visible": false,
+        "center": true,
+        "backgroundColor": "#F5F7FB"
+      }
+    ]
+  },
+  "bundle": {
+    "targets": ["app", "dmg"],
+    "icon": ["icons/icon.icns"]
+  }
+}

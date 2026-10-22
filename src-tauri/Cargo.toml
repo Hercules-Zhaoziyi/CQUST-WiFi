@@ -12,7 +12,7 @@ verify-ui = ["dep:webview2-com", "dep:windows"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["tray-icon", "image-ico"] }
+tauri = { version = "2", features = ["tray-icon", "image-ico", "image-png"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 semver = "1"
@@ -26,10 +26,15 @@ flate2 = "1"
 base64 = "0.22"
 chrono = "0.4"
 zeroize = "1"
+
+[target.'cfg(windows)'.dependencies]
 winreg = "0.55"
 windows-sys = { version = "0.61", features = ["Win32_Security_Credentials", "Win32_Foundation", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_WindowsAndMessaging", "Win32_Graphics_Gdi"] }
 webview2-com = { version = "0.39", optional = true }
 windows = { version = "0.62", optional = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+security-framework = "3.7"
 
 [profile.release]
 opt-level = "s"

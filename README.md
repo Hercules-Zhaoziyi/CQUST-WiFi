@@ -1,6 +1,6 @@
 # CQUST Wi-Fi
 
-重庆科技大学校园网 Windows 客户端。当前推荐版本：**v5.1.1**，使用 **Tauri 2 + Rust**。
+重庆科技大学校园网客户端。当前公开推荐版本：**v5.1.1**，使用 **Tauri 2 + Rust**；本地源码已增加 macOS Apple Silicon 构建支持。
 
 [软件介绍与下载](https://cqust-wifi.ziyis.cn/)
 
@@ -18,15 +18,15 @@
 
 ## 功能
 
-- 手动登录、自动登录、内嵌账号管理与 Windows 凭据管理器。
+- 手动登录、自动登录、内嵌账号管理与系统安全凭据存储（Windows 凭据管理器或 macOS 钥匙串）。
 - 圆形连接按钮、连接状态检测、可选静默重连、IP 与单次连接时长。
-- 自动探测认证入口：HTTP 跳转失败后使用隔离的 WebView2 执行网页动态跳转；必要时保留手动填入引导。
+- 自动探测认证入口：HTTP 跳转失败后使用隔离的系统 WebView 执行网页动态跳转；必要时保留手动填入引导。
 - 同网络切换账号保留进程内入口提示，重新获取页面和公钥，不重用旧登录请求或会话。
 - CAPTCHA 图片显示和会话内刷新，由用户手动填写；不绕过验证码。
 - 亮暗主题、动效、开机自启、系统托盘、实时日志。
 - 20 项本地化图标的校园常用网站。
-- 固定窄窗口宽度，底部拉柄可调整高度；固定导航和自动隐藏滚动条。
-- 可即时开关的屏幕工作区边缘吸附，默认开启；贴边收起、悬停滑出、拖离解除，支持平滑动效。
+- Windows 固定窄窗口宽度；macOS 可调整窗口宽度。底部拉柄可调整高度，导航固定，滚动条自动隐藏。
+- Windows 可即时开关屏幕工作区边缘吸附，默认开启；macOS 不启用吸附。
 - 设置底部的 GitHub 正式版更新检测、安全 Markdown 更新简介与新安装包下载。
 
 ## v5.1.1 更新
@@ -62,6 +62,8 @@ docs/                       版本、安全说明与验证记录
 
 ## 从源码构建
 
+### Windows
+
 需要 Windows x64、Node.js/npm、Rust stable MSVC 工具链、Visual Studio C++ Build Tools 和 Windows SDK。运行时使用系统 WebView2；缺少时安装器可引导安装。
 
 ```powershell
@@ -72,11 +74,25 @@ npm run build
 
 安装器位于 `src-tauri/target/release/bundle/nsis/`。`build-local.ps1` 可使用已配置的本机工具链；仓库不包含工具链缓存、`node_modules` 或构建产物。
 
+### macOS Apple Silicon
+
+需要 Node.js/npm、Rust stable 的 `aarch64-apple-darwin` 目标及 Xcode Command Line Tools。在 Mac 上运行：
+
+```sh
+npm ci
+cargo test --locked --manifest-path src-tauri/Cargo.toml
+npm run build:macos
+```
+
+产物位于 `src-tauri/target/aarch64-apple-darwin/release/bundle/` 下的 `macos/` 和 `dmg/`。macOS 密码保存在钥匙串；登录启动项写入当前用户的 `~/Library/LaunchAgents`，应在将应用移入最终安装位置后开启。此本地构建未使用 Developer ID 签名或公证，分发前仍需完成签名、公证及真实校园网登录验证。
+
+macOS 关闭窗口后仍在后台运行。点击菜单栏的 CQUST 图标可重新打开窗口，右键可打开“显示主窗口 / 退出软件”菜单；点击 Dock 中的应用图标也可恢复窗口。macOS 不显示或运行窗口贴边吸附设置。
+
 仅用于隔离界面验证的 `verify-ui` 功能不应加入发布构建。正式发布使用默认 features；验证模式不会操作真实用户配置、启动项或校园账号。
 
 ## 安全与归档
 
-密码由 Windows 凭据管理器保存，认证参数不进入公开源码。发布前对源码、安装器内层文件和 PyInstaller 解压成员做已知凭据及令牌模式检查，详见 [安全说明](docs/SECURITY.md) 和 [本次审计记录](docs/RELEASE_AUDIT.json)。检查不等于完整安全审计。
+密码由系统安全凭据存储保存，认证参数不进入公开源码。发布前对源码、安装器内层文件和 PyInstaller 解压成员做已知凭据及令牌模式检查，详见 [安全说明](docs/SECURITY.md) 和 [本次审计记录](docs/RELEASE_AUDIT.json)。检查不等于完整安全审计。
 
 本次验证：10 项 Rust 测试与 45 项原生 Tauri 界面检查通过。没有为公开发布断开真实校园网或代用户提交账号密码。
 

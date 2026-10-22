@@ -7,14 +7,14 @@ use zeroize::Zeroizing;
 
 #[derive(Clone,Serialize,Deserialize)]#[serde(default)]
 pub struct Settings{pub keep_connected:bool,pub auto_login:bool,pub check_interval:u64,pub theme:String,pub service:String,pub animations:bool,pub window_snapping:bool}
-impl Default for Settings{fn default()->Self{Self{keep_connected:false,auto_login:false,check_interval:10,theme:"system".into(),service:String::new(),animations:true,window_snapping:true}}}
+impl Default for Settings{fn default()->Self{Self{keep_connected:false,auto_login:false,check_interval:10,theme:"system".into(),service:String::new(),animations:true,window_snapping:cfg!(windows)}}}
 #[derive(Default,Serialize,Deserialize)]pub struct Accounts{pub accounts:Vec<String>,pub last_username:String}
 pub struct Service{pub settings:Settings,pub accounts:Vec<String>,pub username:String,pub display_name:String,password:Zeroizing<String>,remember:bool,folder:PathBuf,auth:Auth,session:Option<Session>,started:f64,ip:String,logs:Vec<String>,manual:bool,next_poll:Instant,next_retry:Option<Instant>,isolated:bool}
 impl Service{
  pub fn enable_browser_probe(&mut self,app:AppHandle){self.auth.browser_probe=Some(std::sync::Arc::new(move||crate::portal_browser::discover(&app)));}
  pub fn new(custom:Option<PathBuf>)->Self{
-  let isolated=custom.is_some();let folder=custom.unwrap_or_else(||PathBuf::from(std::env::var_os("APPDATA").unwrap_or_default()).join("CQUST Wifi"));let _=std::fs::create_dir_all(&folder);
-  let mut settings:Settings=read(&folder.join("settings.json")).unwrap_or_default();if ![5,10,120].contains(&settings.check_interval){settings.check_interval=10}if !["system","light","dark"].contains(&settings.theme.as_str()){settings.theme="system".into()}
+  let isolated=custom.is_some();let folder=custom.unwrap_or_else(default_folder);let _=std::fs::create_dir_all(&folder);
+  let mut settings:Settings=read(&folder.join("settings.json")).unwrap_or_default();if ![5,10,120].contains(&settings.check_interval){settings.check_interval=10}if !["system","light","dark"].contains(&settings.theme.as_str()){settings.theme="system".into()}if cfg!(target_os="macos"){settings.window_snapping=false}
   let accounts:Accounts=read(&folder.join("accounts.json")).unwrap_or_default();
   let next_retry=if !isolated&&settings.auto_login&&!accounts.last_username.is_empty(){Some(Instant::now()+Duration::from_secs(2))}else{None};
   Self{settings,accounts:accounts.accounts,username:accounts.last_username,display_name:String::new(),password:Zeroizing::new(String::new()),remember:true,folder,auth:Auth::default(),session:None,started:0.,ip:auth::lan_ip(),logs:vec![],manual:false,next_poll:Instant::now(),next_retry,isolated}
@@ -56,7 +56,7 @@ impl Service{
     if let Some(v)=args["keep_connected"].as_bool(){self.settings.keep_connected=v}
     if let Some(v)=args["auto_login"].as_bool(){self.settings.auto_login=v}
     if let Some(v)=args["animations"].as_bool(){self.settings.animations=v}
-    if let Some(v)=args["window_snapping"].as_bool(){self.settings.window_snapping=v}
+    if let Some(v)=args["window_snapping"].as_bool(){self.settings.window_snapping=v&&cfg!(windows)}
     if let Some(v)=args["check_interval"].as_u64(){if [5,10,120].contains(&v){self.settings.check_interval=v}}
     if let Some(v)=args["theme"].as_str(){if ["light","dark","system"].contains(&v){self.settings.theme=v.into()}}
     if let Some(v)=args["service"].as_str(){if v.len()<512{self.settings.service=v.into()}}
@@ -89,7 +89,11 @@ impl Service{
  }
 }
 fn read<T:serde::de::DeserializeOwned>(path:&PathBuf)->Option<T>{std::fs::read(path).ok().and_then(|bytes|serde_json::from_slice(&bytes).ok())}
+#[cfg(windows)]
+fn default_folder()->PathBuf{PathBuf::from(std::env::var_os("APPDATA").unwrap_or_default()).join("CQUST Wifi")}
+#[cfg(target_os="macos")]
+fn default_folder()->PathBuf{PathBuf::from(std::env::var_os("HOME").expect("HOME is required on macOS")).join("Library/Application Support/CQUST Wi-Fi")}
 #[cfg(test)]mod tests{
  use super::*;
- #[test]fn migration_and_no_password_export(){let folder=std::env::temp_dir().join(format!("cqust-rust-test-{}",std::process::id()));let _=std::fs::create_dir_all(&folder);std::fs::write(folder.join("settings.json"),r#"{"check_interval":7,"theme":"dark"}"#).unwrap();let mut service=Service::new(Some(folder));assert_eq!(service.settings.check_interval,10);assert_eq!(service.settings.theme,"dark");assert!(service.settings.window_snapping);service.password=Zeroizing::new("synthetic-secret".into());assert!(!service.snapshot().to_string().contains("synthetic-secret"));assert!(service.next_retry.is_none());}
+ #[test]fn migration_and_no_password_export(){let folder=std::env::temp_dir().join(format!("cqust-rust-test-{}",std::process::id()));let _=std::fs::create_dir_all(&folder);std::fs::write(folder.join("settings.json"),r#"{"check_interval":7,"theme":"dark","window_snapping":true}"#).unwrap();let mut service=Service::new(Some(folder));assert_eq!(service.settings.check_interval,10);assert_eq!(service.settings.theme,"dark");assert_eq!(service.settings.window_snapping,cfg!(windows));service.password=Zeroizing::new("synthetic-secret".into());assert!(!service.snapshot().to_string().contains("synthetic-secret"));assert!(service.next_retry.is_none());}
 }

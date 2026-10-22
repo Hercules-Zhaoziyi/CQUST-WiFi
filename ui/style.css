@@ -49,6 +49,8 @@ img{-webkit-user-drag:none;user-select:none;pointer-events:none}
 .window-controls button svg{width:14px;height:14px}
 .window-controls button:hover{background:var(--accent-soft);color:var(--text)}
 .window-controls #window-close:hover{background:#d94050;color:white}
+:root[data-platform=macos] .titlebar{display:none}
+:root[data-platform=macos] #window-snapping-setting{display:none}
 header{margin:12px 0 20px}
 nav{margin-bottom:20px}
 main{overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable both-edges;min-height:0;padding-bottom:8px;overscroll-behavior:contain}
@@ -103,6 +105,7 @@ main{overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable both-edges;min-he
 
 
 nav{gap:0;justify-content:space-between}nav button{font-size:12px;gap:4px;white-space:nowrap}nav button svg{width:16px;height:16px}.site-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.site-tile{display:flex;align-items:center;gap:11px;text-align:left;min-width:0;min-height:94px;padding:15px 12px;border:1px solid var(--line);border-radius:19px;background:var(--card);color:var(--text);transition:transform .2s var(--ease),box-shadow .2s var(--ease),border-color .2s}.site-tile:hover{transform:translateY(-3px);border-color:var(--accent);box-shadow:0 8px 22px #2563eb12}.site-tile:active{transform:scale(.97)}.site-tile img{width:38px;height:38px;object-fit:contain;flex-shrink:0}.site-tile span{min-width:0}.site-tile strong{display:block;font-size:12px;line-height:1.5;font-weight:600;overflow-wrap:anywhere}.site-tile small{display:block;color:var(--muted);font-size:10px;margin-top:4px}.sites-note{font-size:11px;color:var(--muted);line-height:1.8;text-align:center;margin:22px 8px}
+:root[data-platform=macos] .brand img{width:34px;height:34px}
 
 
 /* 5.0.2: stable gutters, quiet scrollbars and guided authentication. */
