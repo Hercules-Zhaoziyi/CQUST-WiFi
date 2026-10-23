@@ -14,6 +14,7 @@ mod portal_browser;
 #[path="snapping_macos.rs"]mod snapping;
 mod updates;
 mod proxy;
+mod schedule;
 use snapping::Snapping;
 #[cfg(feature="verify-ui")]mod verify;
 use std::sync::{Arc,Mutex};
@@ -25,6 +26,16 @@ use tauri::{Manager,Emitter,menu::{Menu,MenuItem},tray::{TrayIconBuilder,TrayIco
 async fn request(app:tauri::AppHandle,window:tauri::WebviewWindow,method:String,args:Value)->Result<Value,String>{
  if window.label()!="main"{return Err("不允许的调用来源".into())}
  #[cfg(feature="verify-ui")]if app.state::<Backend>().1{return Ok(verify::request(&app,&method,args))}
+ if method.starts_with("schedule"){
+  let backend=app.state::<Backend>().0.clone();
+  let student_id=args["student_id"].as_str().unwrap_or("").to_string();
+  let context=if let Ok(service)=backend.lock(){service.campus_context(&student_id)}else{return Err("后台服务暂不可用，请重启软件。".into())};
+  let state=app.state::<schedule::Schedule>().inner().clone();
+  let handle=app.clone();
+  return tauri::async_runtime::spawn_blocking(move||match schedule::command(&handle,&state,&method,args,context){
+   Ok(data)=>json!({"ok":true,"data":data}),Err(error)=>json!({"ok":false,"error":error})
+  }).await.map_err(|_|"课表操作未完成，请稍后重试。".to_string());
+ }
  let backend=app.state::<Backend>().0.clone();Ok(tauri::async_runtime::spawn_blocking(move||{
   let busy=matches!(method.as_str(),"login"|"reconnect"|"disconnect"|"logout"|"switchOnline");
   if busy{let _=app.emit("cqust-event",json!({"event":"busy","data":true}));}
@@ -87,7 +98,7 @@ fn main(){
  }).setup(|app|{
   let verification=cfg!(feature="verify-ui")&&std::env::args().any(|a|a=="--verify");
   app.manage(proxy::ProxyManager::new()?);
-  let mut service=service::Service::new(if verification{Some(std::env::temp_dir().join(format!("cqust-verify-{}",std::process::id())))}else{None});service.enable_browser_probe(app.handle().clone());app.manage(Snapping::new(service.settings.window_snapping));app.manage(updates::Updates::default());let state=Backend(Arc::new(Mutex::new(service)),verification);app.manage(state.clone());
+  let mut service=service::Service::new(if verification{Some(std::env::temp_dir().join(format!("cqust-verify-{}",std::process::id())))}else{None});service.enable_browser_probe(app.handle().clone());let schedule=schedule::Schedule::new(service.folder());app.manage(schedule);app.manage(Snapping::new(service.settings.window_snapping));app.manage(updates::Updates::default());let state=Backend(Arc::new(Mutex::new(service)),verification);app.manage(state.clone());
   app.state::<Snapping>().animations.store(state.0.lock().unwrap().settings.animations,std::sync::atomic::Ordering::Relaxed);
   #[cfg(windows)]{let snap_handle=app.handle().clone();std::thread::spawn(move||loop{std::thread::sleep(std::time::Duration::from_millis(16));snap_handle.state::<Snapping>().tick(&snap_handle);});}
   let show_item=MenuItem::with_id(app,"show","显示主窗口",true,None::<&str>)?;let quit_item=MenuItem::with_id(app,"quit","退出软件",true,None::<&str>)?;

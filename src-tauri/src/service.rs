@@ -17,6 +17,15 @@ impl Service{
   Ok((self.username.clone(),password))
  }
  pub fn enable_browser_probe(&mut self,app:AppHandle){self.auth.browser_probe=Some(std::sync::Arc::new(move||crate::portal_browser::discover(&app)));}
+ pub fn folder(&self)->&PathBuf{&self.folder}
+ // 课表同步只在学号与当前校园网账号一致时复用已保存的校园网密码。
+ pub fn campus_context(&self,student_id:&str)->crate::schedule::CampusContext{
+  let password=if !student_id.is_empty()&&student_id==self.username{
+   let value=if !self.password.is_empty(){self.password.clone()}else if !self.isolated{vault::get(&self.username)}else{Zeroizing::new(String::new())};
+   if value.is_empty(){None}else{Some(value)}
+  }else{None};
+  crate::schedule::CampusContext{password}
+ }
  pub fn new(custom:Option<PathBuf>)->Self{
   let isolated=custom.is_some();let folder=custom.unwrap_or_else(default_folder);let _=std::fs::create_dir_all(&folder);
   let mut settings:Settings=read(&folder.join("settings.json")).unwrap_or_default();if ![5,10,120].contains(&settings.check_interval){settings.check_interval=10}if !["system","light","dark"].contains(&settings.theme.as_str()){settings.theme="system".into()}if cfg!(target_os="macos"){settings.window_snapping=false}

@@ -15,6 +15,7 @@ names=['package.json','package-lock.json','README.md','.gitignore','build-local.
 names+=['ui/sites.json','prepare-installer-assets.ps1','src-tauri/icons/school-seal.png','src-tauri/icons/installer-header.bmp','src-tauri/icons/installer-school.ico']
 names+=['src-tauri/src/portal_browser.rs','src-tauri/src/snapping.rs','src-tauri/src/updates.rs']
 names+=['ui/markdown.js','ui/proxy.js','ui/proxy.css','src-tauri/src/proxy.rs','ui/platform.js','src-tauri/src/platform.rs','src-tauri/src/snapping_macos.rs','src-tauri/src/startup_macos.rs','src-tauri/src/vault_macos.rs','src-tauri/tauri.macos.conf.json','src-tauri/icons/icon.icns','src-tauri/icons/icon.png','src-tauri/icons/tray-macos.png']
+names+=['ui/schedule.js','ui/schedule.css','src-tauri/src/schedule.rs']
 names+=['docs/PROXY.md']
 names+=['src-tauri/icons/icon-macos.svg','src-tauri/icons/tray-macos.svg']
 names+=[path.relative_to(root).as_posix() for path in sorted((root/'docs').glob('*.md')) if path.relative_to(root).as_posix() not in names]
@@ -47,7 +48,7 @@ for executable in payloads:
     if any(secret and secret in executable for secret in secrets):raise RuntimeError('Private data found in executable; release rejected')
     for synthetic in ('synthetic-secret','synthetic-test','private-fixture','local-test-password','verifyPortalRedirect','test-only','测试同学'):
         if synthetic.encode() in executable:raise RuntimeError('Verification backend or fixture found in release executable')
-output=root.parent.parent/'outputs'/'CQUST_Wifi_Tauri_v5.2.1_Source.zip'
+output=root.parent.parent/'outputs'/'CQUST_Wifi_Tauri_v5.2.2_Source.zip'
 with zipfile.ZipFile(output,'w',zipfile.ZIP_DEFLATED) as archive:
     for name in names:archive.write(root/name,'CQUST_Wifi_Tauri/'+name)
 print('Source archive and release executable passed credential/verification-backend scan.')
