@@ -19,4 +19,4 @@ data class VpnProfile(val host:String="", val port:Int=7890, val username:String
 data class ProxyOptions(val port:Int=7890, val mode:String="mixed", val lan:Boolean=true,
     val username:String, val password:String, val campusPassword:Boolean)
 data class CampusSite(val name:String, val url:String, val icon:String, val viaPortal:Boolean)
-data class UpdateInfo(val version:String, val notes:String, val download:String?, val url:String, val newer:Boolean)
+data class UpdateInfo(val version:String, val notes:String, val download:String?, val url:String, val newer:Boolean,val digest:String="",val size:Long=0)

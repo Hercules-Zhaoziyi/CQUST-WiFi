@@ -112,6 +112,7 @@ private val CardShape=RoundedCornerShape(26.dp)
         }
         if(issue!=null)AuthDialog(issue!!,onPortal={Repository.dismissIssue();portal=true})
         if(portal)PortalDialog(onClose={portal=false},onResult={url->portal=false;Repository.retryAuth(url,"","")})
+        UpdateDialog()
     }
 }
 
@@ -214,12 +215,12 @@ private val CardShape=RoundedCornerShape(26.dp)
         run{
             Panel{
                 Row(verticalAlignment=Alignment.CenterVertically){
-                    Column(Modifier.weight(1f)){Text("你好，欢迎回来",fontSize=23.sp,fontWeight=FontWeight.Bold);Text("使用本人的校园网账号",fontSize=12.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)}
+                    Column(Modifier.weight(1f)){Text("统一登录",fontSize=23.sp,fontWeight=FontWeight.Bold);Text("校园网与课表，按需使用",fontSize=12.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)}
                     Image(painterResource(R.drawable.school_logo),"重庆科技大学",Modifier.width(120.dp).height(32.dp),contentScale=ContentScale.Fit)
                 }
                 OutlinedTextField(user,{user=it},label={Text("校园网账号")},modifier=Modifier.fillMaxWidth().testTag("username"),
                     singleLine=true,shape=RoundedCornerShape(16.dp),trailingIcon={IconButton(onClick={accounts=true}){Icon(Icons.Outlined.ExpandMore,"选择账号")}})
-                SecretField(password,{password=it},"登录密码",placeholder=if(Repository.hasPassword(user))"密码已安全保存，可留空"else"请输入密码")
+                SecretField(password,{password=it},"统一认证密码",placeholder=if(Repository.hasPassword(user))"密码已安全保存，可留空"else"请输入密码")
                 Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
                     listOf("校园网","课表","两者").forEachIndexed{i,title->FilterChip(loginMode==i,{loginMode=i},label={Text(title)})}
                 }
@@ -295,6 +296,7 @@ private val CardShape=RoundedCornerShape(26.dp)
     var mode by remember{mutableStateOf("mixed")}
     val context=LocalContext.current
     var scanned by remember{mutableStateOf<VpnProfile?>(null)}
+    var shareQr by remember{mutableStateOf<String?>(null)}
     val scanner=androidx.activity.compose.rememberLauncherForActivityResult(com.journeyapps.barcodescanner.ScanContract()){result->
         result.contents?.let{raw->runCatching{ProxyQr.parse(raw)}.onSuccess{scanned=it}.onFailure{Repository.message("不是有效的局域网代理二维码，请核对桌面端配置。")}}
     }
@@ -367,6 +369,7 @@ private val CardShape=RoundedCornerShape(26.dp)
                     Text("服务器：${s.sharingAddress.substringBeforeLast(':')}\n端口：${s.sharingAddress.substringAfterLast(':')}\n代理用户名：${s.sharingUser}",fontSize=14.sp,lineHeight=27.sp)
                     val uri=(if(mode=="http")"http"else"socks5")+"://"+s.sharingAddress
                     OutlinedButton(onClick={copy(context,uri)}){Icon(Icons.Outlined.ContentCopy,null,Modifier.size(17.dp));Spacer(Modifier.width(8.dp));Text("复制协议链接")}
+                    OutlinedButton(onClick={runCatching{Repository.sharingQr()}.onSuccess{shareQr=it}.onFailure{Repository.message(it.message?:"当前配置不能生成连接二维码")}}){Icon(Icons.Outlined.QrCode,null);Spacer(Modifier.width(8.dp));Text("生成通用连接二维码")}
                     if(s.sharingSecret)Text("正在使用校园网密码，不提供显示或复制。",fontSize=12.sp)
                     else Repository.displayedSharePassword()?.let{secret->SecretField(secret,{},"本次代理密码",visibleByDefault=true)}
                 }
@@ -377,11 +380,31 @@ private val CardShape=RoundedCornerShape(26.dp)
     scanned?.let{p->AlertDialog(onDismissRequest={scanned=null},title={Text("确认连接电脑代理")},text={Text("服务器：${p.host}\n端口：${p.port}\n用户名：${p.username}\n\n二维码包含代理凭据，请只扫描自己电脑生成的配置。")},confirmButton={TextButton(onClick={
         runCatching{Repository.saveVpn(p.host,p.port,p.username,p.password,false)}.onSuccess{host=p.host;port=p.port.toString();user=p.username;password=p.password;campus=false;scanned=null;onVpn()}.onFailure{Repository.message("代理配置保存失败")}
     }){Text("确认并连接")}},dismissButton={TextButton(onClick={scanned=null}){Text("取消")}})}
+    shareQr?.let{payload->ProxyQrDialog(payload,onClose={shareQr=null})}
+}
+@Composable private fun ProxyQrDialog(payload:String,onClose:()->Unit){
+    val bitmap=remember(payload){val matrix=com.google.zxing.qrcode.QRCodeWriter().encode(payload,com.google.zxing.BarcodeFormat.QR_CODE,720,720,mapOf(com.google.zxing.EncodeHintType.CHARACTER_SET to "UTF-8"))
+        android.graphics.Bitmap.createBitmap(720,720,android.graphics.Bitmap.Config.ARGB_8888).apply{
+            val pixels=IntArray(720*720){i->if(matrix[i%720,i/720])android.graphics.Color.BLACK else android.graphics.Color.WHITE};setPixels(pixels,0,720,0,0,720,720)
+        }}
+    AlertDialog(onDismissRequest=onClose,properties=androidx.compose.ui.window.DialogProperties(securePolicy=androidx.compose.ui.window.SecureFlagPolicy.SecureOn),containerColor=MaterialTheme.colorScheme.surface,title={Text("扫码连接本机代理")},text={Column(verticalArrangement=Arrangement.spacedBy(12.dp)){
+        Image(bitmap.asImageBitmap(),"代理连接二维码",Modifier.fillMaxWidth().aspectRatio(1f))
+        Text("二维码含代理密码，请勿公开分享。仅允许自己的可信设备扫描。",fontSize=12.sp)
+    }},confirmButton={TextButton(onClick=onClose){Text("关闭")}})
 }
 private fun copy(context:Context,text:String){context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("代理地址",text));Repository.message("已复制")}
 
 @Composable private fun SettingsPage(s:ViewState,onLogs:()->Unit,onNotifications:()->Unit){
     val context=LocalContext.current;val scope=rememberCoroutineScope()
+    var notificationsReady by remember{mutableStateOf(false)}
+    var batteryReady by remember{mutableStateOf(false)}
+    val lifecycle=androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    fun refreshPermissions(){
+        val manager=context.getSystemService(android.app.NotificationManager::class.java)
+        notificationsReady=androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled()&&listOf("monitor","vpn").all{manager.getNotificationChannel(it)?.importance!=android.app.NotificationManager.IMPORTANCE_NONE}
+        batteryReady=context.getSystemService(android.os.PowerManager::class.java).isIgnoringBatteryOptimizations(context.packageName)
+    }
+    DisposableEffect(lifecycle){refreshPermissions();val observer=androidx.lifecycle.LifecycleEventObserver{_,event->if(event==androidx.lifecycle.Lifecycle.Event.ON_RESUME)refreshPermissions()};lifecycle.addObserver(observer);onDispose{lifecycle.removeObserver(observer)}}
     var update by remember{mutableStateOf<UpdateInfo?>(null)}
     var checking by remember{mutableStateOf(false)}
     PageColumn{
@@ -409,9 +432,9 @@ private fun copy(context:Context,text:String){context.getSystemService(Clipboard
         }
         Panel{
             Text("后台运行",fontSize=18.sp,fontWeight=FontWeight.SemiBold)
-            Text("Android 可能限制后台服务。请按手机品牌允许自启动、后台运行和通知。强行停止应用后，需要手动重新打开；不能保证所有系统下永久保活。",fontSize=13.sp,lineHeight=23.sp)
-            OutlinedButton(onClick=onNotifications,modifier=Modifier.fillMaxWidth()){Text("允许通知栏连接入口")}
-            OutlinedButton(onClick={batterySettings(context)},modifier=Modifier.fillMaxWidth()){Text("打开电池与后台设置")}
+            Text(if(notificationsReady&&batteryReady)"通知与后台权限已就绪。"else"允许通知与后台运行有助于保持连接。权限生效后，对应按钮会隐藏。强行停止后仍需手动打开应用。",fontSize=13.sp,lineHeight=23.sp)
+            if(!notificationsReady)OutlinedButton(onClick=onNotifications,modifier=Modifier.fillMaxWidth()){Text("允许通知栏连接入口")}
+            if(!batteryReady)OutlinedButton(onClick={batterySettings(context)},modifier=Modifier.fillMaxWidth()){Text("打开电池与后台设置")}
             TextButton(onClick=onLogs){Icon(Icons.Outlined.ReceiptLong,null);Spacer(Modifier.width(9.dp));Text("查看运行日志")}
         }
         Panel{
@@ -424,10 +447,25 @@ private fun copy(context:Context,text:String){context.getSystemService(Clipboard
             update?.let{u->
                 Text(if(u.newer)"发现新版本 ${u.version}"else"暂未发现更新版本",fontWeight=FontWeight.SemiBold)
                 Markdown(u.notes)
-                if(u.newer&&u.download!=null)OutlinedButton(onClick={openLink(context,u.download)}){Text("下载 Android 安装包")}
+                if(u.newer&&u.download!=null)OutlinedButton(onClick={AppUpdates.offer(u)}){Text("应用内下载并更新")}
             }
         }
     }
+}
+@Composable private fun UpdateDialog(){
+    val update by AppUpdates.state.collectAsStateWithLifecycle()
+    val context=LocalContext.current
+    val info=update.info
+    if(update.visible&&info!=null)AlertDialog(onDismissRequest=AppUpdates::dismiss,title={Text(if(update.ready)"更新已下载"else"发现新版本 ${info.version}")},text={
+        Column(Modifier.heightIn(max=400.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)){
+            Markdown(info.notes)
+            Text("安装包将校验应用标识、版本、SHA-256 和签名。安装需要系统确认，不会静默安装或自动卸载旧版。",fontSize=12.sp,lineHeight=20.sp)
+            if(update.downloading){LinearProgressIndicator(progress={update.percent/100f},modifier=Modifier.fillMaxWidth());Text("下载中 ${update.percent}%",fontSize=13.sp)}
+            if(update.error.isNotEmpty())Text(update.error,fontSize=13.sp,color=MaterialTheme.colorScheme.error)
+            TextButton(onClick={openLink(context,"https://qm.qq.com/q/Rn7B5NBbiK")}){Icon(Icons.Outlined.Groups,null);Spacer(Modifier.width(7.dp));Text("加入 QQ 内测群")}
+            TextButton(onClick={openLink(context,info.url)}){Text("查看 GitHub 发布页")}
+        }
+    },confirmButton={TextButton(onClick={if(update.ready)AppUpdates.install()else AppUpdates.download()},enabled=!update.downloading){Text(if(update.ready)"安装更新"else"下载并更新")}},dismissButton={TextButton(onClick=AppUpdates::dismiss){Text("稍后")}})
 }
 @Composable private fun Markdown(text:String){
     val color=MaterialTheme.colorScheme.onSurface.toArgb()

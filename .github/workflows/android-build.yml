@@ -24,13 +24,15 @@ jobs:
           test "$(sha256sum app/libs/hev-socks5-tunnel-2.19.1.aar | cut -d' ' -f1)" = "107958f7a07051386248ba8dba778b63d8dcefdfb2c3665b0ee9a8c93de5f6ca"
           test "$(sha256sum gradle/wrapper/gradle-wrapper.jar | cut -d' ' -f1)" = "498495120a03b9a6ab5d155f5de3c8f0d986a449153702fb80fc80e134484f17"
       - name: Build and unit test
-        run: gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug :app:assembleAndroidTest
+        run: gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug :app:assembleRelease :app:assembleAndroidTest
       - name: Collect test APK
         if: success()
         run: |
           mkdir -p artifacts
-          cp app/build/outputs/apk/debug/app-debug.apk artifacts/CQUST-WiFi-Android-1.0.0-beta02.apk
-          sha256sum artifacts/*.apk > artifacts/SHA256SUMS.txt
+          cp app/build/outputs/apk/release/app-release-unsigned.apk artifacts/app-release-unsigned.apk
+          cp "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" artifacts/apksigner.jar
+          cp "$ANDROID_HOME/build-tools/35.0.0/NOTICE.txt" artifacts/BUILD-TOOLS-NOTICE.txt
+          sha256sum artifacts/* > artifacts/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -44,6 +46,10 @@ jobs:
     needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [35, 37]
     defaults:
       run:
         working-directory: android
@@ -63,7 +69,7 @@ jobs:
         run: python3 app/src/androidTest/fixtures/socks_fixture.py > /tmp/cqust-socks-fixture.log 2>&1 &
       - uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 35
+          api-level: ${{ matrix.api }}
           target: google_apis
           arch: x86_64
           profile: pixel_6
@@ -72,7 +78,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: android-emulator-results
+          name: android-emulator-results-api${{ matrix.api }}
           path: |
             android/artifacts/screenshots/
             android/app/build/reports/androidTests/

@@ -35,6 +35,9 @@ class VpnFlowTest {
             var response=""
             rule.waitUntil(15000){response=shell("run-as cn.ziyis.cqustprobe cat files/result.txt");response.contains("CQUST_TUN_OK")||response.contains("PROBE_ERROR")}
             assertTrue("No controlled DNS/HTTP response through TUN: $response",response.contains("CQUST_TUN_OK"))
+            ApplicationClients.client().newCall(okhttp3.Request.Builder().url("http://cqust-fixture.invalid/").build()).execute().use{
+                assertTrue("App-owned proxy request failed",it.body!!.string().contains("CQUST_TUN_OK"))
+            }
             context.startService(Intent(context,CampusVpnService::class.java).setAction("STOP"))
             rule.waitUntil(5000){Repository.engine.connectivity.allNetworks.none{Repository.engine.connectivity.getNetworkCapabilities(it)?.hasTransport(NetworkCapabilities.TRANSPORT_VPN)==true}}
             assertFalse(Repository.state.value.vpn)

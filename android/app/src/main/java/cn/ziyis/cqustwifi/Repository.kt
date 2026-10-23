@@ -34,6 +34,7 @@ object Repository {
     private var lastAttempt=0L
     private var sharing:LanProxy?=null
     private var sharePassword:String?=null
+    private var activeShareOptions:ProxyOptions?=null
     private var selectedService=""
     fun initialize(context:Context) {
         app=context.applicationContext;vault=Vault(app);engine=CampusEngine(app,::log)
@@ -216,18 +217,27 @@ object Repository {
                 resolve={net.getAllByName(it).toList()},connect={address->net.socketFactory.createSocket().apply{connect(address,5000)}},
                 bindUdp={net.bindSocket(it)})
             server.start();sharing=server;sharePassword=if(options.campusPassword)null else secret
+            activeShareOptions=options.copy(username=user,password=secret)
             mutable.update{it.copy(sharing=true,sharingAddress="$ip:${options.port}",sharingUser=user,sharingSecret=options.campusPassword)}
             log("本机代理已开启；设备仍需账号密码认证。");ensureMonitor()
         }catch(_:Exception){message("代理启动失败，请检查端口、账号密码和当前 Wi-Fi。")}
     }}}
     fun displayedSharePassword()=sharePassword
-    fun stopSharing(){sharing?.close();sharing=null;sharePassword=null;mutable.update{it.copy(sharing=false,sharingAddress="",sharingUser="",sharingSecret=false)}}
+    fun sharingQr():String {
+        val options=activeShareOptions?:error("请先开启本机共享")
+        require(options.mode!="http"&&options.lan){"二维码连接需要开启局域网的 SOCKS5 或混合模式"}
+        val host=state.value.sharingAddress.substringBeforeLast(':')
+        require(Protocol.privateV4(host)){"局域网地址已失效，请重启共享"}
+        return JSONObject().put("type","cqust-wifi-proxy").put("version",1).put("protocol","socks5")
+            .put("host",host).put("port",options.port).put("username",options.username).put("password",options.password).toString()
+    }
+    fun stopSharing(){sharing?.close();sharing=null;sharePassword=null;activeShareOptions=null;mutable.update{it.copy(sharing=false,sharingAddress="",sharingUser="",sharingSecret=false)}}
     fun sites():List<CampusSite> {
         val a=JSONArray(app.assets.open("sites.json").bufferedReader().readText())
         return (0 until a.length()).map{val o=a.getJSONObject(it);CampusSite(o.getString("name"),o.getString("url"),o.getString("icon"),o.optBoolean("viaPortal"))}
     }
     suspend fun checkUpdate():UpdateInfo=withContext(Dispatchers.IO){
-        val client=OkHttpClient.Builder().callTimeout(15,TimeUnit.SECONDS).build()
+        val client=ApplicationClients.client()
         val req=Request.Builder().url("https://api.github.com/repos/Hercules-Zhaoziyi/CQUST-WiFi/releases?per_page=30")
             .header("Accept","application/vnd.github+json").header("User-Agent","CQUST-WiFi-Android").build()
         client.newCall(req).execute().use{r->
@@ -243,7 +253,7 @@ object Repository {
                     if(!url.startsWith("https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases/download/"))continue
                     val version=Regex("""\d+\.\d+\.\d+(?:-beta\d+)?""").find(name)?.value?:continue
                     return@withContext UpdateInfo(version,release.optString("body"),url,
-                        release.optString("html_url"),Protocol.newer(version,BuildConfig.VERSION_NAME))
+                        release.optString("html_url"),Protocol.newer(version,BuildConfig.VERSION_NAME),asset.optString("digest"),asset.optLong("size"))
                 }
             }
             UpdateInfo(BuildConfig.VERSION_NAME,"暂无适用于 Android 的新版本。",null,

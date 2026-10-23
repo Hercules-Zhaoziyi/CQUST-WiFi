@@ -23,9 +23,15 @@ class MainActivity:ComponentActivity() {
         setContent{CampusUi(onVpn={if(Repository.state.value.vpn){
             Repository.vpnStoppedByUser();startService(Intent(this,CampusVpnService::class.java).setAction("STOP"))
         }else{val request=VpnService.prepare(this);if(request!=null)vpnPermission.launch(request)else startVpn()}},
-            onNotifications={if(android.os.Build.VERSION.SDK_INT>=33)notifications.launch(Manifest.permission.POST_NOTIFICATIONS)})}
+            onNotifications={
+                val preferences=getSharedPreferences("permissions",MODE_PRIVATE)
+                if(android.os.Build.VERSION.SDK_INT>=33&&androidx.core.content.ContextCompat.checkSelfPermission(this,Manifest.permission.POST_NOTIFICATIONS)!=android.content.pm.PackageManager.PERMISSION_GRANTED&&(!preferences.getBoolean("notification_asked",false)||shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS))){
+                    preferences.edit().putBoolean("notification_asked",true).apply();notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }else startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE,packageName))
+            })}
         Repository.ensureMonitor()
     }
+    override fun onResume(){super.onResume();AppUpdates.onResume()}
     private fun startVpn(){runCatching{ContextCompat.startForegroundService(this,Intent(this,CampusVpnService::class.java))}
         .onFailure{Repository.message("系统暂不允许启动 VPN，请保持应用在前台后重试。")}}
 }
@@ -36,5 +42,5 @@ fun openLink(context:Context,url:String){
         .onFailure{Repository.message("没有可打开此链接的浏览器。")}
 }
 fun batterySettings(context:Context){runCatching{
-    context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    context.startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,Uri.parse("package:"+context.packageName)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
 }.onFailure{context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:"+context.packageName)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))}}

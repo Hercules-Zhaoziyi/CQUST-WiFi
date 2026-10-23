@@ -39,6 +39,7 @@ dependencies {
     implementation("org.jsoup:jsoup:1.18.3")
     implementation("io.ktor:ktor-client-core:2.3.13")
     implementation("io.ktor:ktor-client-android:2.3.13")
+    implementation("io.ktor:ktor-client-okhttp:2.3.13")
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("io.coil-kt:coil-svg:2.7.0")

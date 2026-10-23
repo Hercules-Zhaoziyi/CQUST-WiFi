@@ -2,6 +2,8 @@ package top.msfxp.schedule.data.api
 
 import io.ktor.client.*
 import io.ktor.client.engine.android.*
+import io.ktor.client.engine.okhttp.OkHttp
+import cn.ziyis.cqustwifi.ApplicationClients
 import io.ktor.client.plugins.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -19,8 +21,9 @@ class CqustWebVpnSession(
         const val VPN_GATEWAY = "https://web.cqust.edu.cn"
         const val VPN_TICKET_COOKIE = "wengine_vpn_ticketweb_cqust_edu_cn"
 
-        val defaultClient by lazy {
-            HttpClient(Android) {
+        val defaultClient get() =
+            HttpClient(OkHttp) {
+                engine { preconfigured=ApplicationClients.client() }
                 followRedirects = false
                 install(HttpTimeout) {
                     requestTimeoutMillis = 15000
@@ -28,7 +31,6 @@ class CqustWebVpnSession(
                     socketTimeoutMillis = 15000
                 }
             }
-        }
     }
 
     private val cookieMap = java.util.concurrent.ConcurrentHashMap<String, Cookie>()
