@@ -17,6 +17,8 @@ class SmokeTest {
     @Test fun pagesAreReachableWithoutCredentials(){
         rule.onNodeWithTag("power").assertExists()
         screenshot("01-connection")
+        rule.onNodeWithTag("username").performScrollTo()
+        screenshot("01b-login")
         rule.onNodeWithText("常用网站").performClick()
         rule.onNodeWithText("校园服务，触手可及。").assertExists()
         screenshot("02-sites")
@@ -29,6 +31,9 @@ class SmokeTest {
         rule.onNodeWithText("关于",useUnmergedTree=true).performClick()
         rule.onNodeWithText("加入内测群").assertExists()
         screenshot("05-about")
+        rule.onNodeWithContentDescription("设置").performClick()
+        rule.onNodeWithText("软件更新").performScrollTo().assertExists()
+        screenshot("06-settings-update")
     }
     @Test fun nativeCoreLoadsWithoutStartingVpn(){assertFalse(TProxyService.TProxyIsRunning())}
     private fun screenshot(name:String){

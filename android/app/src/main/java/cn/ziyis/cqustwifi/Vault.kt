@@ -13,8 +13,8 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
 /** Whole credential document encrypted by an app-private Android Keystore key. */
-class Vault(context:Context) {
-    private val file=AtomicFile(File(context.noBackupFilesDir,"credentials.enc"))
+class Vault(context:Context,name:String="credentials.enc") {
+    private val file=AtomicFile(File(context.noBackupFilesDir,name))
     private val alias="cqust-wifi-android-v1"
     private var unreadable=false
     private fun key():SecretKey {

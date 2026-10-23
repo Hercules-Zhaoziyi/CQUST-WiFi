@@ -9,7 +9,7 @@
 - Android Keystore AES-GCM 加密保存凭据，关闭系统备份。
 - 20 个校园常用网站、本地图标、深浅色主题、动效、日志。
 - GitHub Android 更新检测与 Markdown 更新说明、软件介绍和内测群入口。
-- 用户授权的 SOCKS5 VPN 客户端：连接电脑端局域网代理，转发 TCP/UDP。
+- 用户授权的 SOCKS5 VPN 客户端：连接电脑端局域网代理，转发公网 TCP/UDP；校内/私有网络直连。
 - 默认关闭的 HTTP / HTTPS CONNECT / SOCKS5 局域网代理服务，要求账号密码认证。
 - 前台通知服务、可选开机恢复。Android 没有桌面托盘和窗口吸附，用通知和系统后台设置适配。
 

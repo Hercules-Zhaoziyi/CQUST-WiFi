@@ -38,6 +38,7 @@ class CampusEngine(private val context:Context,private val diagnostic:(String)->
     private var challenge:Challenge?=null
     private var hint:String?=null
     private var hintNetwork:String=""
+    private var challengeNetwork:String=""
     fun wifi():Network?=connectivity.allNetworks.firstOrNull {
         val c=connectivity.getNetworkCapabilities(it)
         c?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)==true&&!c.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
@@ -105,17 +106,18 @@ class CampusEngine(private val context:Context,private val diagnostic:(String)->
     fun detect(net:Network):Detection {
         val http=client(net);val deadline=System.currentTimeMillis()+14000
         var online=0
-        for(entry in Protocol.entries.drop(2).take(5)) {
+        for(entry in Protocol.entries.take(1)+Protocol.entries.drop(2).take(5)) {
             if(System.currentTimeMillis()>=deadline)break
             try {
                 val req=Request.Builder().url(entry).header("Cache-Control","no-cache").build()
                 http.newBuilder().callTimeout((deadline-System.currentTimeMillis()).coerceIn(1,3000),TimeUnit.MILLISECONDS)
                     .build().newCall(req).execute().use{r->
                     val location=r.header("Location")?.let{URI(entry).resolve(it).toString()}
-                    if(location!=null&&Protocol.candidate(location))return Detection.Portal(location)
+                    if(location!=null&&Protocol.trusted(location)&&!URI(location).path.endsWith("/success.jsp"))return Detection.Portal(location)
                     val text=bodyText(bounded(r,8192))
                     val embedded=Protocol.redirect(text)?.let{URI(entry).resolve(it).toString()}
-                    if(embedded!=null&&Protocol.candidate(embedded))return Detection.Portal(embedded)
+                    if(embedded!=null&&Protocol.trusted(embedded)&&!URI(embedded).path.endsWith("/success.jsp"))return Detection.Portal(embedded)
+                    if(Protocol.trusted(entry)&&r.code==200&&(text.contains("InterFace.do")||text.contains("net_access_type")))return Detection.Portal(entry)
                     if(r.code==204||(r.code==200&&text.trim()=="Microsoft Connect Test"))online++
                 }
             }catch(_:Exception){diagnostic("探针 "+URI(entry).host+" · 暂不可判定")}
@@ -204,8 +206,11 @@ class CampusEngine(private val context:Context,private val diagnostic:(String)->
     }
     fun login(account:Account,manual:String="",selected:String="",code:String="",reuse:Boolean=false):CampusSession {
         val net=wifi()?:throw AuthIssue("network","请先连接校园 Wi-Fi，移动数据不能代替校园网认证。")
+        val key=networkKey(net)+"/"+ip(net)
+        if(reuse&&challengeNetwork!=key){challenge=null;throw AuthIssue("url","Wi-Fi 已改变，请重新探测认证入口。")}
         val c=if(reuse)challenge?:prepare(net,manual,selected)else prepare(net,manual,selected)
         challenge=c
+        challengeNetwork=key
         if(c.captchaUrl!=null&&code.isBlank())throw AuthIssue("captcha","请输入认证图片中的验证码。",runCatching{captcha()}.getOrNull())
         val body=Protocol.loginBody(account.username,account.password,c.service,c.query,c.encrypt,c.exponent,c.modulus,code,c.prefix)
         val result=post(c.client,c.api,c.page,"login",body)

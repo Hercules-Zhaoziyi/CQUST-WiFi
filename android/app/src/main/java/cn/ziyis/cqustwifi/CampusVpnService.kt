@@ -63,8 +63,9 @@ class CampusVpnService:VpnService(){
                 setUnderlyingNetworks(arrayOf(wifi))
                 val builder=Builder().setSession("CQUST Wi-Fi · 电脑代理").setMtu(1500)
                     .addAddress("198.18.0.1",30).addAddress("fd00:4351::1",126)
-                    .addRoute("0.0.0.0",0).addRoute("::",0).addDnsServer("1.1.1.1").addDnsServer("8.8.8.8")
+                    .addRoute("2000::",3).addDnsServer("1.1.1.1").addDnsServer("8.8.8.8")
                     .addDisallowedApplication(packageName).setBlocking(false)
+                Protocol.vpnRoutes().forEach{(address,prefix)->builder.addRoute(address,prefix)}
                 val descriptor=builder.establish()?:error("VPN 授权已取消，请重新确认。")
                 tun=descriptor
                 // Engine requires a config file. It exists only in noBackupFilesDir,

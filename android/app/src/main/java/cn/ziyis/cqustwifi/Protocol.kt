@@ -70,6 +70,24 @@ object Protocol {
             !(b[0]==0x20&&b[1]==1&&b[2]==0)&&!(b.take(4)==listOf(0x20,1,0x0d,0xb8))
     }
     fun recommendedPassword():String {val chars="ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";val r=SecureRandom();return (1..12).map{chars[r.nextInt(chars.length)]}.joinToString("")}
+    /** Route public IPv4 via VPN; keep campus/private/link-local networks direct. */
+    fun vpnRoutes():List<Pair<String,Int>> {
+        val excluded=listOf(0L to 0x00ffffffL,0x0a000000L to 0x0affffffL,
+            0x64400000L to 0x647fffffL,0x7f000000L to 0x7fffffffL,
+            0xa9fe0000L to 0xa9feffffL,0xac100000L to 0xac1fffffL,
+            0xc0a80000L to 0xc0a8ffffL,0xe0000000L to 0xffffffffL)
+        val out=mutableListOf<Pair<String,Int>>()
+        fun addRange(start:Long,end:Long){var at=start
+            while(at<=end){var size=java.lang.Long.lowestOneBit(at).let{if(it==0L)1L shl 32 else it}
+                while(size>end-at+1)size=size shr 1
+                val host=(3 downTo 0).joinToString("."){((at shr (it*8))and 255).toString()}
+                out+=host to (32-java.lang.Long.numberOfTrailingZeros(size));at+=size
+            }
+        }
+        var at=0L
+        for((start,end)in excluded){if(at<start)addRange(at,start-1);at=end+1}
+        return out
+    }
     fun newer(candidate:String,current:String):Boolean {
         fun parts(s:String)=s.removePrefix("v").substringBefore('-').split('.').map{it.toIntOrNull()?:0}
         val a=parts(candidate);val b=parts(current)

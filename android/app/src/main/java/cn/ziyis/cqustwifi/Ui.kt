@@ -188,6 +188,7 @@ private val CardShape=RoundedCornerShape(26.dp)
             }
             if(connected&&s.status!=LinkState.OPEN)TextButton(onClick={logoutConfirm=true},modifier=Modifier.align(Alignment.CenterHorizontally)){
                 Icon(Icons.Outlined.Logout,null,Modifier.size(17.dp));Spacer(Modifier.width(8.dp));Text("退出登录")}
+            if(s.status==LinkState.OPEN)TextButton(onClick=onPortal,modifier=Modifier.align(Alignment.CenterHorizontally)){Text("在官方页面管理账号与下线")}
         }
         if(!connected){
             Panel{
@@ -293,7 +294,7 @@ private val CardShape=RoundedCornerShape(26.dp)
             Panel{
                 Text("连接前确认",fontWeight=FontWeight.SemiBold)
                 Text("1. 电脑开启 HTTP + SOCKS5 或 SOCKS5 代理。\n2. 手机连接可访问电脑的校园 Wi-Fi，Wi-Fi 系统代理设为“无”。\n3. 填写电脑显示的 IP、端口、账号密码，并确认 Android VPN 授权。",fontSize=13.sp,lineHeight=24.sp)
-                Text("VPN/TUN 转发其他 App 的 IPv4/IPv6、TCP/UDP 和 DNS；本应用自身的认证流量直连 Wi-Fi。SOCKS5 上游本身不加密，仅在可信网络使用。系统限制或不兼容流量仍可能影响个别 App。",fontSize=12.sp,lineHeight=22.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("VPN/TUN 转发其他 App 的公网 IPv4/IPv6、TCP/UDP 和 DNS；校园内网与本应用认证流量直连 Wi-Fi。SOCKS5 上游本身不加密，仅在可信网络使用。系统限制或不兼容流量仍可能影响个别 App。",fontSize=12.sp,lineHeight=22.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }else{
             Panel{
