@@ -228,8 +228,7 @@ object Repository {
         require(options.mode!="http"&&options.lan){"二维码连接需要开启局域网的 SOCKS5 或混合模式"}
         val host=state.value.sharingAddress.substringBeforeLast(':')
         require(Protocol.privateV4(host)){"局域网地址已失效，请重启共享"}
-        return JSONObject().put("type","cqust-wifi-proxy").put("version",1).put("protocol","socks5")
-            .put("host",host).put("port",options.port).put("username",options.username).put("password",options.password).toString()
+        return ProxyQr.encode(VpnProfile(host=host,port=options.port,username=options.username,password=options.password,campusPassword=false))
     }
     fun stopSharing(){sharing?.close();sharing=null;sharePassword=null;activeShareOptions=null;mutable.update{it.copy(sharing=false,sharingAddress="",sharingUser="",sharingSecret=false)}}
     fun sites():List<CampusSite> {

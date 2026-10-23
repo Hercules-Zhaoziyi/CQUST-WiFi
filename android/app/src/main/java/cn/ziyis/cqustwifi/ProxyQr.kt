@@ -5,6 +5,12 @@ import java.net.URI
 import java.net.URLDecoder
 
 object ProxyQr {
+    fun encode(profile:VpnProfile):String {
+        val raw=JSONObject().put("type","cqust-wifi-proxy").put("version",1).put("protocol","socks5")
+            .put("host",profile.host).put("port",profile.port).put("username",profile.username).put("password",profile.password).toString()
+        parse(raw)
+        return raw
+    }
     fun parse(raw:String):VpnProfile {
         require(raw.length in 1..4096){"二维码内容无效"}
         val profile=if(raw.startsWith("{")){
