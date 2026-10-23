@@ -20,13 +20,17 @@ class VpnFlowTest {
         val context=rule.activity
         try{
             shell("svc wifi enable")
-            rule.waitUntil(20000){Repository.engine.wifi()!=null}
+            rule.waitUntil(30000){Repository.engine.wifi()?.let{net->
+                Protocol.privateV4(Repository.engine.ip(net))&&Repository.engine.connectivity.getLinkProperties(net)?.routes?.any{it.isDefaultRoute}==true
+            }==true}
             // Permission grant exists only in this isolated emulator test, never in app code.
             shell("appops set ${context.packageName} ACTIVATE_VPN allow")
             assertNull(android.net.VpnService.prepare(context))
             Repository.saveVpn("10.0.2.2",17890,"fixture-user","fixture-password",false)
+            Repository.vpnState(true,"测试准备启动")
             ContextCompat.startForegroundService(context,Intent(context,CampusVpnService::class.java))
-            rule.waitUntil(15000){Repository.state.value.vpnMessage.startsWith("VPN 已启动")}
+            rule.waitUntil(15000){Repository.state.value.vpnMessage.startsWith("VPN 已启动")||!Repository.state.value.vpn}
+            assertTrue("VPN startup: ${Repository.state.value.vpnMessage}; ${Repository.state.value.logs.takeLast(3)}",Repository.state.value.vpnMessage.startsWith("VPN 已启动"))
             shell("am start -n cn.ziyis.cqustprobe/.MainActivity")
             var response=""
             rule.waitUntil(15000){response=shell("run-as cn.ziyis.cqustprobe cat files/result.txt");response.contains("CQUST_TUN_OK")||response.contains("PROBE_ERROR")}

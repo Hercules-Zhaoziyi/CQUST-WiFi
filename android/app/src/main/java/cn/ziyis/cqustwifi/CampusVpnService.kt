@@ -115,7 +115,7 @@ class CampusVpnService:VpnService(){
             catch(e:Throwable){
                 Repository.vpnState(false,if(e is IllegalArgumentException||e is IllegalStateException)
                     e.message.orEmpty()else "连接未完成，请检查电脑代理、Wi-Fi 和账号密码。")
-                Repository.log("电脑代理连接已停止。");stopSelf()
+                Repository.log("电脑代理连接已停止 · "+e.javaClass.simpleName);stopSelf()
             }
         }
         return START_NOT_STICKY

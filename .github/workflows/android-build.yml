@@ -77,3 +77,4 @@ jobs:
             android/artifacts/screenshots/
             android/app/build/reports/androidTests/
             android/app/build/outputs/androidTest-results/
+            /tmp/cqust-socks-fixture.log
