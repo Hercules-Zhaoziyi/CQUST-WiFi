@@ -164,6 +164,11 @@ private val CardShape=RoundedCornerShape(26.dp)
     LaunchedEffect(s.username){user=s.username;password=""}
     LaunchedEffect(Unit){while(true){delay(1000);now=System.currentTimeMillis()}}
     val connected=s.status in listOf(LinkState.CONNECTED,LinkState.OPEN)
+    val submitLogin:()->Unit={
+        val secret=password.ifEmpty{Repository.sharedAccount(user)?.password.orEmpty()}
+        if(loginMode!=1)Repository.login(user,password,rememberPassword)
+        if(loginMode!=0)ScheduleStore.sync(user,secret,rememberPassword)
+    }
     val title=when(s.status){LinkState.CONNECTED,LinkState.OPEN->"已连接";LinkState.CONNECTING->"正在连接";LinkState.OFFLINE->"未连接 Wi-Fi";LinkState.NEED_AUTH->"等待连接";LinkState.UNKNOWN->"状态待确认"}
     val hour=Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
     val greeting=when(hour){in 5..10->"早安，让今天的灵感从在线开始。";in 11..13->"午间小憩，连接不必费心。";in 14..18->"下午好，让专注与灵感保持在线。";in 19..22->"夜色渐深，愿你的努力都有回响。";else->"夜深了，网络在线，也记得早点休息。"}
@@ -184,7 +189,7 @@ private val CardShape=RoundedCornerShape(26.dp)
                     if(s.busy)return@Surface
                     if(connected&&s.status!=LinkState.OPEN)Repository.disconnect()
                     else if(s.status==LinkState.OPEN)Repository.refresh()
-                    else Repository.login(user,password,rememberPassword)
+                    else submitLogin()
                 },shape=CircleShape,color=onlineColor,shadowElevation=14.dp,modifier=Modifier.size(138.dp).testTag("power")){
                     Box(contentAlignment=Alignment.Center){if(s.busy)CircularProgressIndicator(color=Color.White)
                     else Icon(Icons.Outlined.PowerSettingsNew,title,Modifier.size(64.dp),tint=Color.White)}
@@ -226,11 +231,7 @@ private val CardShape=RoundedCornerShape(26.dp)
                     Checkbox(rememberPassword,{rememberPassword=it});Text("记住账号密码",fontSize=13.sp,modifier=Modifier.weight(1f))
                     TextButton(onClick=onPortal){Text("认证帮助")}
                 }
-                Button(onClick={
-                    val secret=password.ifEmpty{Repository.sharedAccount(user)?.password.orEmpty()}
-                    if(loginMode!=1)Repository.login(user,password,rememberPassword)
-                    if(loginMode!=0)ScheduleStore.sync(user,secret,rememberPassword)
-                },enabled=!s.busy,modifier=Modifier.fillMaxWidth().height(52.dp),shape=RoundedCornerShape(17.dp)){Text("登录");Spacer(Modifier.width(10.dp));Icon(Icons.Outlined.ArrowForward,null)}
+                Button(onClick=submitLogin,enabled=!s.busy,modifier=Modifier.fillMaxWidth().height(52.dp),shape=RoundedCornerShape(17.dp)){Text("登录");Spacer(Modifier.width(10.dp));Icon(Icons.Outlined.ArrowForward,null)}
                 Text("密码使用 Android Keystore 加密保存在本机。",fontSize=11.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
@@ -238,8 +239,8 @@ private val CardShape=RoundedCornerShape(26.dp)
         Text("每 ${if(s.prefs.interval==120)"2 分钟"else"${s.prefs.interval} 秒"}检查 · 可在设置中调整",fontSize=12.sp,
             color=MaterialTheme.colorScheme.onSurfaceVariant,modifier=Modifier.align(Alignment.CenterHorizontally))
     }
-    if(accounts)AlertDialog(onDismissRequest={accounts=false},title={Text("校园网账号")},text={
-        Column(verticalArrangement=Arrangement.spacedBy(10.dp)){
+    if(accounts)AlertDialog(onDismissRequest={accounts=false},containerColor=MaterialTheme.colorScheme.surface,title={Text("校园网账号")},text={
+        Column(Modifier.heightIn(max=360.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)){
             Text("选择已保存账号，或添加新的校园网账号。",fontSize=13.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
             s.accounts.forEach{account->Row(verticalAlignment=Alignment.CenterVertically){
                 Surface(onClick={user=account;Repository.chooseAccount(account);accounts=false},shape=RoundedCornerShape(16.dp),color=MaterialTheme.colorScheme.surfaceVariant,modifier=Modifier.weight(1f)){

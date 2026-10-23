@@ -27,10 +27,10 @@ class VpnFlowTest {
             Repository.saveVpn("10.0.2.2",17890,"fixture-user","fixture-password",false)
             ContextCompat.startForegroundService(context,Intent(context,CampusVpnService::class.java))
             rule.waitUntil(15000){Repository.state.value.vpnMessage.startsWith("VPN 已启动")}
-            val response=shell("printf 'GET / HTTP/1.0\\r\\nHost: fixture\\r\\n\\r\\n' | toybox nc -w 5 1.1.1.1 80")
-            assertTrue("No controlled HTTP response through TUN",response.contains("CQUST_TUN_OK"))
-            val dns=shell("ping -c 1 -W 1 cqust-fixture.invalid")
-            assertTrue("Mapped DNS failed",dns.contains("198.19."))
+            shell("am start -n cn.ziyis.cqustprobe/.MainActivity")
+            var response=""
+            rule.waitUntil(15000){response=shell("run-as cn.ziyis.cqustprobe cat files/result.txt");response.contains("CQUST_TUN_OK")||response.contains("PROBE_ERROR")}
+            assertTrue("No controlled DNS/HTTP response through TUN: $response",response.contains("CQUST_TUN_OK"))
             context.startService(Intent(context,CampusVpnService::class.java).setAction("STOP"))
             rule.waitUntil(5000){Repository.engine.connectivity.allNetworks.none{Repository.engine.connectivity.getNetworkCapabilities(it)?.hasTransport(NetworkCapabilities.TRANSPORT_VPN)==true}}
             assertFalse(Repository.state.value.vpn)

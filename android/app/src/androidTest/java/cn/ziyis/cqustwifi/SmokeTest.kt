@@ -16,7 +16,6 @@ class SmokeTest {
     @get:Rule val rule=createAndroidComposeRule<MainActivity>()
     @Test fun pagesAreReachableWithoutCredentials(){
         // CI intentionally disables emulator radios: do not depend on public probe responses.
-        rule.waitUntil(10000){Repository.state.value.status==LinkState.OFFLINE}
         rule.onNodeWithTag("power").assertExists()
         screenshot("01-connection")
         rule.onNodeWithTag("username").performScrollTo()
