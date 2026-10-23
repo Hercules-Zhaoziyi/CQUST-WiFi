@@ -53,9 +53,11 @@ object CqustCasAuthClient {
                 }
                 Result.success(session)
             } else {
+                session.close()
                 Result.failure(Exception("教务系统单点登录失败，请稍后重试"))
             }
         } catch (e: Exception) {
+            session.close()
             Result.failure(Exception("接入教务系统网络异常: ${e.message}", e))
         }
     }
@@ -67,6 +69,7 @@ object CqustCasAuthClient {
         existingSession: CqustWebVpnSession? = null
     ): CasAuthResult {
         val session = existingSession ?: CqustWebVpnSession()
+        var keepSession=false
         return try {
             // 1. 访问网关登录入口，获取网关初始 Cookie 并跟随重定向至 CAS 登录页
             val (actualUrl, loginPageResp) = session.getFollowingRedirects("$GATEWAY/login")
@@ -93,6 +96,7 @@ object CqustCasAuthClient {
 
             if (salt.isNullOrBlank()) {
                 if (session.hasVpnTicket()) {
+                    keepSession=true
                     return CasAuthResult(success = true, session = session)
                 }
                 return CasAuthResult(
@@ -141,6 +145,7 @@ object CqustCasAuthClient {
             if (redirectLocation != null && redirectLocation.contains("ticket=ST-")) {
                 val startTarget = session.resolveUrl(actualUrl, redirectLocation)
                 promoteSession(session, startTarget)
+                keepSession=true
                 return CasAuthResult(success = true, session = session)
             }
 
@@ -169,7 +174,7 @@ object CqustCasAuthClient {
                 errorMessage = "统一身份认证网络异常: ${e.message}",
                 isNetworkError = true
             )
-        }
+        } finally {if(!keepSession&&existingSession==null)session.close()}
     }
 
     // 跟随 CAS 票据至网关会话提升点

@@ -1,7 +1,6 @@
 package top.msfxp.schedule.data.api
 
 import io.ktor.client.*
-import io.ktor.client.engine.android.*
 import io.ktor.client.engine.okhttp.OkHttp
 import cn.ziyis.cqustwifi.ApplicationClients
 import io.ktor.client.plugins.*
@@ -34,6 +33,7 @@ class CqustWebVpnSession(
     }
 
     private val cookieMap = java.util.concurrent.ConcurrentHashMap<String, Cookie>()
+    fun close(){cookieMap.clear();httpClient.close()}
 
     // 教务与实践系统基地址
     var eamsBaseUrl: String? = null

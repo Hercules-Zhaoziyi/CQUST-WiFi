@@ -32,20 +32,25 @@ object ScheduleStore {
         if(!busy.compareAndSet(false,true))return
         scope.launch{
             message.value="正在登录统一身份认证…"
+            var session:CqustWebVpnSession?=null
             try{
                 require(user.isNotBlank()&&password.isNotEmpty()){"请在共用登录入口填写统一身份认证账号密码。"}
-                val session=CqustCasAuthClient.connect(user.trim(),password){message.value=it}.getOrThrow()
+                val connected=CqustCasAuthClient.connect(user.trim(),password){message.value=it}.getOrThrow();session=connected
                 if(remember)Repository.rememberIdentity(user.trim(),password)
-                val result=CqustEamsParser.fetchAndParse(session,user.trim(),onProgress={message.value=it})
+                val result=CqustEamsParser.fetchAndParse(connected,user.trim(),onProgress={message.value=it})
                 require(result.success){"课表同步未完成，原缓存已保留。请检查统一认证凭据或网络。"}
                 require(result.courses.isNotEmpty()){"本学期未解析到课程，已保留原缓存。"}
                 val courses=JSONArray()
-                fun add(name:String,day:Int,start:Int,end:Int,weeks:List<Int>,place:String,teacher:String){
-                    courses.put(JSONObject().put("name",name).put("day",day).put("start",start).put("end",end).put("weeks",JSONArray(weeks)).put("place",place).put("teacher",teacher))
+                fun add(name:String,day:Int,start:Int,end:Int,weeks:List<Int>,place:String,teacher:String,kind:String="theory"){
+                    courses.put(JSONObject().put("name",name).put("day",day).put("start",start).put("end",end).put("weeks",JSONArray(weeks)).put("place",place).put("teacher",teacher).put("kind",kind))
                 }
                 result.courses.forEach{add(it.name,it.day,it.startSection,it.endSection,it.weeks,it.position,it.teacher)}
-                val practical=CqustPracticalParser.fetchAndParse(session,user.trim())
-                if(practical.success)practical.items.forEach{add(it.name,it.day,it.startSection,it.endSection,it.weeks,it.location,it.teacher)}
+                val practical=CqustPracticalParser.fetchAndParse(connected,user.trim())
+                val previous=data.value
+                val oldCourses=previous?.optJSONArray("courses")
+                val hadPractical=oldCourses!=null&&(0 until oldCourses.length()).any{oldCourses.optJSONObject(it)?.optString("kind")=="practical"}
+                require(practical.success||previous?.optString("user")!=user.trim()||!hadPractical){"实践课暂未同步成功，已保留完整原课表，请稍后重试。"}
+                if(practical.success)practical.items.forEach{add(it.name,it.day,it.startSection,it.endSection,it.weeks,it.location,it.teacher,"practical")}
                 val sem=result.semesters.find{it.id==result.semesterId}?:result.semesters.firstOrNull()
                 val start=sem?.startDate?.takeIf{runCatching{LocalDate.parse(it)}.isSuccess}.orEmpty()
                 val next=JSONObject().put("user",user.trim()).put("name",result.profile.name).put("class",result.profile.className)
@@ -53,7 +58,7 @@ object ScheduleStore {
                 Vault(Repository.app,"schedule.enc").write(next);data.value=next;loaded=true
                 message.value=if(start.isEmpty())"同步成功，请按校历设置开学日期。"else"课表已同步"
             }catch(e:Exception){message.value=if(e is IllegalArgumentException)e.message.orEmpty()else"课表同步失败，已保留原缓存；请检查统一认证凭据或网络。"}
-            finally{busy.value=false}
+            finally{session?.close();busy.value=false}
         }
     }
     fun startDate(date:String){scope.launch{runCatching{LocalDate.parse(date);val next=JSONObject(data.value.toString()).put("startDate",date);Vault(Repository.app,"schedule.enc").write(next);data.value=next}.onFailure{message.value="日期格式应为 YYYY-MM-DD"}}}

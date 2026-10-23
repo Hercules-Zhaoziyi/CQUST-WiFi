@@ -49,7 +49,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        api: [35, 37]
+        api: ['35', '37.0']
     defaults:
       run:
         working-directory: android
@@ -69,7 +69,8 @@ jobs:
         run: python3 app/src/androidTest/fixtures/socks_fixture.py > /tmp/cqust-socks-fixture.log 2>&1 &
       - uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: ${{ matrix.api }}
+          api-level: 35
+          system-image-api-level: ${{ matrix.api }}
           target: google_apis
           arch: x86_64
           profile: pixel_6
