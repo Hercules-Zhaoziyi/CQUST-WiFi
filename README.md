@@ -1,14 +1,14 @@
 # CQUST Wi-Fi
 
-重庆科技大学校园网客户端。当前 Windows 版本：**v5.2.0**，使用 **Tauri 2 + Rust**；保留 macOS Apple Silicon 源码支持，本次未在 Mac 上构建或验证。
+重庆科技大学校园网客户端。当前 Windows 版本：**v5.2.1**，使用 **Tauri 2 + Rust**；保留 macOS Apple Silicon 源码支持，本次未在 Mac 上构建或验证。
 
-## v5.2.0 更新
+## v5.2.1 更新
 
-- 修复吸附动画修改原生裁剪区域导致的边框残留；吸附默认关闭，从旧版升级时一次性关闭，之后可以自行开启。
-- 关于页新增“加入内测群”，原“软件介绍与下载”改为“软件介绍”。
+- 代理账号默认使用当前校园网账号，可自定义。密码可选安全复用校园网密码或设置独立密码；校园网密码不传回界面。
+- 自定义代理密码默认可见，支持小眼睛隐藏与随机推荐；开启代理后精简重复配置，提供服务器、端口、用户名和协议链接。
 - “常用网站”之后新增默认关闭的代理页：HTTP / HTTPS CONNECT、SOCKS5 TCP / UDP，支持仅本机或局域网访问。
-- 局域网客户端无需填写 IP 白名单。代理强制使用独立用户名和密码，支持自定义密码及推荐 12 位短密码；不保存密码，不自动恢复代理。
-- 不修改系统代理或防火墙，不提供透明代理、TUN / VPN 或 Android 端。使用说明与边界见 [代理说明](docs/PROXY.md)。
+- 局域网访问选项默认打开，服务仍默认关闭；新增系统防火墙设置入口和授权指引，不自动更改放行规则。
+- 不修改系统代理或防火墙，不提供透明代理、TUN / VPN 。使用说明与边界见 [代理说明](docs/PROXY.md)。
 
 [软件介绍与下载](https://cqust-wifi.ziyis.cn/)
 
@@ -16,7 +16,7 @@
 
 ## 下载与安装
 
-- [Windows v5.2.0](https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases/tag/v5.2.0)
+- [Windows v5.2.1](https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases/tag/v5.2.1)
 - [全部历史版本](https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases)
 - [版本索引与架构演进](docs/HISTORY.md)
 

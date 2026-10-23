@@ -11,6 +11,11 @@ impl Default for Settings{fn default()->Self{Self{keep_connected:false,auto_logi
 #[derive(Default,Serialize,Deserialize)]pub struct Accounts{pub accounts:Vec<String>,pub last_username:String}
 pub struct Service{pub settings:Settings,pub accounts:Vec<String>,pub username:String,pub display_name:String,password:Zeroizing<String>,remember:bool,folder:PathBuf,auth:Auth,session:Option<Session>,started:f64,ip:String,logs:Vec<String>,manual:bool,next_poll:Instant,next_retry:Option<Instant>,isolated:bool}
 impl Service{
+ pub fn proxy_identity(&self,need_password:bool)->Result<(String,Zeroizing<String>),String>{
+  let password=if !need_password{Zeroizing::new(String::new())}else if !self.password.is_empty(){self.password.clone()}else if !self.isolated{vault::get(&self.username)}else{Zeroizing::new(String::new())};
+  if need_password&&(self.username.is_empty()||password.is_empty()){return Err("未取得校园网密码，请先登录校园网，或选择自定义代理密码。".into())}
+  Ok((self.username.clone(),password))
+ }
  pub fn enable_browser_probe(&mut self,app:AppHandle){self.auth.browser_probe=Some(std::sync::Arc::new(move||crate::portal_browser::discover(&app)));}
  pub fn new(custom:Option<PathBuf>)->Self{
   let isolated=custom.is_some();let folder=custom.unwrap_or_else(default_folder);let _=std::fs::create_dir_all(&folder);

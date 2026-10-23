@@ -6,6 +6,7 @@ v5.1.0 为后续正式更新：浏览器动态认证发现、同网络切换账�
 
 |版本|架构|源码|软件与源码下载|
 |---|---|---|---|
+|v5.2.1|Tauri 2 / Rust（Windows）|[源码标签](https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/tree/v5.2.1)|[Release](https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases/tag/v5.2.1)|
 |v5.2.0|Tauri 2 / Rust（本次 Windows 构建）|[源码标签](https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/tree/v5.2.0)|[Release](https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases/tag/v5.2.0)|
 |v5.1.1|Tauri 2 / Rust|[源码标签](https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/tree/v5.1.1)|[Release](https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases/tag/v5.1.1)|
 |v5.1.0|Tauri 2 / Rust|[源码标签](https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/tree/v5.1.0)|[Release](https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases/tag/v5.1.0)|

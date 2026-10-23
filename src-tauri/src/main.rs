@@ -43,8 +43,9 @@ async fn desktop(app:tauri::AppHandle,window:tauri::WebviewWindow,command:String
   "verifyProxyPort" if app.state::<Backend>().1=>{let listener=std::net::TcpListener::bind("127.0.0.1:0").map_err(|_|"Port unavailable")?;Ok(json!(listener.local_addr().map_err(|_|"Port unavailable")?.port()))},
   "proxyStatus"=>Ok(app.state::<proxy::ProxyManager>().snapshot()),
   "proxyPassword"=>Ok(json!(proxy::recommend_password()?)),
+  "proxyFirewall"=>{platform::open_firewall()?;Ok(json!(true))},
   "proxyStop"=>Ok(app.state::<proxy::ProxyManager>().stop()),
-  "proxyStart"=>{let options:proxy::Options=serde_json::from_value(value).map_err(|_|"代理配置无效")?;app.state::<proxy::ProxyManager>().start(options)},
+  "proxyStart"=>{let mut options:proxy::Options=serde_json::from_value(value).map_err(|_|"代理配置无效")?;let backend=app.state::<Backend>();let service=backend.0.lock().map_err(|_|"账号状态不可用")?;let (username,password)=service.proxy_identity(options.campus_password)?;if options.username.trim().is_empty(){options.username=username;}if options.username.is_empty(){return Err("请填写代理用户名，或先登录校园网。".into())}if options.campus_password{options.password=password.to_string();}drop(service);app.state::<proxy::ProxyManager>().start(options)},
   "betaGroup"=>{platform::open_url("https://qm.qq.com/q/Rn7B5NBbiK")?;Ok(json!(true))},
   #[cfg(feature="verify-ui")]
   "verifyPortalRedirect" if app.state::<Backend>().1=>{let handle=app.clone();let ok=tauri::async_runtime::spawn_blocking(move||portal_browser::verify_dynamic_redirect(&handle)).await.map_err(|_|"探测测试失败")?;Ok(json!(ok))},

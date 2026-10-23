@@ -10,22 +10,22 @@ use zeroize::Zeroizing;
 const USER:&str="cqust";
 fn err(message:&str)->io::Error{io::Error::new(io::ErrorKind::InvalidInput,message)}
 #[derive(Default,Deserialize)]#[serde(default,deny_unknown_fields)]
-pub struct Options{pub port:u16,pub lan:bool,pub clients:String,pub mode:String,pub password:String}
-struct Config{bind:Ipv4Addr,password:Zeroizing<String>,allowed:HashSet<IpAddr>,mode:String,#[cfg(test)]test_targets:bool}
+pub struct Options{pub port:u16,pub lan:bool,pub clients:String,pub mode:String,pub password:String,pub username:String,pub campus_password:bool}
+struct Config{bind:Ipv4Addr,username:String,campus_password:bool,password:Zeroizing<String>,allowed:HashSet<IpAddr>,mode:String,#[cfg(test)]test_targets:bool}
 #[derive(Default)]struct Stats{active:AtomicUsize,accepted:AtomicU64,rejected:AtomicU64,up:AtomicU64,down:AtomicU64}
 struct Running{config:Arc<Config>,port:u16,stats:Arc<Stats>,stop:watch::Sender<bool>,task:tokio::task::JoinHandle<()>}
 pub struct ProxyManager{runtime:tokio::runtime::Runtime,inner:Mutex<Option<Running>>}
 impl ProxyManager{
  pub fn new()->io::Result<Self>{Ok(Self{runtime:tokio::runtime::Builder::new_multi_thread().worker_threads(2).enable_all().build()?,inner:Mutex::new(None)})}
- pub fn snapshot(&self)->Value{let Ok(inner)=self.inner.lock()else{return json!({"running":false})};match inner.as_ref(){None=>json!({"running":false,"username":USER}),Some(r)=>json!({"running":true,"ip":r.config.bind.to_string(),"port":r.port,"mode":r.config.mode,"lan":!r.config.bind.is_loopback(),"username":USER,"password":r.config.password.as_str(),"active":r.stats.active.load(Ordering::Relaxed),"accepted":r.stats.accepted.load(Ordering::Relaxed),"rejected":r.stats.rejected.load(Ordering::Relaxed),"up":r.stats.up.load(Ordering::Relaxed),"down":r.stats.down.load(Ordering::Relaxed)})}}
+ pub fn snapshot(&self)->Value{let Ok(inner)=self.inner.lock()else{return json!({"running":false})};match inner.as_ref(){None=>json!({"running":false,"username":USER}),Some(r)=>json!({"running":true,"ip":r.config.bind.to_string(),"port":r.port,"mode":r.config.mode,"lan":!r.config.bind.is_loopback(),"username":r.config.username,"campus_password":r.config.campus_password,"password":if r.config.campus_password{None}else{Some(r.config.password.as_str())},"active":r.stats.active.load(Ordering::Relaxed),"accepted":r.stats.accepted.load(Ordering::Relaxed),"rejected":r.stats.rejected.load(Ordering::Relaxed),"up":r.stats.up.load(Ordering::Relaxed),"down":r.stats.down.load(Ordering::Relaxed)})}}
  pub fn start(&self,options:Options)->Result<Value,String>{
   let mut inner=self.inner.lock().map_err(|_|"代理状态不可用")?;if inner.is_some(){return Err("请先关闭代理再修改配置。".into())}
   if !(1024..=65535).contains(&options.port){return Err("端口须为 1024–65535。".into())}
   if !["mixed","http","socks5"].contains(&options.mode.as_str()){return Err("代理协议无效。".into())}
   let bind=if options.lan{crate::auth::lan_ip().parse::<Ipv4Addr>().ok().filter(|ip|ip.is_private()).ok_or("未找到有效的局域网 IPv4 地址。")?}else{Ipv4Addr::LOCALHOST};
   let allowed=parse_clients(&options.clients).map_err(|_|"允许的设备 IP 无效；仅支持具体局域网 IPv4 地址，不支持网段或通配符。")?;
-  let supplied=Zeroizing::new(options.password);let password=if supplied.is_empty(){Zeroizing::new(recommend_password()?)}else{if !valid_password(&supplied){return Err("代理密码需为 8–64 位可见英文字符，请勿使用校园网密码。".into())}supplied};
-  let config=Arc::new(Config{bind,password,allowed,mode:options.mode,#[cfg(test)]test_targets:false});
+  let username=if options.username.is_empty(){USER.into()}else{options.username};if username.len()>255||username.contains(':')||username.chars().any(char::is_control){return Err("代理用户名无效，不能包含冒号或控制字符。".into())}let supplied=Zeroizing::new(options.password);let password=if options.campus_password{if supplied.is_empty()||supplied.len()>255{return Err("未取得校园网密码，请先登录或使用自定义代理密码。".into())}supplied}else if supplied.is_empty(){Zeroizing::new(recommend_password()?)}else{if !valid_password(&supplied){return Err("自定义代理密码需为 8–64 位可见英文字符。".into())}supplied};
+  let config=Arc::new(Config{bind,username,campus_password:options.campus_password,password,allowed,mode:options.mode,#[cfg(test)]test_targets:false});
   let listener=std::net::TcpListener::bind((bind,options.port)).map_err(|e|format!("无法监听指定地址/端口：{e}"))?;listener.set_nonblocking(true).map_err(|_|"无法配置监听端口")?;
   let _guard=self.runtime.enter();let listener=TcpListener::from_std(listener).map_err(|_|"无法启动代理监听")?;
   let stats=Arc::new(Stats::default());let(stop,rx)=watch::channel(false);let task=self.runtime.spawn(serve(listener,config.clone(),stats.clone(),rx));
@@ -54,7 +54,7 @@ async fn session(mut client:TcpStream,peer:SocketAddr,c:Arc<Config>,s:Arc<Stats>
 }
 async fn relay(client:TcpStream,remote:TcpStream,s:&Stats)->io::Result<()>{let(mut cr,mut cw)=client.into_split();let(mut rr,mut rw)=remote.into_split();async fn pump<R:tokio::io::AsyncRead+Unpin,W:tokio::io::AsyncWrite+Unpin>(r:&mut R,w:&mut W,count:&AtomicU64)->io::Result<()>{let mut bytes=[0u8;16384];loop{let n=r.read(&mut bytes).await?;if n==0{w.shutdown().await?;return Ok(())}w.write_all(&bytes[..n]).await?;count.fetch_add(n as u64,Ordering::Relaxed);}}tokio::try_join!(pump(&mut cr,&mut rw,&s.up),pump(&mut rr,&mut cw,&s.down))?;Ok(())}
 fn equal(a:&[u8],b:&[u8])->bool{let mut mismatch=a.len()^b.len();for i in 0..a.len().max(b.len()){mismatch|=usize::from(a.get(i).copied().unwrap_or(0)^b.get(i).copied().unwrap_or(0));}mismatch==0}
-fn valid_credentials(user:&[u8],password:&[u8],c:&Config)->bool{equal(user,USER.as_bytes())&equal(password,c.password.as_bytes())}
+fn valid_credentials(user:&[u8],password:&[u8],c:&Config)->bool{equal(user,c.username.as_bytes())&equal(password,c.password.as_bytes())}
 async fn byte(r:&mut TcpStream)->io::Result<u8>{r.read_u8().await}
 async fn target(r:&mut TcpStream)->io::Result<(String,u16)>{let kind=byte(r).await?;let host=match kind{1=>{let mut b=[0;4];r.read_exact(&mut b).await?;Ipv4Addr::from(b).to_string()},4=>{let mut b=[0;16];r.read_exact(&mut b).await?;std::net::Ipv6Addr::from(b).to_string()},3=>{let n=byte(r).await? as usize;if n==0{return Err(err("empty domain"))}let mut b=vec![0;n];r.read_exact(&mut b).await?;String::from_utf8(b).map_err(|_|err("invalid domain"))?},_=>return Err(err("address type"))};Ok((host,r.read_u16().await?))}
 fn address(a:SocketAddr)->Vec<u8>{let mut b=vec![];match a.ip(){IpAddr::V4(ip)=>{b.push(1);b.extend(ip.octets())},IpAddr::V6(ip)=>{b.push(4);b.extend(ip.octets())}}b.extend(a.port().to_be_bytes());b}
@@ -94,8 +94,16 @@ async fn udp(mut control:TcpStream,peer:SocketAddr,requested_port:u16,c:&Config,
 }
 #[cfg(test)]mod tests{
  use super::*;
+ #[test]fn campus_secret_is_never_exported(){
+  let manager=ProxyManager::new().unwrap();
+  let listener=std::net::TcpListener::bind("127.0.0.1:0").unwrap();let port=listener.local_addr().unwrap().port();drop(listener);
+  let value=manager.start(Options{port,mode:"mixed".into(),username:"student".into(),password:"private-fixture".into(),campus_password:true,..Default::default()}).unwrap();
+  assert_eq!(value["username"],"student");assert_eq!(value["campus_password"],true);assert!(value["password"].is_null());assert!(!value.to_string().contains("private-fixture"));manager.stop();
+  let config=Config{bind:Ipv4Addr::LOCALHOST,username:"custom-user".into(),campus_password:true,password:Zeroizing::new("private-fixture".into()),allowed:HashSet::new(),mode:"mixed".into(),test_targets:false};
+  assert!(valid_credentials(b"custom-user",b"private-fixture",&config));assert!(!valid_credentials(b"cqust",b"private-fixture",&config));
+ }
  #[test]fn custom_and_recommended_passwords(){assert!(!valid_password("short"));assert!(!valid_password("space bad"));assert!(valid_password("myPass88"));let a=recommend_password().unwrap();let b=recommend_password().unwrap();assert_eq!(a.len(),12);assert!(valid_password(&a));assert_ne!(a,b);assert!(!a.chars().any(|c|"01IOlo".contains(c)));}
- async fn fixture(mode:&str)->(SocketAddr,watch::Sender<bool>,tokio::task::JoinHandle<()>,Arc<Stats>){let listener=TcpListener::bind("127.0.0.1:0").await.unwrap();let addr=listener.local_addr().unwrap();let c=Arc::new(Config{bind:Ipv4Addr::LOCALHOST,password:Zeroizing::new("test-password".into()),allowed:HashSet::new(),mode:mode.into(),test_targets:true});let s=Arc::new(Stats::default());let(tx,rx)=watch::channel(false);let handle=tokio::spawn(serve(listener,c,s.clone(),rx));(addr,tx,handle,s)}
+ async fn fixture(mode:&str)->(SocketAddr,watch::Sender<bool>,tokio::task::JoinHandle<()>,Arc<Stats>){let listener=TcpListener::bind("127.0.0.1:0").await.unwrap();let addr=listener.local_addr().unwrap();let c=Arc::new(Config{bind:Ipv4Addr::LOCALHOST,username:USER.into(),campus_password:false,password:Zeroizing::new("test-password".into()),allowed:HashSet::new(),mode:mode.into(),test_targets:true});let s=Arc::new(Stats::default());let(tx,rx)=watch::channel(false);let handle=tokio::spawn(serve(listener,c,s.clone(),rx));(addr,tx,handle,s)}
  async fn echo()->SocketAddr{let listener=TcpListener::bind("127.0.0.1:0").await.unwrap();let addr=listener.local_addr().unwrap();tokio::spawn(async move{let(stream,_)=listener.accept().await.unwrap();let(mut r,mut w)=stream.into_split();let _=tokio::io::copy(&mut r,&mut w).await;});addr}
  async fn socks_auth(server:SocketAddr)->TcpStream{let mut stream=TcpStream::connect(server).await.unwrap();stream.write_all(&[5,1,2]).await.unwrap();let mut response=[0;2];stream.read_exact(&mut response).await.unwrap();assert_eq!(response,[5,2]);let mut auth=vec![1,5];auth.extend(USER.as_bytes());auth.push(13);auth.extend(b"test-password");stream.write_all(&auth).await.unwrap();stream.read_exact(&mut response).await.unwrap();assert_eq!(response,[1,0]);stream}
  async fn response(stream:&mut TcpStream)->SocketAddr{let mut header=[0;3];stream.read_exact(&mut header).await.unwrap();assert_eq!(header,[5,0,0]);let(host,port)=target(stream).await.unwrap();SocketAddr::new(host.parse().unwrap(),port)}
