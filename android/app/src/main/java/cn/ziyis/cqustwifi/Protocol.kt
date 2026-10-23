@@ -58,7 +58,9 @@ object Protocol {
         return null
     }
     fun privateV4(host:String):Boolean {
-        val parts=host.split('.').mapNotNull{it.toIntOrNull()?.takeIf{n->n in 0..255}}
+        val raw=host.split('.')
+        if(raw.size!=4||raw.any{part->part.toIntOrNull()?.let{it !in 0..255||part!=it.toString()}?:true})return false
+        val parts=raw.map{it.toInt()}
         return parts.size==4&&(parts[0]==10||(parts[0]==172&&parts[1] in 16..31)||(parts[0]==192&&parts[1]==168))
     }
     fun publicTarget(ip:InetAddress):Boolean {

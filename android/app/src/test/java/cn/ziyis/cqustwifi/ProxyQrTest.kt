@@ -6,5 +6,6 @@ class ProxyQrTest {
     @Test fun rejectsPublicServersAndMissingCredentials(){
         assertThrows(IllegalArgumentException::class.java){ProxyQr.parse("socks5://u:p@8.8.8.8:7890")}
         assertThrows(IllegalArgumentException::class.java){ProxyQr.parse("https://example.com")}
+        for(host in listOf("010.1.2.3","10.bad.1.2.3","+10.1.2.3"))assertFalse(Protocol.privateV4(host))
     }
 }

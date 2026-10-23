@@ -15,10 +15,10 @@ import java.util.concurrent.atomic.AtomicBoolean
 class CampusVpnService:VpnService(){
     companion object {
         private val coreLock=Any()
-        private var coreOwner:CampusVpnService?=null
+        @Volatile private var coreOwner:CampusVpnService?=null
     }
     private val scope=CoroutineScope(SupervisorJob()+Dispatchers.IO)
-    private var tun:ParcelFileDescriptor?=null
+    @Volatile private var tun:ParcelFileDescriptor?=null
     private val started=AtomicBoolean(false)
     private var network:Network?=null
     private var config:File?=null
@@ -69,6 +69,7 @@ class CampusVpnService:VpnService(){
                 Protocol.vpnRoutes().forEach{(address,prefix)->builder.addRoute(address,prefix)}
                 val descriptor=builder.establish()?:error("VPN 授权已取消，请重新确认。")
                 tun=descriptor
+                if(!scope.isActive){descriptor.close();tun=null;throw CancellationException("VPN 已取消")}
                 // Engine requires a config file. It exists only in noBackupFilesDir,
                 // never shared, included in logs, or copied into exported sources.
                 val file=File(noBackupFilesDir,"active-tunnel-${System.nanoTime()}.yml");config=file
@@ -98,6 +99,7 @@ class CampusVpnService:VpnService(){
                 """.trimIndent())
                 file.setReadable(false,false);file.setWritable(false,false);file.setReadable(true,true);file.setWritable(true,true)
                 check(TProxyService.TProxyStartService(file.absolutePath,descriptor.fd)){"转发核心未能启动。"}
+                if(!scope.isActive){descriptor.close();tun=null;throw CancellationException("VPN 已取消")}
                 cm.registerNetworkCallback(NetworkRequest.Builder().addTransportType(NetworkCapabilities.TRANSPORT_WIFI).build(),callback)
                 Repository.vpnState(true,"VPN 已启动 · 电脑代理认证通过")
                 Repository.log("已启动电脑 SOCKS5 转发；本应用认证请求仍直连 Wi-Fi。")
@@ -123,6 +125,7 @@ class CampusVpnService:VpnService(){
         scope.cancel();runCatching{Repository.engine.connectivity.unregisterNetworkCallback(callback)}
         // Release Android's VPN network immediately, even if native quit/join stalls.
         runCatching{tun?.close()};tun=null
+        if(coreOwner===this)Repository.engine.connectivity.bindProcessToNetwork(null)
         Repository.vpnState(false,Repository.state.value.vpnMessage.ifBlank{"电脑代理已断开"})
         // Native quit can join its worker thread: do not block the UI thread.
         Thread{
@@ -130,6 +133,7 @@ class CampusVpnService:VpnService(){
                 if(coreOwner===this@CampusVpnService){
                     runCatching{TProxyService.TProxyStopService()}
                     Repository.engine.connectivity.bindProcessToNetwork(null)
+                    Repository.vpnState(false,Repository.state.value.vpnMessage)
                     coreOwner=null
                 }
             }
