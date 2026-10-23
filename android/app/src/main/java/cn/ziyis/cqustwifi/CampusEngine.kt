@@ -52,7 +52,7 @@ class CampusEngine(private val context:Context,private val diagnostic:(String)->
     fun client(net:Network,timeout:Long=5000):OkHttpClient {
         val cookies=mutableListOf<Cookie>()
         return OkHttpClient.Builder().proxy(Proxy.NO_PROXY).socketFactory(net.socketFactory)
-            .dns { host->net.getAllByName(host).toList() }
+            .dns(object:Dns{override fun lookup(hostname:String)=net.getAllByName(hostname).toList()})
             .followRedirects(false).followSslRedirects(false).retryOnConnectionFailure(false)
             .connectTimeout(timeout,TimeUnit.MILLISECONDS).readTimeout(timeout,TimeUnit.MILLISECONDS)
             .callTimeout(timeout,TimeUnit.MILLISECONDS)
