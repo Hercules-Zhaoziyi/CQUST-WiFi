@@ -31,6 +31,7 @@ object Repository {
     val issues=MutableStateFlow<AuthIssue?>(null)
     private var session:CampusSession?=null
     private var manualPause=false
+    @Volatile private var networkRequested=true
     private var lastAttempt=0L
     private var sharing:LanProxy?=null
     private var sharePassword:String?=null
@@ -40,6 +41,7 @@ object Repository {
         app=context.applicationContext;vault=Vault(app);engine=CampusEngine(app,::log)
         val error=runCatching{credentials=vault.read()}.exceptionOrNull()
         val p=app.getSharedPreferences("settings",Context.MODE_PRIVATE)
+        networkRequested=Protocol.usesCampusLogin(p.getInt("loginPurpose",0))
         val prefs=Preferences(p.getBoolean("startup",false),p.getBoolean("autoLogin",false),
             p.getBoolean("keepConnected",false),p.getInt("interval",10).takeIf{it in listOf(5,10,120)}?:10,
             p.getBoolean("animations",true),p.getString("theme","system")?:"system",p.getBoolean("vpnAuto",false))
@@ -67,9 +69,9 @@ object Repository {
     }
     fun ensureMonitor() {
         val s=state.value
-        if(s.prefs.autoLogin||s.prefs.keepConnected||s.prefs.vpnAuto||s.sharing) {
+        if((networkRequested&&(s.prefs.autoLogin||s.prefs.keepConnected))||s.prefs.vpnAuto||s.sharing) {
             runCatching{ContextCompat.startForegroundService(app,Intent(app,MonitorService::class.java))}
-                .onFailure{message("系统暂不允许后台启动，请打开应用后重试，并检查自启动权限。")}
+                .onFailure{message("系统暂不允许后台运行，请打开应用后重试，并检查通知与电池设置。")}
         } else app.stopService(Intent(app,MonitorService::class.java))
     }
     private fun account(user:String=state.value.username):Account? {
@@ -79,6 +81,13 @@ object Repository {
     }
     fun hasPassword(user:String=state.value.username)=account(user)!=null
     internal fun sharedAccount(user:String)=account(user)
+    fun loginPurpose()=app.getSharedPreferences("settings",Context.MODE_PRIVATE).getInt("loginPurpose",0).coerceIn(0,2)
+    fun loginPurpose(mode:Int){
+        val safe=mode.coerceIn(0,2)
+        networkRequested=Protocol.usesCampusLogin(safe)
+        app.getSharedPreferences("settings",Context.MODE_PRIVATE).edit().putInt("loginPurpose",safe).apply()
+        ensureMonitor()
+    }
     fun rememberIdentity(user:String,password:String){scope.launch{gate.withLock{
         val accounts=credentials.optJSONObject("accounts")?:JSONObject().also{credentials.put("accounts",it)}
         accounts.put(user,password);runCatching{vault.write(credentials)}.onFailure{message("身份认证已通过，但安全凭据保存失败。")}
@@ -157,7 +166,7 @@ object Repository {
             refreshLocked()
             val prefs=state.value.prefs
             val enabled=if(wasConnected)prefs.keepConnected else prefs.autoLogin||prefs.keepConnected
-            if(!manualPause&&enabled&&state.value.status==LinkState.NEED_AUTH&&
+            if(networkRequested&&!manualPause&&enabled&&state.value.status==LinkState.NEED_AUTH&&
                 System.currentTimeMillis()-lastAttempt>=10000&&issues.value==null) {
                 lastAttempt=System.currentTimeMillis();account()?.let{performLogin(it)}
             }

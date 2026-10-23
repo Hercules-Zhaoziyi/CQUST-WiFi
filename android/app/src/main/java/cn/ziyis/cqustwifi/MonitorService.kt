@@ -29,7 +29,7 @@ class MonitorService:Service() {
                     delay(seconds*1000L)
                 }
             }
-        }catch(_:Exception){Repository.message("系统限制后台服务，请保持应用开启，并检查自启动及电池设置。");stopSelf()}
+        }catch(_:Exception){Repository.message("系统限制后台服务，请保持应用开启，并检查通知与电池设置。");stopSelf()}
     }
     override fun onStartCommand(intent:Intent?,flags:Int,startId:Int):Int {
         if(intent?.action=="STOP"){

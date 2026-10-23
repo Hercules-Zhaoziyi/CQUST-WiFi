@@ -52,7 +52,7 @@ private val CardShape=RoundedCornerShape(26.dp)
     val state by Repository.state.collectAsStateWithLifecycle()
     val issue by Repository.issues.collectAsStateWithLifecycle()
     var page by remember{mutableStateOf("连接")}
-    var loginTarget by remember{mutableIntStateOf(0)}
+    var loginTarget by remember{mutableIntStateOf(Repository.loginPurpose())}
     var portal by remember{mutableStateOf(false)}
     val systemDark=isSystemInDarkTheme()
     val dark=when(state.prefs.theme){"dark"->true;"light"->false;else->systemDark}
@@ -100,7 +100,7 @@ private val CardShape=RoundedCornerShape(26.dp)
                 fadeIn(tween(if(state.prefs.animations)220 else 0)) togetherWith fadeOut(tween(if(state.prefs.animations)100 else 0))
             },label="page"){current->
                 when(current){
-                    "连接"->Home(state,onPortal={portal=true},initialMode=loginTarget)
+                    "连接"->Home(state,onPortal={portal=true},initialMode=loginTarget,onMode={loginTarget=it})
                     "常用网站"->Sites()
                     "课程表"->SchedulePage(onLogin={loginTarget=1;page="连接"})
                     "代理"->ProxyPage(state,onVpn)
@@ -153,7 +153,7 @@ private val CardShape=RoundedCornerShape(26.dp)
         Text(value.ifBlank{"—"},fontSize=15.sp,fontWeight=FontWeight.SemiBold,modifier=Modifier.padding(top=7.dp))
     }
 }
-@Composable private fun Home(s:ViewState,onPortal:()->Unit,initialMode:Int=0){
+@Composable private fun Home(s:ViewState,onPortal:()->Unit,initialMode:Int=0,onMode:(Int)->Unit={}){
     var loginMode by remember{mutableIntStateOf(initialMode)}
     val scheduleMessage by ScheduleStore.message.collectAsStateWithLifecycle()
     var user by remember{mutableStateOf(s.username)}
@@ -166,6 +166,7 @@ private val CardShape=RoundedCornerShape(26.dp)
     LaunchedEffect(Unit){while(true){delay(1000);now=System.currentTimeMillis()}}
     val connected=s.status in listOf(LinkState.CONNECTED,LinkState.OPEN)
     val submitLogin:()->Unit={
+        Repository.loginPurpose(loginMode)
         val secret=password.ifEmpty{Repository.sharedAccount(user)?.password.orEmpty()}
         if(loginMode!=1)Repository.login(user,password,rememberPassword)
         if(loginMode!=0)ScheduleStore.sync(user,secret,rememberPassword)
@@ -222,7 +223,7 @@ private val CardShape=RoundedCornerShape(26.dp)
                     singleLine=true,shape=RoundedCornerShape(16.dp),trailingIcon={IconButton(onClick={accounts=true}){Icon(Icons.Outlined.ExpandMore,"选择账号")}})
                 SecretField(password,{password=it},"统一认证密码",placeholder=if(Repository.hasPassword(user))"密码已安全保存，可留空"else"请输入密码")
                 Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
-                    listOf("校园网","课表","两者").forEachIndexed{i,title->FilterChip(loginMode==i,{loginMode=i},label={Text(title)})}
+                    listOf("校园网","课表","两者").forEachIndexed{i,title->FilterChip(loginMode==i,{loginMode=i;onMode(i)},label={Text(title)})}
                 }
                 if(loginMode!=0){
                     Text("课表独立使用统一身份认证，无需开通校园网。",fontSize=12.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
@@ -236,7 +237,7 @@ private val CardShape=RoundedCornerShape(26.dp)
                 Text("密码使用 Android Keystore 加密保存在本机。",fontSize=11.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        Panel{Setting("自动登录","检测到校园认证入口时，使用选定账号连接。",s.prefs.autoLogin){Repository.preferences(s.prefs.copy(autoLogin=it))}}
+        Panel{Setting("自动登录","仅选择校园网或两者时，检测到认证入口后自动连接。",s.prefs.autoLogin){Repository.preferences(s.prefs.copy(autoLogin=it))}}
         Text("每 ${if(s.prefs.interval==120)"2 分钟"else"${s.prefs.interval} 秒"}检查 · 可在设置中调整",fontSize=12.sp,
             color=MaterialTheme.colorScheme.onSurfaceVariant,modifier=Modifier.align(Alignment.CenterHorizontally))
     }

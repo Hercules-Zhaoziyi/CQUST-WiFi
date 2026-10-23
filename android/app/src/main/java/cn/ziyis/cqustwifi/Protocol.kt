@@ -7,6 +7,7 @@ import java.security.SecureRandom
 
 /** Pure JVM wire/security helpers. No Android or network access. */
 object Protocol {
+    fun usesCampusLogin(mode:Int)=mode==0||mode==2
     val entries=listOf("http://aaa.cqust.edu.cn/","http://aaa.cqust.edu.cn/eportal/index.jsp",
         "http://www.baidu.com/","http://www.qq.com/","http://connect.rom.miui.com/generate_204",
         "http://connect.hicloud.com/generate_204","http://www.msftconnecttest.com/connecttest.txt",
