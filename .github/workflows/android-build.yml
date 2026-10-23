@@ -67,6 +67,8 @@ jobs:
           sudo chmod 666 /dev/kvm
       - name: Start controlled SOCKS endpoint
         run: python3 app/src/androidTest/fixtures/socks_fixture.py > /tmp/cqust-socks-fixture.log 2>&1 &
+      - name: Compile test APKs before starting memory-intensive emulator
+        run: gradle --no-daemon :app:assembleDebug :app:assembleAndroidTest :vpnprobe:assembleDebug
       - uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
@@ -75,12 +77,14 @@ jobs:
           arch: x86_64
           profile: pixel_6
           disk-size: 8192M
+          ram-size: 3072M
+          heap-size: 512M
           working-directory: android
           script: |
             gradle --no-daemon :vpnprobe:assembleDebug
             for attempt in $(seq 1 30); do if adb shell svc wifi disable && adb shell svc data disable; then break; fi; sleep 2; done
             adb shell df -h /data
-            adb install -r vpnprobe/build/outputs/apk/debug/vpnprobe-debug.apk
+            adb install -r vpnprobe/build/outputs/apk/debug/vpnprobe-debug.apk || (adb logcat -d -t 300; exit 1)
             gradle --no-daemon -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true :app:connectedDebugAndroidTest
             mkdir -p artifacts && adb pull /sdcard/Android/data/cn.ziyis.cqustwifi/files/screenshots artifacts/screenshots
       - uses: actions/upload-artifact@v4
