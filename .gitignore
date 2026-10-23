@@ -19,3 +19,4 @@ verification/*-output/
 verification/output/
 verification/native-output/
 verification/v502-*/
+test
