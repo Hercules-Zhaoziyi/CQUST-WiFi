@@ -22,6 +22,7 @@ jobs:
       - name: Verify pinned native dependency
         run: |
           test "$(sha256sum app/libs/hev-socks5-tunnel-2.19.1.aar | cut -d' ' -f1)" = "107958f7a07051386248ba8dba778b63d8dcefdfb2c3665b0ee9a8c93de5f6ca"
+          test "$(sha256sum gradle/wrapper/gradle-wrapper.jar | cut -d' ' -f1)" = "498495120a03b9a6ab5d155f5de3c8f0d986a449153702fb80fc80e134484f17"
       - name: Build and unit test
         run: gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug :app:assembleAndroidTest
       - name: Collect test APK
@@ -68,7 +69,9 @@ jobs:
           script: gradle --no-daemon :app:connectedDebugAndroidTest
       - name: Collect UI captures
         if: always()
-        run: adb pull /sdcard/Android/data/cn.ziyis.cqustwifi/files/screenshots artifacts/screenshots || true
+        run: |
+          mkdir -p artifacts
+          adb pull /sdcard/Android/data/cn.ziyis.cqustwifi/files/screenshots artifacts/screenshots || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:

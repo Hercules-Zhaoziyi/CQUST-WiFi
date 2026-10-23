@@ -394,6 +394,7 @@ private fun copy(context:Context,text:String){context.getSystemService(Clipboard
 }
 @Composable private fun About(){
     val context=LocalContext.current
+    var licenses by remember{mutableStateOf(false)}
     PageColumn{
         Panel{
             Image(painterResource(R.drawable.app_logo),null,Modifier.size(74.dp).align(Alignment.CenterHorizontally).clip(RoundedCornerShape(22.dp)))
@@ -420,9 +421,15 @@ private fun copy(context:Context,text:String){context.getSystemService(Clipboard
             TextButton(onClick={openLink(context,"https://github.com/Zelm05/campus-autologin")}){Text("campus-autologin · Wi-Fi 探测与布局参考")}
             TextButton(onClick={openLink(context,"https://github.com/heiher/hev-socks5-tunnel")}){Text("HevSocks5Tunnel · 转发核心")}
             Text("开源许可与依赖说明随源码及应用一并提供。",fontSize=12.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
+            TextButton(onClick={licenses=true}){Text("查看开源许可")}
         }
         Image(painterResource(R.drawable.school_logo),"重庆科技大学",Modifier.fillMaxWidth().height(64.dp).padding(horizontal=22.dp),contentScale=ContentScale.Fit)
     }
+    if(licenses)AlertDialog(onDismissRequest={licenses=false},title={Text("开源许可")},text={
+        val notices=remember{context.assets.list("licenses").orEmpty().sorted().joinToString("\n\n"){name->
+            name+"\n"+context.assets.open("licenses/$name").bufferedReader().use{it.readText()}}}
+        Text(notices,Modifier.verticalScroll(rememberScrollState()),fontSize=11.sp,lineHeight=18.sp)
+    },confirmButton={TextButton(onClick={licenses=false}){Text("关闭")}})
 }
 
 @Composable private fun AuthDialog(issue:AuthIssue,onPortal:()->Unit){
@@ -452,6 +459,14 @@ private fun copy(context:Context,text:String){context.getSystemService(Clipboard
 }
 @Composable private fun PortalDialog(onClose:()->Unit,onResult:(String)->Unit){
     var finished by remember{mutableStateOf(false)}
+    val wifi=remember{Repository.engine.wifi()}
+    DisposableEffect(wifi){
+        val cm=Repository.engine.connectivity
+        val previous=cm.boundNetworkForProcess
+        val bound=wifi!=null&&cm.bindProcessToNetwork(wifi)
+        if(!bound)Repository.message("未找到校园 Wi-Fi，请连接后重新打开认证页。")
+        onDispose{if(bound&&cm.boundNetworkForProcess==wifi)cm.bindProcessToNetwork(previous)}
+    }
     AlertDialog(onDismissRequest=onClose,title={Text("读取官方认证跳转")},text={
         Column{
             Text("仅打开学校认证页面，不向页面注入账号密码。捕获完整网址后会自动返回。",fontSize=12.sp,lineHeight=20.sp)
@@ -460,6 +475,10 @@ private fun copy(context:Context,text:String){context.getSystemService(Clipboard
                 settings.javaScriptEnabled=true;settings.allowFileAccess=false;settings.allowContentAccess=false
                 settings.domStorageEnabled=false
                 webViewClient=object:WebViewClient(){
+                    override fun shouldInterceptRequest(view:WebView,request:WebResourceRequest):android.webkit.WebResourceResponse? {
+                        return if(Protocol.trusted(request.url.toString()))null else android.webkit.WebResourceResponse(
+                            "text/plain","UTF-8",java.io.ByteArrayInputStream(ByteArray(0)))
+                    }
                     override fun shouldOverrideUrlLoading(view:WebView,request:WebResourceRequest):Boolean {
                         val url=request.url.toString()
                         if(Protocol.candidate(url)){if(!finished){finished=true;view.stopLoading();onResult(url)};return true}
@@ -469,7 +488,7 @@ private fun copy(context:Context,text:String){context.getSystemService(Clipboard
                         if(Protocol.candidate(url)&&!finished){finished=true;view.stopLoading();onResult(url)}
                     }
                 }
-                loadUrl("http://aaa.cqust.edu.cn/")
+                if(wifi!=null)loadUrl("http://aaa.cqust.edu.cn/")
             }},modifier=Modifier.fillMaxWidth().height(250.dp),
                 onRelease={it.stopLoading();it.clearHistory();it.destroy()})
         }

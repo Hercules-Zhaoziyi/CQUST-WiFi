@@ -18,10 +18,12 @@
 需要 JDK 17、Android SDK 35、Gradle 8.9；Android 10（API 29）及以上。
 
 ```sh
-gradle :app:testDebugUnitTest :app:assembleDebug :app:assembleAndroidTest
+./gradlew :app:testDebugUnitTest :app:assembleDebug :app:assembleAndroidTest
 ```
 
 仓库 `.github/workflows/android-build.yml` 可手动构建。构建产物为默认 Android debug key 签名的测试 APK；不是生产签名发行版。尚需真实校园网与不同品牌手机测试，不能承诺后台永久驻留。启用 VPN 必须由用户在系统授权页同意；启动时不会自动申请权限。
+
+Windows 使用 `gradlew.bat`；Android Studio 可直接打开本目录。Gradle 发行包与官方 wrapper JAR 均校验 SHA-256；wrapper JAR 为 `498495120a03b9a6ab5d155f5de3c8f0d986a449153702fb80fc80e134484f17`。
 
 ## 安全与使用边界
 
