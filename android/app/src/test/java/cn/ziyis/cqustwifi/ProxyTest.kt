@@ -48,7 +48,9 @@ class ProxyTest {
             reply(DataInputStream(client.getInputStream()));client.getOutputStream().write(73)
             assertEquals(73,client.getInputStream().read())
         }finally{client.close();proxy.close();origin.close();worker.join(3000)}
-        assertThrows(IOException::class.java){Socket("127.0.0.1",port)}
+        // Verify the actual listening port is released; a bare loopback connect
+        // can self-connect when its ephemeral source port equals the closed port.
+        ServerSocket().use{released->released.reuseAddress=true;released.bind(InetSocketAddress("127.0.0.1",port))}
     }
     @Test fun httpForwardStripsProxyCredentials(){
         val origin=ServerSocket(0).apply{soTimeout=3000};var observed=""
