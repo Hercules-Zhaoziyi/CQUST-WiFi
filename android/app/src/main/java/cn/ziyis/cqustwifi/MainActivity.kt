@@ -21,7 +21,7 @@ class MainActivity:ComponentActivity() {
     override fun onCreate(savedInstanceState:Bundle?) {
         super.onCreate(savedInstanceState);enableEdgeToEdge()
         setContent{CampusUi(onVpn={if(Repository.state.value.vpn){
-            Repository.vpnStoppedByUser();stopService(Intent(this,CampusVpnService::class.java))
+            Repository.vpnStoppedByUser();startService(Intent(this,CampusVpnService::class.java).setAction("STOP"))
         }else{val request=VpnService.prepare(this);if(request!=null)vpnPermission.launch(request)else startVpn()}},
             onNotifications={if(android.os.Build.VERSION.SDK_INT>=33)notifications.launch(Manifest.permission.POST_NOTIFICATIONS)})}
         Repository.ensureMonitor()

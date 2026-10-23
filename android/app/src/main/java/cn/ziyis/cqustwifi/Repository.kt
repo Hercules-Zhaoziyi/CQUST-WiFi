@@ -77,6 +77,14 @@ object Repository {
         return if(user.isNotBlank()&&password.isNotEmpty())Account(user,password,true)else null
     }
     fun hasPassword(user:String=state.value.username)=account(user)!=null
+    internal fun sharedAccount(user:String)=account(user)
+    fun rememberIdentity(user:String,password:String){scope.launch{gate.withLock{
+        val accounts=credentials.optJSONObject("accounts")?:JSONObject().also{credentials.put("accounts",it)}
+        accounts.put(user,password);vault.write(credentials)
+        runtimeAccounts[user]=Account(user,password,true)
+        mutable.update{it.copy(accounts=(it.accounts+user).distinct())}
+        if(session==null)select(user)
+    }}}
     private fun select(user:String) {
         app.getSharedPreferences("settings",Context.MODE_PRIVATE).edit().putString("username",user).apply()
         mutable.update{it.copy(username=user,name="")}

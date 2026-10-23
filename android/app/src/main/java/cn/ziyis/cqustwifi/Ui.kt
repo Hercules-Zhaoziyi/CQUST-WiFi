@@ -46,6 +46,7 @@ import java.util.Calendar
 private val Blue=Color(0xff4166f5)
 private val Green=Color(0xff1eaf91)
 private val CardShape=RoundedCornerShape(26.dp)
+@Composable private fun GithubIcon(){val context=LocalContext.current;AsyncImage("file:///android_asset/github.svg",null,imageLoader=remember{ImageLoader.Builder(context).components{add(SvgDecoder.Factory())}.build()},modifier=Modifier.size(17.dp))}
 
 @Composable fun CampusUi(onVpn:()->Unit,onNotifications:()->Unit) {
     val state by Repository.state.collectAsStateWithLifecycle()
@@ -73,7 +74,7 @@ private val CardShape=RoundedCornerShape(26.dp)
     LaunchedEffect(state.message){if(state.message.isNotEmpty()){snackbar.showSnackbar(state.message);Repository.dismissMessage()}}
     MaterialTheme(colorScheme=scheme) {
         Scaffold(containerColor=background,snackbarHost={SnackbarHost(snackbar)},topBar={
-            Column(Modifier.statusBarsPadding().background(background)){
+            if(page!="课程表")Column(Modifier.statusBarsPadding().background(background)){
                 Row(Modifier.fillMaxWidth().padding(horizontal=20.dp,vertical=12.dp),verticalAlignment=Alignment.CenterVertically){
                     Image(painterResource(R.drawable.app_logo),null,Modifier.size(42.dp).clip(RoundedCornerShape(12.dp)))
                     Column(Modifier.weight(1f).padding(start=12.dp)){
@@ -83,12 +84,13 @@ private val CardShape=RoundedCornerShape(26.dp)
                     IconButton(onClick={Repository.preferences(state.prefs.copy(theme=if(dark)"light"else"dark"))}){
                         Icon(if(dark)Icons.Outlined.LightMode else Icons.Outlined.DarkMode,"切换主题")}
                     IconButton(onClick={page=if(page=="设置")"连接"else"设置"}){Icon(Icons.Outlined.Tune,"设置")}
+                    IconButton(onClick={page=if(page=="关于")"连接"else"关于"}){Icon(Icons.Outlined.Info,"关于")}
                 }
             }
         },bottomBar={
             NavigationBar(containerColor=MaterialTheme.colorScheme.surface){
-                listOf("连接" to Icons.Outlined.Wifi,"常用网站" to Icons.Outlined.Language,
-                    "代理" to Icons.Outlined.Shield,"关于" to Icons.Outlined.Info).forEach{(name,icon)->
+                listOf("连接" to Icons.Outlined.Wifi,"课程表" to Icons.Outlined.CalendarMonth,"常用网站" to Icons.Outlined.Language,
+                    "代理" to Icons.Outlined.Shield).forEach{(name,icon)->
                     NavigationBarItem(selected=page==name,onClick={page=name},icon={Icon(icon,null)},label={Text(name,fontSize=12.sp)})
                 }
             }
@@ -99,6 +101,7 @@ private val CardShape=RoundedCornerShape(26.dp)
                 when(current){
                     "连接"->Home(state,onPortal={portal=true})
                     "常用网站"->Sites()
+                    "课程表"->SchedulePage(onLogin={page="连接"})
                     "代理"->ProxyPage(state,onVpn)
                     "设置"->SettingsPage(state,onLogs={page="日志"},onNotifications)
                     "日志"->Logs(state)
@@ -149,6 +152,8 @@ private val CardShape=RoundedCornerShape(26.dp)
     }
 }
 @Composable private fun Home(s:ViewState,onPortal:()->Unit){
+    var loginMode by remember{mutableIntStateOf(0)}
+    val scheduleMessage by ScheduleStore.message.collectAsStateWithLifecycle()
     var user by remember{mutableStateOf(s.username)}
     var password by remember{mutableStateOf("")}
     var rememberPassword by remember{mutableStateOf(true)}
@@ -209,11 +214,22 @@ private val CardShape=RoundedCornerShape(26.dp)
                 OutlinedTextField(user,{user=it},label={Text("校园网账号")},modifier=Modifier.fillMaxWidth().testTag("username"),
                     singleLine=true,shape=RoundedCornerShape(16.dp),trailingIcon={IconButton(onClick={accounts=true}){Icon(Icons.Outlined.ExpandMore,"选择账号")}})
                 SecretField(password,{password=it},"登录密码",placeholder=if(Repository.hasPassword(user))"密码已安全保存，可留空"else"请输入密码")
+                Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                    listOf("校园网","课表","两者").forEachIndexed{i,title->FilterChip(loginMode==i,{loginMode=i},label={Text(title)})}
+                }
+                if(loginMode!=0){
+                    Text("课表独立使用统一身份认证，无需开通校园网。",fontSize=12.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    if(scheduleMessage.isNotEmpty())Text(scheduleMessage,fontSize=12.sp,color=MaterialTheme.colorScheme.primary)
+                }
                 Row(verticalAlignment=Alignment.CenterVertically){
                     Checkbox(rememberPassword,{rememberPassword=it});Text("记住账号密码",fontSize=13.sp,modifier=Modifier.weight(1f))
                     TextButton(onClick=onPortal){Text("认证帮助")}
                 }
-                Button(onClick={Repository.login(user,password,rememberPassword)},enabled=!s.busy,modifier=Modifier.fillMaxWidth().height(52.dp),shape=RoundedCornerShape(17.dp)){Text("登录");Spacer(Modifier.width(10.dp));Icon(Icons.Outlined.ArrowForward,null)}
+                Button(onClick={
+                    val secret=password.ifEmpty{Repository.sharedAccount(user)?.password.orEmpty()}
+                    if(loginMode!=1)Repository.login(user,password,rememberPassword)
+                    if(loginMode!=0)ScheduleStore.sync(user,secret,rememberPassword)
+                },enabled=!s.busy,modifier=Modifier.fillMaxWidth().height(52.dp),shape=RoundedCornerShape(17.dp)){Text("登录");Spacer(Modifier.width(10.dp));Icon(Icons.Outlined.ArrowForward,null)}
                 Text("密码使用 Android Keystore 加密保存在本机。",fontSize=11.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
@@ -222,12 +238,15 @@ private val CardShape=RoundedCornerShape(26.dp)
             color=MaterialTheme.colorScheme.onSurfaceVariant,modifier=Modifier.align(Alignment.CenterHorizontally))
     }
     if(accounts)AlertDialog(onDismissRequest={accounts=false},title={Text("校园网账号")},text={
-        Column(verticalArrangement=Arrangement.spacedBy(8.dp)){
+        Column(verticalArrangement=Arrangement.spacedBy(10.dp)){
+            Text("选择已保存账号，或添加新的校园网账号。",fontSize=13.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
             s.accounts.forEach{account->Row(verticalAlignment=Alignment.CenterVertically){
-                TextButton(onClick={user=account;Repository.chooseAccount(account);accounts=false},modifier=Modifier.weight(1f)){Text(account)}
+                Surface(onClick={user=account;Repository.chooseAccount(account);accounts=false},shape=RoundedCornerShape(16.dp),color=MaterialTheme.colorScheme.surfaceVariant,modifier=Modifier.weight(1f)){
+                    Row(Modifier.padding(14.dp),verticalAlignment=Alignment.CenterVertically){Icon(Icons.Outlined.AccountCircle,null);Spacer(Modifier.width(12.dp));Column{Text(account,fontWeight=FontWeight.SemiBold);Text(if(account==s.username)"当前账号"else"密码已保存",fontSize=11.sp)};Spacer(Modifier.weight(1f));if(account==s.username)Icon(Icons.Outlined.CheckCircle,null,tint=MaterialTheme.colorScheme.primary)}
+                }
                 IconButton(onClick={Repository.forgetAccount(account)}){Icon(Icons.Outlined.DeleteOutline,"忘记账号")}
             }}
-            TextButton(onClick={user="";password="";accounts=false}){Text("添加其他账号")}
+            OutlinedButton(onClick={user="";password="";accounts=false},modifier=Modifier.fillMaxWidth()){Icon(Icons.Outlined.Add,null);Spacer(Modifier.width(8.dp));Text("添加其他账号")}
         }
     },confirmButton={TextButton(onClick={accounts=false}){Text("关闭")}})
     if(logoutConfirm)AlertDialog(onDismissRequest={logoutConfirm=false},title={Text("退出登录？")},text={Text("将向校园网关提交下线请求，已保存的账号密码仍保留。")},
@@ -273,9 +292,27 @@ private val CardShape=RoundedCornerShape(26.dp)
     var lan by remember{mutableStateOf(true)}
     var mode by remember{mutableStateOf("mixed")}
     val context=LocalContext.current
+    var scanned by remember{mutableStateOf<VpnProfile?>(null)}
+    val scanner=androidx.activity.compose.rememberLauncherForActivityResult(com.journeyapps.barcodescanner.ScanContract()){result->
+        result.contents?.let{raw->runCatching{ProxyQr.parse(raw)}.onSuccess{scanned=it}.onFailure{Repository.message("不是有效的局域网代理二维码，请核对桌面端配置。")}}
+    }
     PageColumn{
         Heading("YOUR DEVICES, CONNECTED","代理","连接电脑共享的网络，或在自己的设备之间转发。")
-        TabRow(tab){listOf("连接电脑","本机共享").forEachIndexed{i,title->Tab(tab==i,{tab=i},text={Text(title)})}}
+        if(tab==0&&!s.vpn)OutlinedButton(onClick={scanner.launch(com.journeyapps.barcodescanner.ScanOptions().setDesiredBarcodeFormats(com.journeyapps.barcodescanner.ScanOptions.QR_CODE).setPrompt("扫描桌面端代理配置二维码").setOrientationLocked(false))},modifier=Modifier.fillMaxWidth()){
+            Icon(Icons.Outlined.QrCodeScanner,null);Spacer(Modifier.width(8.dp));Text("扫码导入并连接")
+        }
+        Surface(shape=RoundedCornerShape(20.dp),color=MaterialTheme.colorScheme.surfaceVariant){
+            Row(Modifier.fillMaxWidth().padding(5.dp),horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                listOf("连接电脑","本机共享").forEachIndexed{i,title->
+                    Surface(onClick={tab=i},shape=RoundedCornerShape(16.dp),
+                        color=if(tab==i)MaterialTheme.colorScheme.surface else Color.Transparent,modifier=Modifier.weight(1f)){
+                        Row(Modifier.padding(vertical=14.dp),horizontalArrangement=Arrangement.Center,verticalAlignment=Alignment.CenterVertically){
+                            Icon(if(i==0)Icons.Outlined.Computer else Icons.Outlined.Share,null,Modifier.size(18.dp));Spacer(Modifier.width(8.dp));Text(title,fontSize=14.sp,fontWeight=FontWeight.SemiBold)
+                        }
+                    }
+                }
+            }
+        }
         if(tab==0){
             Panel{
                 Row(verticalAlignment=Alignment.CenterVertically){
@@ -335,6 +372,9 @@ private val CardShape=RoundedCornerShape(26.dp)
             Text("HTTP 支持 HTTPS CONNECT，不解密网页内容；SOCKS5 支持 TCP/UDP。认证本身不加密，请仅在可信网络与自己的设备之间使用。网络隔离可能阻止互访，应用不会改变校园网设备配额。",fontSize=12.sp,lineHeight=22.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
+    scanned?.let{p->AlertDialog(onDismissRequest={scanned=null},title={Text("确认连接电脑代理")},text={Text("服务器：${p.host}\n端口：${p.port}\n用户名：${p.username}\n\n二维码包含代理凭据，请只扫描自己电脑生成的配置。")},confirmButton={TextButton(onClick={
+        runCatching{Repository.saveVpn(p.host,p.port,p.username,p.password,false)}.onSuccess{host=p.host;port=p.port.toString();user=p.username;password=p.password;campus=false;scanned=null;onVpn()}.onFailure{Repository.message("代理配置保存失败")}
+    }){Text("确认并连接")}},dismissButton={TextButton(onClick={scanned=null}){Text("取消")}})}
 }
 private fun copy(context:Context,text:String){context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("代理地址",text));Repository.message("已复制")}
 
@@ -345,8 +385,6 @@ private fun copy(context:Context,text:String){context.getSystemService(Clipboard
     PageColumn{
         Heading("MAKE IT YOURS","连接与偏好","操作即时生效，让连接按你的习惯运行。")
         Panel{
-            Setting("开机自启","系统解锁后尝试恢复后台监测；请同时开启自动登录或自动代理连接。",s.prefs.startup){Repository.preferences(s.prefs.copy(startup=it))}
-            HorizontalDivider()
             Setting("自动登录","检测到认证入口时使用选定账号；不会绕过验证码。",s.prefs.autoLogin){Repository.preferences(s.prefs.copy(autoLogin=it))}
             HorizontalDivider()
             Setting("始终保持连接","会话失效后静默尝试重连；手动断开时暂停。",s.prefs.keepConnected){Repository.preferences(s.prefs.copy(keepConnected=it))}
@@ -412,14 +450,16 @@ private fun copy(context:Context,text:String){context.getSystemService(Clipboard
             Text("CQUST Wi-Fi",Modifier.align(Alignment.CenterHorizontally),fontSize=29.sp,fontWeight=FontWeight.Bold)
             Text("${BuildConfig.VERSION_NAME} · Android",Modifier.align(Alignment.CenterHorizontally),fontSize=13.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
             Text("让校园网络连接，简单一点。",Modifier.align(Alignment.CenterHorizontally),fontSize=14.sp)
-            TextButton(onClick={openLink(context,"https://www.xiaohongshu.com/user/profile/60d40af7000000000101f612")},modifier=Modifier.align(Alignment.CenterHorizontally)){Text("小红书  @ 十七号旅客")}
             Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceEvenly){
-                TextButton(onClick={openLink(context,"https://ziyis.cn/")}){Text("ziyis.cn")}
-                TextButton(onClick={openLink(context,"https://github.com/Hercules-Zhaoziyi")}){Text("GitHub")}
-                TextButton(onClick={openLink(context,"https://github.com/Hercules-Zhaoziyi/CQUST-WiFi")}){Text("开源项目")}
+                TextButton(onClick={openLink(context,"https://www.xiaohongshu.com/user/profile/60d40af7000000000101f612")}){
+                    AsyncImage("file:///android_asset/xiaohongshu-logo.svg",null,imageLoader=remember{ImageLoader.Builder(context).components{add(SvgDecoder.Factory())}.build()},modifier=Modifier.width(26.dp).height(16.dp));Spacer(Modifier.width(4.dp));Text("十七号旅客",fontSize=11.sp)}
+                TextButton(onClick={openLink(context,"https://github.com/yuexps")}){GithubIcon();Spacer(Modifier.width(4.dp));Text("GitHub",fontSize=11.sp)}
+                TextButton(onClick={openLink(context,"https://github.com/Hercules-Zhaoziyi/CQUST-WiFi")}){Icon(Icons.Outlined.Code,null,Modifier.size(15.dp));Text("开源项目",fontSize=11.sp)}
             }
-            OutlinedButton(onClick={openLink(context,"https://qm.qq.com/q/Rn7B5NBbiK")},modifier=Modifier.fillMaxWidth()){Text("加入内测群")}
-            OutlinedButton(onClick={openLink(context,"https://cqust-wifi.ziyis.cn/")},modifier=Modifier.fillMaxWidth()){Text("软件介绍")}
+            Row(horizontalArrangement=Arrangement.spacedBy(10.dp)){
+                OutlinedButton(onClick={openLink(context,"https://qm.qq.com/q/Rn7B5NBbiK")},modifier=Modifier.weight(1f)){Icon(Icons.Outlined.Groups,null,Modifier.size(17.dp));Spacer(Modifier.width(5.dp));Text("加入内测群",fontSize=12.sp)}
+                OutlinedButton(onClick={openLink(context,"https://cqust-wifi.ziyis.cn/")},modifier=Modifier.weight(1f)){Icon(Icons.Outlined.Language,null,Modifier.size(17.dp));Spacer(Modifier.width(5.dp));Text("软件介绍",fontSize=12.sp)}
+            }
         }
         Panel{
             Text("Android 版，轻松连接",fontSize=19.sp,fontWeight=FontWeight.SemiBold)
@@ -428,13 +468,15 @@ private fun copy(context:Context,text:String){context.getSystemService(Clipboard
         }
         Panel{
             Text("特别鸣谢",fontSize=18.sp,fontWeight=FontWeight.SemiBold)
-            TextButton(onClick={openLink(context,"https://github.com/Gloridust/RuijieWIFI-AutoLogin")}){Text("AutoLogin · 锐捷认证脚本参考")}
-            TextButton(onClick={openLink(context,"https://github.com/Zelm05/campus-autologin")}){Text("campus-autologin · Wi-Fi 探测与布局参考")}
-            TextButton(onClick={openLink(context,"https://github.com/heiher/hev-socks5-tunnel")}){Text("HevSocks5Tunnel · 转发核心")}
+            Column{
+                listOf("Gloridust/RuijieWIFI-AutoLogin" to "AutoLogin · 锐捷认证", "Zelm05/campus-autologin" to "campus-autologin · 网络探测", "heiher/hev-socks5-tunnel" to "HevSocks5Tunnel · 转发核心", "yuexps/cqust-schedule-miuix" to "cqust-schedule-miuix · 课程表").forEach{(repo,label)->
+                    TextButton(onClick={openLink(context,"https://github.com/$repo")},contentPadding=PaddingValues(horizontal=0.dp,vertical=2.dp)){GithubIcon();Spacer(Modifier.width(9.dp));Text(label,fontSize=12.sp)}
+                }
+            }
             Text("开源许可与依赖说明随源码及应用一并提供。",fontSize=12.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
             TextButton(onClick={licenses=true}){Text("查看开源许可")}
         }
-        Image(painterResource(R.drawable.school_logo),"重庆科技大学",Modifier.fillMaxWidth().height(64.dp).padding(horizontal=22.dp),contentScale=ContentScale.Fit)
+        Image(painterResource(R.drawable.school_logo),"重庆科技大学",Modifier.width(215.dp).height(38.dp).align(Alignment.CenterHorizontally),contentScale=ContentScale.Fit)
     }
     if(licenses)AlertDialog(onDismissRequest={licenses=false},title={Text("开源许可")},text={
         val notices=remember{context.assets.list("licenses").orEmpty().sorted().joinToString("\n\n"){name->

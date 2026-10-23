@@ -26,7 +26,7 @@ class CampusVpnService:VpnService(){
         override fun onLost(net:Network){if(net==network){Repository.vpnState(false,"Wi-Fi 已断开，VPN 已停止");stopSelf()}}
     }
     override fun onStartCommand(intent:Intent?,flags:Int,startId:Int):Int {
-        if(intent?.action=="STOP"){Repository.vpnStoppedByUser();stopSelf();return START_NOT_STICKY}
+        if(intent?.action=="STOP"){Repository.vpnStoppedByUser();scope.cancel();runCatching{tun?.close()};tun=null;stopSelf();return START_NOT_STICKY}
         if(!started.compareAndSet(false,true))return START_NOT_STICKY
         try {
             ServiceCompat.startForeground(this,20,Notifications.build(this,"正在连接电脑 SOCKS5",true),
@@ -64,7 +64,7 @@ class CampusVpnService:VpnService(){
                 setUnderlyingNetworks(arrayOf(wifi))
                 val builder=Builder().setSession("CQUST Wi-Fi · 电脑代理").setMtu(1500)
                     .addAddress("198.18.0.1",30).addAddress("fd00:4351::1",126)
-                    .addRoute("2000::",3).addDnsServer("1.1.1.1").addDnsServer("8.8.8.8")
+                    .addRoute("2000::",3).addDnsServer("198.18.0.2")
                     .addDisallowedApplication(packageName).setBlocking(false)
                 Protocol.vpnRoutes().forEach{(address,prefix)->builder.addRoute(address,prefix)}
                 val descriptor=builder.establish()?:error("VPN 授权已取消，请重新确认。")
@@ -83,6 +83,13 @@ class CampusVpnService:VpnService(){
                       username: ${Protocol.yaml(profile.username)}
                       password: ${Protocol.yaml(profile.password)}
                       udp: 'udp'
+                      udp-address: ${Protocol.yaml(profile.host)}
+                    mapdns:
+                      address: 198.18.0.2
+                      port: 53
+                      network: 198.19.0.0
+                      netmask: 255.255.0.0
+                      cache-size: 4096
                     misc:
                       log-level: error
                       connect-timeout: 10000
@@ -114,6 +121,8 @@ class CampusVpnService:VpnService(){
     override fun onRevoke(){Repository.vpnStoppedByUser();stopSelf();super.onRevoke()}
     override fun onDestroy(){
         scope.cancel();runCatching{Repository.engine.connectivity.unregisterNetworkCallback(callback)}
+        // Release Android's VPN network immediately, even if native quit/join stalls.
+        runCatching{tun?.close()};tun=null
         Repository.vpnState(false,Repository.state.value.vpnMessage.ifBlank{"电脑代理已断开"})
         // Native quit can join its worker thread: do not block the UI thread.
         Thread{
