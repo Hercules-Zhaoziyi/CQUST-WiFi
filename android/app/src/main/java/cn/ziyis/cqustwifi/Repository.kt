@@ -88,10 +88,11 @@ object Repository {
         app.getSharedPreferences("settings",Context.MODE_PRIVATE).edit().putInt("loginPurpose",safe).apply()
         ensureMonitor()
     }
-    fun rememberIdentity(user:String,password:String){scope.launch{gate.withLock{
+    fun rememberIdentity(user:String,password:String,remember:Boolean=true){scope.launch{gate.withLock{
         val accounts=credentials.optJSONObject("accounts")?:JSONObject().also{credentials.put("accounts",it)}
-        accounts.put(user,password);runCatching{vault.write(credentials)}.onFailure{message("身份认证已通过，但安全凭据保存失败。")}
-        runtimeAccounts[user]=Account(user,password,true)
+        if(remember)accounts.put(user,password)else accounts.remove(user)
+        runCatching{vault.write(credentials)}.onFailure{message("身份认证已通过，但安全凭据保存失败。")}
+        runtimeAccounts[user]=Account(user,password,remember)
         mutable.update{it.copy(accounts=(it.accounts+user).distinct())}
         if(session==null)select(user)
     }}}

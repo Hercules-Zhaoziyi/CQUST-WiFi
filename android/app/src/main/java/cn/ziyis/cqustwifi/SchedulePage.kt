@@ -36,7 +36,7 @@ object ScheduleStore {
             try{
                 require(user.isNotBlank()&&password.isNotEmpty()){"请在共用登录入口填写统一身份认证账号密码。"}
                 val connected=CqustCasAuthClient.connect(user.trim(),password){message.value=it}.getOrThrow();session=connected
-                if(remember)Repository.rememberIdentity(user.trim(),password)
+                Repository.rememberIdentity(user.trim(),password,remember)
                 val result=CqustEamsParser.fetchAndParse(connected,user.trim(),onProgress={message.value=it})
                 require(result.success){"课表同步未完成，原缓存已保留。请检查统一认证凭据或网络。"}
                 require(result.courses.isNotEmpty()){"本学期未解析到课程，已保留原缓存。"}
