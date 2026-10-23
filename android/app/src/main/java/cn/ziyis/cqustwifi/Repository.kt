@@ -80,7 +80,7 @@ object Repository {
     internal fun sharedAccount(user:String)=account(user)
     fun rememberIdentity(user:String,password:String){scope.launch{gate.withLock{
         val accounts=credentials.optJSONObject("accounts")?:JSONObject().also{credentials.put("accounts",it)}
-        accounts.put(user,password);vault.write(credentials)
+        accounts.put(user,password);runCatching{vault.write(credentials)}.onFailure{message("身份认证已通过，但安全凭据保存失败。")}
         runtimeAccounts[user]=Account(user,password,true)
         mutable.update{it.copy(accounts=(it.accounts+user).distinct())}
         if(session==null)select(user)

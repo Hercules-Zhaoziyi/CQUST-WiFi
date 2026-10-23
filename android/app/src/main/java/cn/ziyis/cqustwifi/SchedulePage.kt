@@ -29,9 +29,9 @@ object ScheduleStore {
     private var loaded=false
     fun load(){if(!loaded){loaded=true;data.value=runCatching{Vault(Repository.app,"schedule.enc").read().takeIf{it.has("courses")}}.getOrNull()}}
     fun sync(user:String,password:String,remember:Boolean=false){
-        if(busy.value)return
+        if(!busy.compareAndSet(false,true))return
         scope.launch{
-            busy.value=true;message.value="正在登录统一身份认证…"
+            message.value="正在登录统一身份认证…"
             try{
                 require(user.isNotBlank()&&password.isNotEmpty()){"请在共用登录入口填写统一身份认证账号密码。"}
                 val session=CqustCasAuthClient.connect(user.trim(),password){message.value=it}.getOrThrow()

@@ -29,7 +29,7 @@ jobs:
         if: success()
         run: |
           mkdir -p artifacts
-          cp app/build/outputs/apk/debug/app-debug.apk artifacts/CQUST-WiFi-Android-1.0.0-beta01.apk
+          cp app/build/outputs/apk/debug/app-debug.apk artifacts/CQUST-WiFi-Android-1.0.0-beta02.apk
           sha256sum artifacts/*.apk > artifacts/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         if: always()
@@ -59,6 +59,8 @@ jobs:
       - name: Enable KVM for isolated test emulator
         run: |
           sudo chmod 666 /dev/kvm
+      - name: Start controlled SOCKS endpoint
+        run: python3 app/src/androidTest/fixtures/socks_fixture.py > /tmp/cqust-socks-fixture.log 2>&1 &
       - uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35

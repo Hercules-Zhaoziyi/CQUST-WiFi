@@ -52,6 +52,7 @@ private val CardShape=RoundedCornerShape(26.dp)
     val state by Repository.state.collectAsStateWithLifecycle()
     val issue by Repository.issues.collectAsStateWithLifecycle()
     var page by remember{mutableStateOf("连接")}
+    var loginTarget by remember{mutableIntStateOf(0)}
     var portal by remember{mutableStateOf(false)}
     val systemDark=isSystemInDarkTheme()
     val dark=when(state.prefs.theme){"dark"->true;"light"->false;else->systemDark}
@@ -99,9 +100,9 @@ private val CardShape=RoundedCornerShape(26.dp)
                 fadeIn(tween(if(state.prefs.animations)220 else 0)) togetherWith fadeOut(tween(if(state.prefs.animations)100 else 0))
             },label="page"){current->
                 when(current){
-                    "连接"->Home(state,onPortal={portal=true})
+                    "连接"->Home(state,onPortal={portal=true},initialMode=loginTarget)
                     "常用网站"->Sites()
-                    "课程表"->SchedulePage(onLogin={page="连接"})
+                    "课程表"->SchedulePage(onLogin={loginTarget=1;page="连接"})
                     "代理"->ProxyPage(state,onVpn)
                     "设置"->SettingsPage(state,onLogs={page="日志"},onNotifications)
                     "日志"->Logs(state)
@@ -151,8 +152,8 @@ private val CardShape=RoundedCornerShape(26.dp)
         Text(value.ifBlank{"—"},fontSize=15.sp,fontWeight=FontWeight.SemiBold,modifier=Modifier.padding(top=7.dp))
     }
 }
-@Composable private fun Home(s:ViewState,onPortal:()->Unit){
-    var loginMode by remember{mutableIntStateOf(0)}
+@Composable private fun Home(s:ViewState,onPortal:()->Unit,initialMode:Int=0){
+    var loginMode by remember{mutableIntStateOf(initialMode)}
     val scheduleMessage by ScheduleStore.message.collectAsStateWithLifecycle()
     var user by remember{mutableStateOf(s.username)}
     var password by remember{mutableStateOf("")}
@@ -205,7 +206,7 @@ private val CardShape=RoundedCornerShape(26.dp)
                 Icon(Icons.Outlined.Logout,null,Modifier.size(17.dp));Spacer(Modifier.width(8.dp));Text("退出登录")}
             if(s.status==LinkState.OPEN)TextButton(onClick=onPortal,modifier=Modifier.align(Alignment.CenterHorizontally)){Text("在官方页面管理账号与下线")}
         }
-        if(!connected){
+        run{
             Panel{
                 Row(verticalAlignment=Alignment.CenterVertically){
                     Column(Modifier.weight(1f)){Text("你好，欢迎回来",fontSize=23.sp,fontWeight=FontWeight.Bold);Text("使用本人的校园网账号",fontSize=12.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)}
