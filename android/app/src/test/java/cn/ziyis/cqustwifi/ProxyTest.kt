@@ -48,9 +48,15 @@ class ProxyTest {
             reply(DataInputStream(client.getInputStream()));client.getOutputStream().write(73)
             assertEquals(73,client.getInputStream().read())
         }finally{client.close();proxy.close();origin.close();worker.join(3000)}
-        // Verify the actual listening port is released; a bare loopback connect
-        // can self-connect when its ephemeral source port equals the closed port.
-        ServerSocket().use{released->released.reuseAddress=true;released.bind(InetSocketAddress("127.0.0.1",port))}
+        assertFalse(proxy.isListening)
+    }
+    @Test fun stopClosesPendingAuthenticatedConnection(){
+        val(proxy,port)=server()
+        Socket("127.0.0.1",port).use{client->
+            auth(client);proxy.close();assertFalse(proxy.isListening)
+            val closed=try{client.getInputStream().read()==-1}catch(_:IOException){true}
+            assertTrue("Accepted connection should terminate on stop",closed)
+        }
     }
     @Test fun httpForwardStripsProxyCredentials(){
         val origin=ServerSocket(0).apply{soTimeout=3000};var observed=""

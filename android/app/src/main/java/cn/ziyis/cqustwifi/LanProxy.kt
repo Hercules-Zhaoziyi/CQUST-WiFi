@@ -23,6 +23,7 @@ class LanProxy(
     private val sockets=ConcurrentHashMap.newKeySet<Closeable>()
     private val slots=Semaphore(32)
     private var listener:ServerSocket?=null
+    internal val isListening:Boolean get()=listener?.isClosed==false
     val up=AtomicLong();val down=AtomicLong()
     fun start(){
         require(options.port in 1024..65535)
@@ -178,5 +179,5 @@ class LanProxy(
             }
         }}finally{relay.close();sockets.remove(relay);control.cancel(true)}
     }
-    override fun close(){runCatching{listener?.close()};listener=null;sockets.toList().forEach{runCatching{it.close()}};sockets.clear();pool.shutdownNow()}
+    override fun close(){val server=listener;server?.close();check(server==null||server.isClosed);listener=null;sockets.toList().forEach{runCatching{it.close()}};sockets.clear();pool.shutdownNow()}
 }
