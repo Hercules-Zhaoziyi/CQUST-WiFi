@@ -6,11 +6,17 @@ use tauri::{Emitter,AppHandle,Manager};
 use zeroize::Zeroizing;
 
 #[derive(Clone,Serialize,Deserialize)]#[serde(default)]
-pub struct Settings{pub keep_connected:bool,pub auto_login:bool,pub check_interval:u64,pub theme:String,pub service:String,pub animations:bool,pub window_snapping:bool,#[serde(default)]pub snapping_revision:u8}
-impl Default for Settings{fn default()->Self{Self{keep_connected:false,auto_login:false,check_interval:10,theme:"system".into(),service:String::new(),animations:true,window_snapping:false,snapping_revision:2}}}
+pub struct Settings{pub keep_connected:bool,pub auto_login:bool,pub check_interval:u64,pub theme:String,pub service:String,pub animations:bool,pub window_snapping:bool,#[serde(default)]pub snapping_revision:u8,pub login_purpose:String}
+impl Default for Settings{fn default()->Self{Self{keep_connected:false,auto_login:false,check_interval:10,theme:"system".into(),service:String::new(),animations:true,window_snapping:false,snapping_revision:2,login_purpose:"network".into()}}}
 #[derive(Default,Serialize,Deserialize)]pub struct Accounts{pub accounts:Vec<String>,pub last_username:String}
 pub struct Service{pub settings:Settings,pub accounts:Vec<String>,pub username:String,pub display_name:String,password:Zeroizing<String>,remember:bool,folder:PathBuf,auth:Auth,session:Option<Session>,started:f64,ip:String,logs:Vec<String>,manual:bool,next_poll:Instant,next_retry:Option<Instant>,isolated:bool}
 impl Service{
+ pub fn remember_identity(&mut self,app:&AppHandle,username:String,password:Zeroizing<String>,remember:bool,network_requested:bool){
+  if self.session.is_none()||self.username==username{self.username=username.clone();self.password=password;self.remember=remember;}
+  if !self.accounts.contains(&username){self.accounts.push(username)}
+  if !network_requested&&self.session.is_none(){self.manual=true;self.next_retry=None;self.settings.login_purpose="schedule".into();}
+  let _=self.write("settings.json",&self.settings);let _=self.write("accounts.json",&Accounts{accounts:self.accounts.clone(),last_username:self.username.clone()});self.emit(app);
+ }
  pub fn proxy_identity(&self,need_password:bool)->Result<(String,Zeroizing<String>),String>{
   let password=if !need_password{Zeroizing::new(String::new())}else if !self.password.is_empty(){self.password.clone()}else if !self.isolated{vault::get(&self.username)}else{Zeroizing::new(String::new())};
   if need_password&&(self.username.is_empty()||password.is_empty()){return Err("未取得校园网密码，请先登录校园网，或选择自定义代理密码。".into())}
@@ -32,7 +38,7 @@ impl Service{
   let accounts:Accounts=read(&folder.join("accounts.json")).unwrap_or_default();
   // One-time opt-out migration; later manual opt-in remains persistent.
   if settings.snapping_revision<2{settings.window_snapping=false;settings.snapping_revision=2;let path=folder.join("settings.json");if let Ok(bytes)=serde_json::to_vec_pretty(&settings){let temporary=path.with_extension("tmp");let _=std::fs::write(&temporary,bytes).and_then(|_|std::fs::rename(temporary,path));}}
-  let next_retry=if !isolated&&settings.auto_login&&!accounts.last_username.is_empty(){Some(Instant::now()+Duration::from_secs(2))}else{None};
+  let next_retry=if !isolated&&settings.auto_login&&settings.login_purpose!="schedule"&&!accounts.last_username.is_empty(){Some(Instant::now()+Duration::from_secs(2))}else{None};
   Self{settings,accounts:accounts.accounts,username:accounts.last_username,display_name:String::new(),password:Zeroizing::new(String::new()),remember:true,folder,auth:Auth::default(),session:None,started:0.,ip:auth::lan_ip(),logs:vec![],manual:false,next_poll:Instant::now(),next_retry,isolated}
  }
  pub fn snapshot(&self)->Value{json!({"connected":self.session.is_some(),"username":self.username,"display_name":self.session.as_ref().map(|s|s.display_name.as_str()).filter(|s|!s.is_empty()).unwrap_or(&self.display_name),"accounts":self.accounts,"started":self.started,"ip":self.session.as_ref().map(|s|s.ip.as_str()).unwrap_or(&self.ip),"logs":self.logs,"settings":self.settings})}
@@ -47,6 +53,7 @@ impl Service{
   if self.password.is_empty()&&!self.isolated{self.password=vault::get(&self.username)}
   if self.username.is_empty()||self.password.is_empty(){return Err(Error::new("credentials","请输入校园网账号和密码。"))}
   self.manual=false;self.next_retry=None;
+  self.settings.login_purpose=if args["purpose"]=="both"{"both"}else{"network"}.into();
   let session=match self.auth.login(&self.username,&self.password,&args,&self.settings.service){Ok(s)=>s,Err(e)=>{if silent&&e.retryable{self.next_retry=Some(Instant::now()+Duration::from_secs(self.settings.check_interval))}return Err(e)}};
   self.settings.service=session.context.service.clone();self.display_name=session.display_name.clone();self.session=Some(session);self.started=SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs_f64();self.next_poll=Instant::now()+Duration::from_secs(self.settings.check_interval);
   if !self.accounts.contains(&self.username){self.accounts.push(self.username.clone())}

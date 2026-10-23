@@ -21,11 +21,11 @@ fn schedule_data()->&'static Mutex<Value>{
 }
 
 pub fn request(app:&tauri::AppHandle,method:&str,args:Value)->Value{
- if method.starts_with("schedule"){let mut schedule=schedule_data().lock().unwrap();match method{"scheduleSync"=>{schedule["syncedAt"]=json!(1);},"scheduleStartDate"=>{schedule["startDate"]=args["startDate"].clone();},_=>()}return json!({"ok":true,"data":*schedule})}
+ if method.starts_with("schedule"){let mut schedule=schedule_data().lock().unwrap();match method{"scheduleSync"|"scheduleSignIn"=>{schedule["syncedAt"]=json!(1);},"scheduleStartDate"=>{schedule["startDate"]=args["startDate"].clone();},_=>()}return json!({"ok":true,"data":*schedule})}
  if method=="captcha"{return json!({"ok":true,"data":{"kind":"captcha","message":"请输入图片中的验证码","image":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aS1sAAAAASUVORK5CYII="}})}let mut data=data().lock().unwrap();match method{"settings"=>{if let Some(patch)=args.as_object(){for(k,v)in patch{data["settings"][k]=v.clone()}}},"login"|"reconnect"=>{data["connected"]=json!(true);data["started"]=json!(chrono::Utc::now().timestamp());},"disconnect"|"logout"=>{data["connected"]=json!(false);data["started"]=json!(0);},_=>()}let _=app.emit("cqust-event",json!({"event":"state","data":*data}));json!({"ok":true,"data":*data})}
 fn folder()->std::path::PathBuf{let folder=std::env::var_os("CQUST_VERIFY_DIR").map(std::path::PathBuf::from).unwrap_or_else(||std::env::temp_dir().join("cqust-native-verification"));let _=std::fs::create_dir_all(&folder);folder}
 pub async fn capture(window:tauri::WebviewWindow,name:String)->Result<bool,String>{
- if !["proxy","dashboard","about","about-top","updates","login","settings","captcha","sites","schedule","schedule-setup","schedule-settings","schedule-dark","schedule-stack","auth-help"].contains(&name.as_str()){return Err("Invalid capture".into())}
+ if !["proxy","proxy-dark","sites-dark","about-dark","dashboard","about","about-top","updates","login","settings","captcha","sites","schedule","schedule-setup","schedule-settings","schedule-dark","schedule-stack","auth-help"].contains(&name.as_str()){return Err("Invalid capture".into())}
  tauri::async_runtime::spawn_blocking(move||{
   let (send,recv)=std::sync::mpsc::channel();let file=folder().join(format!("{name}.png"));
   window.with_webview(move|webview|{unsafe{

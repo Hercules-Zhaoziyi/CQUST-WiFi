@@ -172,7 +172,7 @@ pub fn command(app: &AppHandle, state: &Schedule, method: &str, args: Value, ctx
             let store = state.cache.lock().map_err(|_| error("课表缓存暂不可用，请重启软件。"))?;
             Ok(view(&store))
         }
-        "scheduleSync" => sync(app, state, args, ctx),
+        "scheduleSync" | "scheduleSignIn" => sync(app, state, args, ctx),
         "scheduleStartDate" => set_start_date(state, args),
         _ => Err(error("不支持的课表操作。")),
     }

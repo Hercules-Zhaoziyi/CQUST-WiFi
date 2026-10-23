@@ -27,7 +27,7 @@ try{
  switch($Mode){
   'test' { cargo test --release --manifest-path src-tauri\Cargo.toml }
   'verify' { cargo build --release --features verify-ui --manifest-path src-tauri\Cargo.toml }
-  'bundle' { npm.cmd run build }
+  'bundle' { if($env:CQUST_TAURI_CLI){node $env:CQUST_TAURI_CLI build}else{npm.cmd run build} }
  }
  if($LASTEXITCODE -ne 0){exit $LASTEXITCODE}
 }finally{Pop-Location}

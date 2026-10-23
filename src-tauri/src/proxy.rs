@@ -16,6 +16,14 @@ struct Config{bind:Ipv4Addr,username:String,campus_password:bool,password:Zeroiz
 struct Running{config:Arc<Config>,port:u16,stats:Arc<Stats>,stop:watch::Sender<bool>,task:tokio::task::JoinHandle<()>}
 pub struct ProxyManager{runtime:tokio::runtime::Runtime,inner:Mutex<Option<Running>>}
 impl ProxyManager{
+ pub fn qr_svg(&self)->Result<String,String>{
+  let inner=self.inner.lock().map_err(|_|"代理状态不可用")?;
+  let r=inner.as_ref().ok_or("请先开启代理")?;
+  if r.config.bind.is_loopback()||r.config.mode=="http"{return Err("扫码连接需开启局域网的 SOCKS5 或混合模式。".into())}
+  let ascii=qr_payload(&r.config,r.port);
+  let code=qrcode::QrCode::new(ascii.as_bytes()).map_err(|_|"二维码内容过长")?;
+  Ok(code.render::<qrcode::render::svg::Color>().min_dimensions(512,512).dark_color(qrcode::render::svg::Color("#000000")).light_color(qrcode::render::svg::Color("#ffffff")).build())
+ }
  pub fn new()->io::Result<Self>{Ok(Self{runtime:tokio::runtime::Builder::new_multi_thread().worker_threads(2).enable_all().build()?,inner:Mutex::new(None)})}
  pub fn snapshot(&self)->Value{let Ok(inner)=self.inner.lock()else{return json!({"running":false})};match inner.as_ref(){None=>json!({"running":false,"username":USER}),Some(r)=>json!({"running":true,"ip":r.config.bind.to_string(),"port":r.port,"mode":r.config.mode,"lan":!r.config.bind.is_loopback(),"username":r.config.username,"campus_password":r.config.campus_password,"password":if r.config.campus_password{None}else{Some(r.config.password.as_str())},"active":r.stats.active.load(Ordering::Relaxed),"accepted":r.stats.accepted.load(Ordering::Relaxed),"rejected":r.stats.rejected.load(Ordering::Relaxed),"up":r.stats.up.load(Ordering::Relaxed),"down":r.stats.down.load(Ordering::Relaxed)})}}
  pub fn start(&self,options:Options)->Result<Value,String>{
@@ -34,6 +42,10 @@ impl ProxyManager{
  pub fn stop(&self)->Value{if let Ok(mut inner)=self.inner.lock(){if let Some(r)=inner.take(){let _=r.stop.send(true);r.task.abort();}}self.snapshot()}
 }
 impl Drop for ProxyManager{fn drop(&mut self){if let Ok(inner)=self.inner.get_mut(){if let Some(r)=inner.take(){let _=r.stop.send(true);r.task.abort();}}}}
+fn qr_payload(config:&Config,port:u16)->Zeroizing<String>{
+ let payload=Zeroizing::new(json!({"type":"cqust-wifi-proxy","version":1,"protocol":"socks5","host":config.bind.to_string(),"port":port,"username":config.username,"password":config.password.as_str()}).to_string());
+ let mut ascii=Zeroizing::new(String::new());for ch in payload.chars(){if ch.is_ascii(){ascii.push(ch)}else{for unit in ch.encode_utf16(&mut [0u16;2]){ascii.push_str(&format!("\\u{unit:04x}"));}}}ascii
+}
 fn valid_password(value:&str)->bool{(8..=64).contains(&value.len())&&value.bytes().all(|b|(33..=126).contains(&b))}
 pub fn recommend_password()->Result<String,String>{let alphabet=b"ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";let ceiling=(256/alphabet.len())*alphabet.len();let mut value=String::with_capacity(12);while value.len()<12{let mut random=[0u8;16];getrandom::fill(&mut random).map_err(|_|"无法生成安全访问密码")?;for byte in random{if (byte as usize)<ceiling{value.push(alphabet[byte as usize%alphabet.len()]as char);if value.len()==12{break}}}}Ok(value)}
 fn parse_clients(text:&str)->io::Result<HashSet<IpAddr>>{if text.len()>1024{return Err(err("too many clients"))}let mut out=HashSet::new();for part in text.split(|c:char|c==','||c==';'||c.is_whitespace()).filter(|s|!s.is_empty()){let ip:Ipv4Addr=part.parse().map_err(|_|err("invalid IP"))?;if !ip.is_private()||ip.is_unspecified()||ip.is_broadcast(){return Err(err("not a private IP"))}out.insert(IpAddr::V4(ip));}if out.len()>16{return Err(err("too many clients"))}Ok(out)}
@@ -94,6 +106,10 @@ async fn udp(mut control:TcpStream,peer:SocketAddr,requested_port:u16,c:&Config,
 }
 #[cfg(test)]mod tests{
  use super::*;
+ #[test]fn universal_qr_preserves_unicode_and_requires_active_lan(){
+  let config=Config{bind:Ipv4Addr::new(172,21,39,11),username:"测试用户".into(),campus_password:true,password:Zeroizing::new("测试😀+123".into()),allowed:HashSet::new(),mode:"mixed".into(),test_targets:false};
+  let payload=qr_payload(&config,7890);assert!(payload.is_ascii());let value:Value=serde_json::from_str(&payload).unwrap();assert_eq!(value["type"],"cqust-wifi-proxy");assert_eq!(value["version"],1);assert_eq!(value["username"],"测试用户");assert_eq!(value["password"],"测试😀+123");assert!(qrcode::QrCode::new(payload.as_bytes()).is_ok());assert!(ProxyManager::new().unwrap().qr_svg().is_err());
+ }
  #[test]fn campus_secret_is_never_exported(){
   let manager=ProxyManager::new().unwrap();
   let listener=std::net::TcpListener::bind("127.0.0.1:0").unwrap();let port=listener.local_addr().unwrap().port();drop(listener);

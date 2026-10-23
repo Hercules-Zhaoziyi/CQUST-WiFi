@@ -29,12 +29,21 @@ async fn request(app:tauri::AppHandle,window:tauri::WebviewWindow,method:String,
  if method.starts_with("schedule"){
   let backend=app.state::<Backend>().0.clone();
   let student_id=args["student_id"].as_str().unwrap_or("").to_string();
-  let context=if let Ok(service)=backend.lock(){service.campus_context(&student_id)}else{return Err("后台服务暂不可用，请重启软件。".into())};
+  let context=if !args["password"].as_str().unwrap_or("").is_empty(){schedule::CampusContext::default()}else if let Ok(service)=backend.try_lock(){service.campus_context(&student_id)}else{
+   let password=if student_id.len()<=32&&student_id.chars().all(|c|c.is_ascii_alphanumeric()||c=='_'||c=='-'){vault::get(&student_id)}else{zeroize::Zeroizing::new(String::new())};
+   schedule::CampusContext{password:if password.is_empty(){None}else{Some(password)}}
+  };
+  let verified=if method=="scheduleSignIn"{Some((student_id.clone(),zeroize::Zeroizing::new(args["password"].as_str().filter(|s|!s.is_empty()).map(str::to_owned).or_else(||context.password.as_ref().map(|s|s.to_string())).unwrap_or_default()),args["remember"].as_bool().unwrap_or(false),args["network_requested"].as_bool().unwrap_or(false)))}else{None};
   let state=app.state::<schedule::Schedule>().inner().clone();
   let handle=app.clone();
-  return tauri::async_runtime::spawn_blocking(move||match schedule::command(&handle,&state,&method,args,context){
+  let result=tauri::async_runtime::spawn_blocking(move||match schedule::command(&handle,&state,&method,args,context){
    Ok(data)=>json!({"ok":true,"data":data}),Err(error)=>json!({"ok":false,"error":error})
-  }).await.map_err(|_|"课表操作未完成，请稍后重试。".to_string());
+  }).await.map_err(|_|"课表操作未完成，请稍后重试。".to_string())?;
+  if result["ok"]==true{if let Some((username,password,remember,network_requested))=verified{
+   if remember{let _=vault::set(&username,&password);}else{let _=vault::remove(&username);}
+   let app=app.clone();tauri::async_runtime::spawn_blocking(move||{if let Ok(mut service)=backend.lock(){service.remember_identity(&app,username,password,remember,network_requested)}});
+  }}
+  return Ok(result);
  }
  let backend=app.state::<Backend>().0.clone();Ok(tauri::async_runtime::spawn_blocking(move||{
   let busy=matches!(method.as_str(),"login"|"reconnect"|"disconnect"|"logout"|"switchOnline");
@@ -53,6 +62,8 @@ async fn desktop(app:tauri::AppHandle,window:tauri::WebviewWindow,command:String
   #[cfg(feature="verify-ui")]
   "verifyProxyPort" if app.state::<Backend>().1=>{let listener=std::net::TcpListener::bind("127.0.0.1:0").map_err(|_|"Port unavailable")?;Ok(json!(listener.local_addr().map_err(|_|"Port unavailable")?.port()))},
   "proxyStatus"=>Ok(app.state::<proxy::ProxyManager>().snapshot()),
+  "proxyQr"=>Ok(json!(app.state::<proxy::ProxyManager>().qr_svg()?)),
+  "qrPrivacy"=>{window.set_content_protected(value.as_bool().unwrap_or(false)).map_err(|_|"屏幕保护设置不可用")?;Ok(json!(true))},
   "proxyPassword"=>Ok(json!(proxy::recommend_password()?)),
   "proxyFirewall"=>{platform::open_firewall()?;Ok(json!(true))},
   "proxyStop"=>Ok(app.state::<proxy::ProxyManager>().stop()),
@@ -67,7 +78,14 @@ async fn desktop(app:tauri::AppHandle,window:tauri::WebviewWindow,command:String
    #[cfg(feature="verify-ui")]if app.state::<Backend>().1{return Ok(json!({"current":"5.1.0","latest":"5.2.0","available":true,"notes":"# 测试更新说明\n\n**重点修复**与 `inline`\n\n- 第二项改进\n- 列表项\n\n```rust\nlet safe = true;\n```\n\n| 项目 | 状态 |\n| --- | --- |\n| 吸附 | 已修复 |\n\n[发布页](https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases)\n\n[危险链接](javascript:alert(1))<img src=x onerror=alert(1)><script>window.markdownUnsafe=true</script>","url":"https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases/tag/v5.2.0","download":null}))}
    let update=tauri::async_runtime::spawn_blocking(updates::check).await.map_err(|_|"更新检测未完成")??;*app.state::<updates::Updates>().0.lock().map_err(|_|"更新状态不可用")?=Some(update.clone());Ok(serde_json::to_value(update).map_err(|_|"更新信息异常")?)
   },
-  "updateDownload"|"updateRelease"=>{let cache=app.state::<updates::Updates>();let guard=cache.0.lock().map_err(|_|"更新状态不可用")?;let u=guard.as_ref().ok_or("请先检查更新")?;let url=if command=="updateDownload"{u.download.as_ref().unwrap_or(&u.url)}else{&u.url};platform::open_url(url)?;Ok(json!(true))},
+  "updatePrepare"=>{
+   let state=app.state::<updates::Updates>();if state.2.swap(true,std::sync::atomic::Ordering::AcqRel){return Err("安装包正在下载".into())}
+   let cached=state.0.lock().map_err(|_|"更新状态不可用")?.clone();let handle=app.clone();
+   let result=tauri::async_runtime::spawn_blocking(move||{let update=cached.ok_or("请先检查更新")?;let path=updates::download(&handle,&update)?;*handle.state::<updates::Updates>().1.lock().map_err(|_|"更新状态不可用")?=Some((update,path));Ok::<_,String>(json!(true))}).await;
+   app.state::<updates::Updates>().2.store(false,std::sync::atomic::Ordering::Release);result.map_err(|_|"下载任务未完成")?
+  },
+  "updateInstall"=>{let prepared=app.state::<updates::Updates>().1.lock().map_err(|_|"更新状态不可用")?.clone().ok_or("请先下载并校验安装包")?;updates::install(&prepared.0,&prepared.1)?;Ok(json!(true))},
+  "updateDownload"|"updateRelease"=>{let cache=app.state::<updates::Updates>();let guard=cache.0.lock().map_err(|_|"更新状态不可用")?;let u=guard.as_ref().ok_or("请先检查更新")?;platform::open_url(&u.url)?;Ok(json!(true))},
   "dockHold"=>{app.state::<Snapping>().hold.store(value.as_bool().unwrap_or(false),std::sync::atomic::Ordering::Relaxed);Ok(json!(true))},
   "markdownLink"=>{let target=value.as_str().ok_or("链接无效")?;if target.len()>2048||target.chars().any(char::is_control){return Err("链接无效".into())}let url=url::Url::parse(target).map_err(|_|"链接无效")?;if !matches!(url.scheme(),"https"|"http")||url.host_str().is_none()||!url.username().is_empty()||url.password().is_some(){return Err("链接无效".into())}platform::open_url(url.as_str())?;Ok(json!(true))},
   "startup"=>{let enabled=value.as_bool().ok_or("设置无效")?;match startup::set(enabled){Ok(value)=>Ok(json!({"ok":true,"value":value})),Err(message)=>Ok(json!({"ok":false,"message":message}))}},
@@ -78,7 +96,7 @@ async fn desktop(app:tauri::AppHandle,window:tauri::WebviewWindow,command:String
   "close"=>{window.hide().map_err(|_|"隐藏窗口失败")?;Ok(json!(true))},
   "quit"=>{app.exit(0);Ok(json!(true))},
   "campus"=>{let id=value.as_str().ok_or("链接无效")?;let sites:Vec<Value>=serde_json::from_str(include_str!("../../ui/sites.json")).map_err(|_|"网站清单无效")?;let url=sites.iter().find(|site|site["id"]==id).and_then(|site|site["url"].as_str()).ok_or("链接无效")?;let parsed=url::Url::parse(url).map_err(|_|"链接无效")?;if !matches!(parsed.scheme(),"http"|"https")||!parsed.host_str().map(|host|host=="cqust.edu.cn"||host.ends_with(".cqust.edu.cn")).unwrap_or(false)||!matches!(parsed.port_or_known_default(),Some(80|443))||!parsed.username().is_empty()||parsed.password().is_some(){return Err("链接无效".into())}platform::open_url(url)?;Ok(json!(true))},
-  "link"=>{let url=match value.as_str(){Some("downloadSite")=>"https://cqust-wifi.ziyis.cn/",Some("website")=>"https://ziyis.cn",Some("github")=>"https://github.com/Hercules-Zhaoziyi",Some("source")=>"https://github.com/Hercules-Zhaoziyi/CQUST-WiFi",Some("auth")=>"http://aaa.cqust.edu.cn/",Some("author")=>"https://www.xiaohongshu.com/user/profile/60d40af7000000000101f612?xsec_token=YBykuSDNRY8IJg1x1y0oc6r7YL7n6Htxy_UtidvkbYg8k=&xsec_source=app_share&xhsshare=CopyLink&appuid=60d40af7000000000101f612&apptime=1737012920&share_id=bd20550e989148b1ba9d719e8b478d24",Some("thanks")=>"https://github.com/Gloridust/RuijieWIFI-AutoLogin",_=>return Err("链接无效".into())};platform::open_url(url)?;Ok(json!(true))},
+  "link"=>{let url=match value.as_str(){Some("downloadSite")=>"https://cqust-wifi.ziyis.cn/",Some("website")=>"https://ziyis.cn",Some("github")=>"https://github.com/yuexps",Some("source")=>"https://github.com/Hercules-Zhaoziyi/CQUST-WiFi",Some("auth")=>"http://aaa.cqust.edu.cn/",Some("author")=>"https://www.xiaohongshu.com/user/profile/60d40af7000000000101f612",Some("thanks")=>"https://github.com/Gloridust/RuijieWIFI-AutoLogin",Some("scheduleThanks")=>"https://github.com/yuexps/cqust-schedule-miuix",Some("probeThanks")=>"https://github.com/Zelm05/campus-autologin",Some("tunnelThanks")=>"https://github.com/heiher/hev-socks5-tunnel",_=>return Err("链接无效".into())};platform::open_url(url)?;Ok(json!(true))},
   _=>Err("不支持的窗口操作".into())
  }
 }

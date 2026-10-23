@@ -1,6 +1,15 @@
 # CQUST Wi-Fi
 
-重庆科技大学校园网客户端。当前 Windows 版本：**v5.2.1**，使用 **Tauri 2 + Rust**；保留 macOS Apple Silicon 源码支持，本次未在 Mac 上构建或验证。
+重庆科技大学校园网与课表客户端。当前 Windows 版本：**v5.3.0**；Android：**1.0.0-beta02**。Windows 使用 **Tauri 2 + Rust**；Android 使用 Kotlin / Jetpack Compose。macOS 仍提供此前 v5.1.1 Apple Silicon 安装包，本次未重新构建或验证 Mac。
+
+## v5.3.0 更新
+
+- 共用一个账号密码入口，按需选择校园网、课表或两者；两条认证独立，未开通校园网上网服务也能通过可用网络同步课表。
+- 课表支持教务理论课与实践课、离线缓存和周视图；保留原有 Cookie 安全边界与解析失败保护。
+- Windows 与 Android 本机共享生成同一格式的代理二维码；Android 扫码确认后连接 SOCKS5 VPN。二维码含凭据，请勿公开传播。
+- “关于”移到右上角，优化导航、账号列表和关于链接；桌面校徽尺寸保持不变。
+- 自动发现新正式版本并弹窗；支持 Markdown 简介、应用内下载安装包、SHA-256 校验和 QQ 内测群入口。安装仍由用户确认。
+- Android beta02：移除开机自启，默认跟随系统主题；权限生效后隐藏对应提示，权限丢失时重新出现。修正 VPN DNS 转发与断开清理，增加系统兼容性测试。
 
 ## v5.2.1 更新
 
@@ -12,11 +21,12 @@
 
 [软件介绍与下载](https://cqust-wifi.ziyis.cn/)
 
-本项目为非官方工具，不代表学校。需要连接学校校园网，且使用本人有权限的账号。
+本项目为非官方工具，不代表学校。上网认证需要学校校园网络及本人有权限的账号；仅同步课表不要求开通校园网上网服务，但需能访问学校统一认证及教务系统。
 
 ## 下载与安装
 
-- [Windows v5.2.1](https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases/tag/v5.2.1)
+- [Windows v5.3.0](https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases/tag/v5.3.0)
+- [Android beta02](https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases/tag/android-v1.0.0-beta02)
 - [全部历史版本](https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases)
 - [版本索引与架构演进](docs/HISTORY.md)
 
@@ -33,7 +43,7 @@
 - CAPTCHA 图片显示和会话内刷新，由用户手动填写；不绕过验证码。
 - 亮暗主题、动效、开机自启、系统托盘、实时日志。
 - 20 项本地化图标的校园常用网站。
-- 课表查看：经统一身份认证同步教务理论课与实践教学课表，按周查看课程、教师、地点与节次；缓存仅保存在本机，统一认证密码默认不保存。详见[课表说明](docs/SCHEDULE.md)。
+- 课表查看：共用登录入口，经独立统一身份认证同步理论课与实践课；按周查看、离线缓存，凭据是否保存由用户选择。详见[课表说明](docs/SCHEDULE.md)。
 - Windows 固定窄窗口宽度；macOS 可调整窗口宽度。底部拉柄可调整高度，导航固定，滚动条自动隐藏。
 - Windows 可即时开关屏幕工作区边缘吸附，默认关闭；macOS 不启用吸附。
 - 设置底部的 GitHub 正式版更新检测、安全 Markdown 更新简介与新安装包下载。

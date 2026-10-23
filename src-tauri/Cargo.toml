@@ -1,6 +1,6 @@
 [package]
 name = "cqust-wifi"
-version = "5.2.1"
+version = "5.3.0"
 edition = "2021"
 description = "CQUST campus network client"
 authors = ["十七号旅客"]
@@ -30,6 +30,8 @@ cipher = "0.4"
 chrono = "0.4"
 zeroize = "1"
 getrandom = "0.3"
+qrcode = { version = "0.14.1", default-features = false, features = ["svg"] }
+sha2 = "0.10"
 tokio = { version = "1", features = ["rt-multi-thread", "net", "io-util", "sync", "time", "macros"] }
 
 [target.'cfg(windows)'.dependencies]

@@ -308,4 +308,13 @@ window.cqust.subscribe(({event,data})=>{
 
 loadSchedule();
 setTimeout(prefillStudent,800);
+window.cqustSchedule={async signIn(credentials){
+ if(scheduleBusy)return {ok:false,error:{message:'课表正在同步，请稍候。'}};
+ setBusy(true);
+ try{
+  const result=await call('scheduleSignIn',{student_id:credentials.username,password:credentials.password,remember:credentials.remember,use_campus_password:true,network_requested:credentials.purpose==='both'});
+  if(result.ok){$('schedule-password').value='';applySchedule(result.data,true);}
+  return result;
+ }finally{setBusy(false);}
+}};
 })();
