@@ -74,7 +74,17 @@ object Protocol {
         fun parts(s:String)=s.removePrefix("v").substringBefore('-').split('.').map{it.toIntOrNull()?:0}
         val a=parts(candidate);val b=parts(current)
         for(i in 0 until maxOf(a.size,b.size)){val c=(a.getOrElse(i){0}).compareTo(b.getOrElse(i){0});if(c!=0)return c>0}
-        return current.contains('-')&&!candidate.contains('-')
+        val aPre=candidate.removePrefix("v").substringAfter('-',"")
+        val bPre=current.removePrefix("v").substringAfter('-',"")
+        if(aPre.isEmpty()||bPre.isEmpty())return bPre.isNotEmpty()&&aPre.isEmpty()
+        val tokens=Regex("[0-9]+|[A-Za-z]+")
+        val ap=tokens.findAll(aPre).map{it.value}.toList();val bp=tokens.findAll(bPre).map{it.value}.toList()
+        for(i in 0 until maxOf(ap.size,bp.size)){
+            val av=ap.getOrElse(i){""};val bv=bp.getOrElse(i){""}
+            val c=if(av.toIntOrNull()!=null&&bv.toIntOrNull()!=null)av.toInt().compareTo(bv.toInt())else av.compareTo(bv)
+            if(c!=0)return c>0
+        }
+        return false
     }
     fun yaml(value:String):String {require(value.none{it.isISOControl()});return "'"+value.replace("'","''")+"'"}
 }

@@ -25,7 +25,7 @@ object Repository {
     private val scope=CoroutineScope(SupervisorJob()+Dispatchers.IO)
     private val gate=Mutex()
     private var credentials=JSONObject()
-    private val runtimeAccounts=mutableMapOf<String,Account>()
+    private val runtimeAccounts=java.util.concurrent.ConcurrentHashMap<String,Account>()
     private val mutable=MutableStateFlow(ViewState())
     val state=mutable.asStateFlow()
     val issues=MutableStateFlow<AuthIssue?>(null)
@@ -125,10 +125,15 @@ object Repository {
         val net=engine.wifi()
         if(net==null){session=null;stopSharing();mutable.update{it.copy(status=LinkState.OFFLINE,ip="",name="",started=0)};return}
         mutable.update{it.copy(ip=engine.ip(net))}
+        if(state.value.sharing&&state.value.sharingAddress.substringBeforeLast(':') !in listOf("127.0.0.1",engine.ip(net))){
+            stopSharing();message("Wi-Fi 地址已改变，本机代理已停止；请重新开启并更新客户端地址。")
+        }
         session?.let{s->
             try {
                 if(engine.status(s)){mutable.update{it.copy(status=LinkState.CONNECTED,name=s.name,ip=s.ip)};return}
-                session=null;mutable.update{it.copy(started=0,status=LinkState.NEED_AUTH)};log("检测到校园网会话已下线。")
+                session=null
+                if(!state.value.prefs.keepConnected)manualPause=true
+                mutable.update{it.copy(started=0,status=LinkState.NEED_AUTH)};log("检测到校园网会话已下线。")
             }catch(_:Exception){mutable.update{it.copy(status=LinkState.UNKNOWN)};log("暂无法确认在线状态，稍后再检查。");return}
         }
         if(manualPause){mutable.update{it.copy(status=LinkState.NEED_AUTH)};return}

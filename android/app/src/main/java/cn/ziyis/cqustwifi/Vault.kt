@@ -16,6 +16,7 @@ import javax.crypto.spec.GCMParameterSpec
 class Vault(context:Context) {
     private val file=AtomicFile(File(context.noBackupFilesDir,"credentials.enc"))
     private val alias="cqust-wifi-android-v1"
+    private var unreadable=false
     private fun key():SecretKey {
         val store=KeyStore.getInstance("AndroidKeyStore").apply{load(null)}
         (store.getKey(alias,null) as? SecretKey)?.let{return it}
@@ -26,12 +27,14 @@ class Vault(context:Context) {
     }
     @Synchronized fun read():JSONObject {
         if(!file.baseFile.exists())return JSONObject()
+        unreadable=true
         val bytes=file.readFully();require(bytes.size>13){"凭据文件无效"}
         val cipher=Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.DECRYPT_MODE,key(),GCMParameterSpec(128,bytes.copyOfRange(0,12)))
-        return JSONObject(String(cipher.doFinal(bytes.copyOfRange(12,bytes.size)),Charsets.UTF_8))
+        return JSONObject(String(cipher.doFinal(bytes.copyOfRange(12,bytes.size)),Charsets.UTF_8)).also{unreadable=false}
     }
     @Synchronized fun write(value:JSONObject) {
+        check(!unreadable){"原凭据暂不可读，已阻止覆盖，请先恢复设备密钥。"}
         val cipher=Cipher.getInstance("AES/GCM/NoPadding");cipher.init(Cipher.ENCRYPT_MODE,key())
         val plain=value.toString().toByteArray();val out=file.startWrite()
         try {out.write(cipher.iv);out.write(cipher.doFinal(plain));file.finishWrite(out)}

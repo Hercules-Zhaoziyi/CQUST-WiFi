@@ -124,14 +124,17 @@ class CampusEngine(private val context:Context,private val diagnostic:(String)->
     }
     private fun post(http:OkHttpClient,api:String,page:String,method:String,body:String):JSONObject {
         require(Protocol.trusted(api)){"认证接口不受信任"}
-        val target=api.substringBefore('?')+"?method="+method
+        val target=api.substringBefore('?')+"?method="+method+if(method=="getServices")"&"+body else ""
         val request=Request.Builder().url(target).header("Referer",page)
             .header("Origin",URI(page).let{"${it.scheme}://${it.rawAuthority}"})
             .post(body.toRequestBody("application/x-www-form-urlencoded; charset=UTF-8".toMediaType())).build()
         http.newCall(request).execute().use{r->
             if(r.code in 300..399)throw AuthIssue("server","认证接口发生异常跳转，已停止发送凭据。")
             if(!r.isSuccessful)throw AuthIssue("network","校园认证接口暂不可达。")
-            return runCatching{JSONObject(bodyText(bounded(r)))}.getOrElse{throw AuthIssue("server","认证服务器返回格式异常。")}
+            return runCatching{
+                val text=bodyText(bounded(r)).trim()
+                if(method=="getServices"&&text.startsWith("["))JSONObject().put("services",org.json.JSONArray(text))else JSONObject(text)
+            }.getOrElse{throw AuthIssue("server","认证服务器返回格式异常。")}
         }
     }
     private fun prepare(net:Network,manual:String,selected:String):Challenge {
@@ -166,7 +169,8 @@ class CampusEngine(private val context:Context,private val diagnostic:(String)->
             .map{it.attr("value")}.filter{it.isNotBlank()}.distinct()
         if(services.isEmpty()) {
             val response=post(http,api,page,"getServices","queryString="+Protocol.component(query))
-            val array=response.optJSONArray("services")?:response.optJSONArray("serviceList")
+            val array=response.optJSONArray("services")?:response.optJSONArray("serviceList")?:
+                runCatching{org.json.JSONArray(response.optString("services"))}.getOrNull()
             if(array!=null)services=(0 until array.length()).mapNotNull{array.optJSONObject(it)?.optString("serviceName")}.filter{it.isNotBlank()}
         }
         if(services.isEmpty())values["net_access_type"]?.takeIf{it.isNotBlank()}?.let{services=listOf(it)}

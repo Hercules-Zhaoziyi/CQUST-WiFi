@@ -39,8 +39,8 @@ class ProxyTest {
         }}
     }
     @Test fun socksTcpAndStop(){
-        val origin=ServerSocket(0)
-        val worker=thread{origin.use{val s=origin.accept();s.use{it.getOutputStream().write(it.getInputStream().read())}}}
+        val origin=ServerSocket(0).apply{soTimeout=3000}
+        val worker=thread(isDaemon=true){origin.use{val s=origin.accept();s.use{it.getOutputStream().write(it.getInputStream().read())}}}
         val(proxy,port)=server()
         val client=Socket("127.0.0.1",port)
         try{auth(client);val target=origin.localPort
@@ -51,8 +51,8 @@ class ProxyTest {
         assertThrows(IOException::class.java){Socket("127.0.0.1",port)}
     }
     @Test fun httpForwardStripsProxyCredentials(){
-        val origin=ServerSocket(0);var observed=""
-        val worker=thread{origin.use{it.accept().use{s->observed=headers(s.getInputStream());s.getOutputStream().write("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok".toByteArray())}}}
+        val origin=ServerSocket(0).apply{soTimeout=3000};var observed=""
+        val worker=thread(isDaemon=true){origin.use{it.accept().use{s->observed=headers(s.getInputStream());s.getOutputStream().write("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok".toByteArray())}}}
         val(proxy,port)=server("http")
         proxy.use{Socket("127.0.0.1",port).use{s->
             s.soTimeout=3000;val basic=Base64.getEncoder().encodeToString("local-user:test-password".toByteArray())
@@ -64,7 +64,7 @@ class ProxyTest {
     }
     @Test fun udpAssociate(){
         val echo=DatagramSocket(0,InetAddress.getLoopbackAddress());echo.soTimeout=3000
-        val worker=thread{echo.use{val p=DatagramPacket(ByteArray(256),256);it.receive(p);it.send(p)}}
+        val worker=thread(isDaemon=true){echo.use{val p=DatagramPacket(ByteArray(256),256);it.receive(p);it.send(p)}}
         val(proxy,port)=server("socks5")
         proxy.use{Socket("127.0.0.1",port).use{s->
             auth(s);s.getOutputStream().write(byteArrayOf(5,3,0,1,0,0,0,0,0,0))

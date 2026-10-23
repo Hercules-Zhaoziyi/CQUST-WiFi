@@ -13,6 +13,10 @@ import java.net.InetSocketAddress
 import java.util.concurrent.atomic.AtomicBoolean
 
 class CampusVpnService:VpnService(){
+    companion object {
+        private val coreLock=Any()
+        private var coreOwner:CampusVpnService?=null
+    }
     private val scope=CoroutineScope(SupervisorJob()+Dispatchers.IO)
     private var tun:ParcelFileDescriptor?=null
     private val started=AtomicBoolean(false)
@@ -49,6 +53,10 @@ class CampusVpnService:VpnService(){
                     require(input.readUnsignedByte()==1&&input.readUnsignedByte()==0){"电脑代理拒绝账号密码，请核对。"}
                 }
                 val cm=Repository.engine.connectivity
+                synchronized(coreLock){
+                check(coreOwner==null){"上一次 VPN 正在关闭，请稍后重新连接。"}
+                check(scope.isActive){"VPN 已取消。"}
+                coreOwner=this@CampusVpnService
                 // Native engine sockets share our UID; exclude our package to avoid loops,
                 // and bind the process to Wi-Fi so native sockets cannot fall back to 5G.
                 check(cm.bindProcessToNetwork(wifi)){"无法绑定校园 Wi-Fi。"}
@@ -61,7 +69,7 @@ class CampusVpnService:VpnService(){
                 tun=descriptor
                 // Engine requires a config file. It exists only in noBackupFilesDir,
                 // never shared, included in logs, or copied into exported sources.
-                val file=File(noBackupFilesDir,"active-tunnel.yml");config=file
+                val file=File(noBackupFilesDir,"active-tunnel-${System.nanoTime()}.yml");config=file
                 file.writeText("""
                     tunnel:
                       mtu: 1500
@@ -84,6 +92,7 @@ class CampusVpnService:VpnService(){
                 cm.registerNetworkCallback(NetworkRequest.Builder().addTransportType(NetworkCapabilities.TRANSPORT_WIFI).build(),callback)
                 Repository.vpnState(true,"VPN 已启动 · 电脑代理认证通过")
                 Repository.log("已启动电脑 SOCKS5 转发；本应用认证请求仍直连 Wi-Fi。")
+                }
                 while(isActive){
                     delay(1000)
                     if(!TProxyService.TProxyIsRunning())error("转发核心已停止，请检查电脑代理。")
@@ -106,9 +115,15 @@ class CampusVpnService:VpnService(){
         Repository.vpnState(false,"电脑代理已断开")
         // Native quit can join its worker thread: do not block the UI thread.
         Thread{
-            runCatching{TProxyService.TProxyStopService()}
+            synchronized(coreLock){
+                if(coreOwner===this@CampusVpnService){
+                    runCatching{TProxyService.TProxyStopService()}
+                    Repository.engine.connectivity.bindProcessToNetwork(null)
+                    coreOwner=null
+                }
+            }
             runCatching{tun?.close()};tun=null
-            config?.delete();Repository.engine.connectivity.bindProcessToNetwork(null)
+            config?.delete()
         }.start()
         super.onDestroy()
     }
