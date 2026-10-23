@@ -1,0 +1,41 @@
+name: Android beta build
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Verify pinned native dependency
+        run: |
+          test "$(sha256sum app/libs/hev-socks5-tunnel-2.19.1.aar | cut -d' ' -f1)" = "107958f7a07051386248ba8dba778b63d8dcefdfb2c3665b0ee9a8c93de5f6ca"
+      - name: Build and unit test
+        run: gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug :app:assembleAndroidTest
+      - name: Collect test APK
+        if: success()
+        run: |
+          mkdir -p artifacts
+          cp app/build/outputs/apk/debug/app-debug.apk artifacts/CQUST-WiFi-Android-1.0.0-beta01.apk
+          sha256sum artifacts/*.apk > artifacts/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-beta-build
+          path: |
+            android/artifacts/
+            android/app/build/reports/tests/
+            android/app/build/outputs/apk/androidTest/
+          if-no-files-found: warn
