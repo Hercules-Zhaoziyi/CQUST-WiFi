@@ -43,7 +43,18 @@ class SmokeTest {
         // Coil's local decode and the platform render thread are not Compose idling resources.
         Thread.sleep(800)
         rule.waitForIdle()
-        val image=androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
+        val automation=androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation
+        val window=automation.rootInActiveWindow
+        // Cold hosted emulators can show an unrelated Pixel Launcher ANR after boot.
+        // Dismiss ONLY that known system launcher dialog, never an app-under-test ANR.
+        if(window?.findAccessibilityNodeInfosByText("Pixel Launcher isn't responding")?.isNotEmpty()==true){
+            val button=window.findAccessibilityNodeInfosByText("Close app").firstOrNull()
+            check(button?.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK)==true)
+            Thread.sleep(400)
+        }
+        val active=automation.rootInActiveWindow
+        check(active?.findAccessibilityNodeInfosByText("CQUST Wi-Fi isn't responding").isNullOrEmpty())
+        val image=automation.takeScreenshot()
         val dir=File(rule.activity.getExternalFilesDir(null),"screenshots").apply{mkdirs()}
         File(dir,"$name.png").outputStream().use{image.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it)}
     }
