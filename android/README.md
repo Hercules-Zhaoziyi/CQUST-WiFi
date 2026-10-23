@@ -25,6 +25,8 @@
 
 Windows 使用 `gradlew.bat`；Android Studio 可直接打开本目录。Gradle 发行包与官方 wrapper JAR 均校验 SHA-256；wrapper JAR 为 `498495120a03b9a6ab5d155f5de3c8f0d986a449153702fb80fc80e134484f17`。
 
+目前 CI 未配置固定生产签名。不同次测试构建的签名可能不同，后续安装可能需要卸载旧测试版（会清除已保存账号）。正式持续分发前须配置并妥善保管固定签名密钥；不要将密钥或密码提交到 GitHub。
+
 ## 安全与使用边界
 
 - 认证凭据只发送给经过校验的学校认证主机；探测不使用系统代理，绑定 Wi-Fi 的 DNS 和 socket。

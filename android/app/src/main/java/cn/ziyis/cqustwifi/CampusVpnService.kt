@@ -32,6 +32,7 @@ class CampusVpnService:VpnService(){
             ServiceCompat.startForeground(this,20,Notifications.build(this,"正在连接电脑 SOCKS5",true),
                 if(android.os.Build.VERSION.SDK_INT>=34)ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE else 0)
         }catch(_:Exception){Repository.vpnState(false,"系统拒绝启动 VPN 前台服务");stopSelf();return START_NOT_STICKY}
+        Repository.vpnState(true,"正在连接电脑代理…")
         scope.launch {
             try {
                 require(!Repository.state.value.sharing){"请先关闭本机共享代理。"}
@@ -113,7 +114,7 @@ class CampusVpnService:VpnService(){
     override fun onRevoke(){Repository.vpnStoppedByUser();stopSelf();super.onRevoke()}
     override fun onDestroy(){
         scope.cancel();runCatching{Repository.engine.connectivity.unregisterNetworkCallback(callback)}
-        Repository.vpnState(false,"电脑代理已断开")
+        Repository.vpnState(false,Repository.state.value.vpnMessage.ifBlank{"电脑代理已断开"})
         // Native quit can join its worker thread: do not block the UI thread.
         Thread{
             synchronized(coreLock){

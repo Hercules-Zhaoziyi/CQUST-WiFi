@@ -194,7 +194,7 @@ object Repository {
         vault.write(credentials);manualPause=false
     }
     fun vpnState(running:Boolean,text:String,transfer:String=""){mutable.update{it.copy(vpn=running,vpnMessage=text,transfer=transfer)}}
-    fun vpnStoppedByUser(){manualPause=true}
+    fun vpnStoppedByUser(){manualPause=true;vpnState(false,"电脑代理已断开")}
     fun startSharing(options:ProxyOptions){scope.launch{gate.withLock{
         try {
             require(!state.value.vpn){"请先关闭“连接电脑”的 VPN。"}
