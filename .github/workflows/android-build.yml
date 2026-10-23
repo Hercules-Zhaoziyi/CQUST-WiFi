@@ -85,7 +85,8 @@ jobs:
             for attempt in $(seq 1 30); do if adb shell svc wifi disable && adb shell svc data disable; then break; fi; sleep 2; done
             adb shell df -h /data
             adb install -r vpnprobe/build/outputs/apk/debug/vpnprobe-debug.apk || (adb logcat -d -t 300; exit 1)
-            gradle --no-daemon -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true :app:connectedDebugAndroidTest
+            mkdir -p artifacts
+            if [ '${{ matrix.api }}' = '37.0' ]; then adb install --no-streaming -r app/build/outputs/apk/debug/app-debug.apk && adb install --no-streaming -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk && adb shell am instrument -w -r cn.ziyis.cqustwifi.test/androidx.test.runner.AndroidJUnitRunner | tee artifacts/instrumentation-api37.txt && grep -Eq 'OK \([0-9]+ tests?\)' artifacts/instrumentation-api37.txt; else gradle --no-daemon -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true :app:connectedDebugAndroidTest; fi
             mkdir -p artifacts && adb pull /sdcard/Android/data/cn.ziyis.cqustwifi/files/screenshots artifacts/screenshots
       - uses: actions/upload-artifact@v4
         if: always()
@@ -93,6 +94,7 @@ jobs:
           name: android-emulator-results-api${{ matrix.api }}
           path: |
             android/artifacts/screenshots/
+            android/artifacts/instrumentation-api37.txt
             android/app/build/reports/androidTests/
             android/app/build/outputs/androidTest-results/
             /tmp/cqust-socks-fixture.log
