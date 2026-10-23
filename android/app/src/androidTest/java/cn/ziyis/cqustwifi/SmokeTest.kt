@@ -40,7 +40,10 @@ class SmokeTest {
     @Test fun nativeCoreLoadsWithoutStartingVpn(){assertFalse(TProxyService.TProxyIsRunning())}
     private fun screenshot(name:String){
         rule.waitForIdle()
-        val image=rule.onRoot().captureToImage().asAndroidBitmap()
+        // Coil's local decode and the platform render thread are not Compose idling resources.
+        Thread.sleep(800)
+        rule.waitForIdle()
+        val image=androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
         val dir=File(rule.activity.getExternalFilesDir(null),"screenshots").apply{mkdirs()}
         File(dir,"$name.png").outputStream().use{image.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it)}
     }

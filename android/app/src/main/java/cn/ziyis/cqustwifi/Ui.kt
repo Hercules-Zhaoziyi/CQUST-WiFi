@@ -54,10 +54,20 @@ private val CardShape=RoundedCornerShape(26.dp)
     var portal by remember{mutableStateOf(false)}
     val systemDark=isSystemInDarkTheme()
     val dark=when(state.prefs.theme){"dark"->true;"light"->false;else->systemDark}
+    val activity=LocalContext.current as? android.app.Activity
+    SideEffect{activity?.let{
+        androidx.core.view.WindowInsetsControllerCompat(it.window,it.window.decorView).apply{
+            isAppearanceLightStatusBars=!dark;isAppearanceLightNavigationBars=!dark
+        }
+    }}
     val scheme=if(dark)darkColorScheme(primary=Color(0xff8ca4ff),background=Color(0xff101725),
-        surface=Color(0xff192334),surfaceVariant=Color(0xff222f44),onSurface=Color(0xffe7edf9))
+        surface=Color(0xff192334),surfaceVariant=Color(0xff222f44),onSurface=Color(0xffe7edf9),
+        onBackground=Color(0xffe7edf9),onSurfaceVariant=Color(0xff97a7bd),outline=Color(0xff52627b),
+        secondaryContainer=Color(0xff26395f),onSecondaryContainer=Color(0xffa6b8ff))
         else lightColorScheme(primary=Blue,background=Color(0xfff4f6fb),surface=Color.White,
-            surfaceVariant=Color(0xffedf1fa),onSurface=Color(0xff1b293e))
+            surfaceVariant=Color(0xffedf1fa),onSurface=Color(0xff1b293e),onBackground=Color(0xff1b293e),
+            onSurfaceVariant=Color(0xff7e8faa),outline=Color(0xffc4cfe0),outlineVariant=Color(0xffe1e7f1),
+            secondaryContainer=Color(0xffe5ebff),onSecondaryContainer=Blue)
     val background by animateColorAsState(scheme.background,tween(if(state.prefs.animations)450 else 0),label="theme")
     val snackbar=remember{SnackbarHostState()}
     LaunchedEffect(state.message){if(state.message.isNotEmpty()){snackbar.showSnackbar(state.message);Repository.dismissMessage()}}
