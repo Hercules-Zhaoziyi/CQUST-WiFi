@@ -6,8 +6,8 @@ use tauri::{Emitter,AppHandle,Manager};
 use zeroize::Zeroizing;
 
 #[derive(Clone,Serialize,Deserialize)]#[serde(default)]
-pub struct Settings{pub keep_connected:bool,pub auto_login:bool,pub check_interval:u64,pub theme:String,pub service:String,pub animations:bool,pub window_snapping:bool}
-impl Default for Settings{fn default()->Self{Self{keep_connected:false,auto_login:false,check_interval:10,theme:"system".into(),service:String::new(),animations:true,window_snapping:cfg!(windows)}}}
+pub struct Settings{pub keep_connected:bool,pub auto_login:bool,pub check_interval:u64,pub theme:String,pub service:String,pub animations:bool,pub window_snapping:bool,#[serde(default)]pub snapping_revision:u8}
+impl Default for Settings{fn default()->Self{Self{keep_connected:false,auto_login:false,check_interval:10,theme:"system".into(),service:String::new(),animations:true,window_snapping:false,snapping_revision:2}}}
 #[derive(Default,Serialize,Deserialize)]pub struct Accounts{pub accounts:Vec<String>,pub last_username:String}
 pub struct Service{pub settings:Settings,pub accounts:Vec<String>,pub username:String,pub display_name:String,password:Zeroizing<String>,remember:bool,folder:PathBuf,auth:Auth,session:Option<Session>,started:f64,ip:String,logs:Vec<String>,manual:bool,next_poll:Instant,next_retry:Option<Instant>,isolated:bool}
 impl Service{
@@ -16,6 +16,8 @@ impl Service{
   let isolated=custom.is_some();let folder=custom.unwrap_or_else(default_folder);let _=std::fs::create_dir_all(&folder);
   let mut settings:Settings=read(&folder.join("settings.json")).unwrap_or_default();if ![5,10,120].contains(&settings.check_interval){settings.check_interval=10}if !["system","light","dark"].contains(&settings.theme.as_str()){settings.theme="system".into()}if cfg!(target_os="macos"){settings.window_snapping=false}
   let accounts:Accounts=read(&folder.join("accounts.json")).unwrap_or_default();
+  // One-time opt-out migration; later manual opt-in remains persistent.
+  if settings.snapping_revision<2{settings.window_snapping=false;settings.snapping_revision=2;let path=folder.join("settings.json");if let Ok(bytes)=serde_json::to_vec_pretty(&settings){let temporary=path.with_extension("tmp");let _=std::fs::write(&temporary,bytes).and_then(|_|std::fs::rename(temporary,path));}}
   let next_retry=if !isolated&&settings.auto_login&&!accounts.last_username.is_empty(){Some(Instant::now()+Duration::from_secs(2))}else{None};
   Self{settings,accounts:accounts.accounts,username:accounts.last_username,display_name:String::new(),password:Zeroizing::new(String::new()),remember:true,folder,auth:Auth::default(),session:None,started:0.,ip:auth::lan_ip(),logs:vec![],manual:false,next_poll:Instant::now(),next_retry,isolated}
  }
@@ -95,5 +97,5 @@ fn default_folder()->PathBuf{PathBuf::from(std::env::var_os("APPDATA").unwrap_or
 fn default_folder()->PathBuf{PathBuf::from(std::env::var_os("HOME").expect("HOME is required on macOS")).join("Library/Application Support/CQUST Wi-Fi")}
 #[cfg(test)]mod tests{
  use super::*;
- #[test]fn migration_and_no_password_export(){let folder=std::env::temp_dir().join(format!("cqust-rust-test-{}",std::process::id()));let _=std::fs::create_dir_all(&folder);std::fs::write(folder.join("settings.json"),r#"{"check_interval":7,"theme":"dark","window_snapping":true}"#).unwrap();let mut service=Service::new(Some(folder));assert_eq!(service.settings.check_interval,10);assert_eq!(service.settings.theme,"dark");assert_eq!(service.settings.window_snapping,cfg!(windows));service.password=Zeroizing::new("synthetic-secret".into());assert!(!service.snapshot().to_string().contains("synthetic-secret"));assert!(service.next_retry.is_none());}
+ #[test]fn migration_and_no_password_export(){let folder=std::env::temp_dir().join(format!("cqust-rust-test-{}",std::process::id()));let _=std::fs::create_dir_all(&folder);std::fs::write(folder.join("settings.json"),r#"{"check_interval":7,"theme":"dark","window_snapping":true}"#).unwrap();let mut service=Service::new(Some(folder));assert_eq!(service.settings.check_interval,10);assert_eq!(service.settings.theme,"dark");assert!(!service.settings.window_snapping);assert_eq!(service.settings.snapping_revision,2);service.password=Zeroizing::new("synthetic-secret".into());assert!(!service.snapshot().to_string().contains("synthetic-secret"));assert!(service.next_retry.is_none());}
 }

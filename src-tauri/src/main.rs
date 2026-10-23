@@ -13,6 +13,7 @@ mod portal_browser;
 #[cfg(target_os="macos")]
 #[path="snapping_macos.rs"]mod snapping;
 mod updates;
+mod proxy;
 use snapping::Snapping;
 #[cfg(feature="verify-ui")]mod verify;
 use std::sync::{Arc,Mutex};
@@ -38,6 +39,13 @@ async fn desktop(app:tauri::AppHandle,window:tauri::WebviewWindow,command:String
  let value=value.unwrap_or(Value::Null);
  #[cfg(feature="verify-ui")]if app.state::<Backend>().1{if command=="startup"{return Ok(json!({"ok":true,"value":value}))}if command=="link"||command=="campus"{return Ok(json!(true))}}
  match command.as_str(){
+  #[cfg(feature="verify-ui")]
+  "verifyProxyPort" if app.state::<Backend>().1=>{let listener=std::net::TcpListener::bind("127.0.0.1:0").map_err(|_|"Port unavailable")?;Ok(json!(listener.local_addr().map_err(|_|"Port unavailable")?.port()))},
+  "proxyStatus"=>Ok(app.state::<proxy::ProxyManager>().snapshot()),
+  "proxyPassword"=>Ok(json!(proxy::recommend_password()?)),
+  "proxyStop"=>Ok(app.state::<proxy::ProxyManager>().stop()),
+  "proxyStart"=>{let options:proxy::Options=serde_json::from_value(value).map_err(|_|"代理配置无效")?;app.state::<proxy::ProxyManager>().start(options)},
+  "betaGroup"=>{platform::open_url("https://qm.qq.com/q/Rn7B5NBbiK")?;Ok(json!(true))},
   #[cfg(feature="verify-ui")]
   "verifyPortalRedirect" if app.state::<Backend>().1=>{let handle=app.clone();let ok=tauri::async_runtime::spawn_blocking(move||portal_browser::verify_dynamic_redirect(&handle)).await.map_err(|_|"探测测试失败")?;Ok(json!(ok))},
   #[cfg(feature="verify-ui")]
@@ -77,6 +85,7 @@ fn main(){
   let _=(window,event);
  }).setup(|app|{
   let verification=cfg!(feature="verify-ui")&&std::env::args().any(|a|a=="--verify");
+  app.manage(proxy::ProxyManager::new()?);
   let mut service=service::Service::new(if verification{Some(std::env::temp_dir().join(format!("cqust-verify-{}",std::process::id())))}else{None});service.enable_browser_probe(app.handle().clone());app.manage(Snapping::new(service.settings.window_snapping));app.manage(updates::Updates::default());let state=Backend(Arc::new(Mutex::new(service)),verification);app.manage(state.clone());
   app.state::<Snapping>().animations.store(state.0.lock().unwrap().settings.animations,std::sync::atomic::Ordering::Relaxed);
   #[cfg(windows)]{let snap_handle=app.handle().clone();std::thread::spawn(move||loop{std::thread::sleep(std::time::Duration::from_millis(16));snap_handle.state::<Snapping>().tick(&snap_handle);});}

@@ -1,6 +1,14 @@
 # CQUST Wi-Fi
 
-重庆科技大学校园网客户端。当前公开推荐版本：**v5.1.1**，使用 **Tauri 2 + Rust**；本地源码已增加 macOS Apple Silicon 构建支持。
+重庆科技大学校园网客户端。当前 Windows 版本：**v5.2.0**，使用 **Tauri 2 + Rust**；保留 macOS Apple Silicon 源码支持，本次未在 Mac 上构建或验证。
+
+## v5.2.0 更新
+
+- 修复吸附动画修改原生裁剪区域导致的边框残留；吸附默认关闭，从旧版升级时一次性关闭，之后可以自行开启。
+- 关于页新增“加入内测群”，原“软件介绍与下载”改为“软件介绍”。
+- “常用网站”之后新增默认关闭的代理页：HTTP / HTTPS CONNECT、SOCKS5 TCP / UDP，支持仅本机或局域网访问。
+- 局域网客户端无需填写 IP 白名单。代理强制使用独立用户名和密码，支持自定义密码及推荐 12 位短密码；不保存密码，不自动恢复代理。
+- 不修改系统代理或防火墙，不提供透明代理、TUN / VPN 或 Android 端。使用说明与边界见 [代理说明](docs/PROXY.md)。
 
 [软件介绍与下载](https://cqust-wifi.ziyis.cn/)
 
@@ -8,7 +16,7 @@
 
 ## 下载与安装
 
-- [最新版本 v5.1.1](https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases/tag/v5.1.1)
+- [Windows v5.2.0](https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases/tag/v5.2.0)
 - [全部历史版本](https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases)
 - [版本索引与架构演进](docs/HISTORY.md)
 
@@ -26,7 +34,7 @@
 - 亮暗主题、动效、开机自启、系统托盘、实时日志。
 - 20 项本地化图标的校园常用网站。
 - Windows 固定窄窗口宽度；macOS 可调整窗口宽度。底部拉柄可调整高度，导航固定，滚动条自动隐藏。
-- Windows 可即时开关屏幕工作区边缘吸附，默认开启；macOS 不启用吸附。
+- Windows 可即时开关屏幕工作区边缘吸附，默认关闭；macOS 不启用吸附。
 - 设置底部的 GitHub 正式版更新检测、安全 Markdown 更新简介与新安装包下载。
 
 ## v5.1.1 更新

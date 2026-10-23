@@ -74,8 +74,9 @@ fn dock(pos:Point,size:Point,area:Area,scale:f64)->Option<Dock>{
 }
 fn tween(from:Point,to:Point,t:f64)->Point{let k=1.-(1.-t.clamp(0.,1.)).powi(3);((from.0 as f64+(to.0-from.0) as f64*k).round() as i32,(from.1 as f64+(to.1-from.1) as f64*k).round() as i32)}
 fn clip(w:&WebviewWindow,pos:Point,area:Option<Area>){
- use windows_sys::Win32::Graphics::Gdi::{CreateRectRgn,SetWindowRgn,DeleteObject};
- let Ok(hwnd)=w.hwnd()else{return};unsafe{if let Some((x,y,width,height))=area{let rgn=CreateRectRgn((x-pos.0).max(0),(y-pos.1).max(0),(x+width-pos.0).max(0),(y+height-pos.1).max(0));if !rgn.is_null()&&SetWindowRgn(hwnd.0 as _,rgn,1)==0{DeleteObject(rgn as _);}}else{SetWindowRgn(hwnd.0 as _,std::ptr::null_mut(),1);}}
+ // Do not change HRGN during animations: it invalidates the non-client frame
+ // and can leave an accent border after undocking. Let DWM clip naturally.
+ let _=(w,pos,area); // No HRGN, style, or non-client-frame mutation at all.
 }
 #[cfg(test)]mod tests{use super::*;
  #[test]fn hides_to_recoverable_strip_on_each_edge(){let area=(-1920,40,1920,1040);let size=(440,820);for (p,e)in [((-1912,100),Edge::Left),((-448,100),Edge::Right),((-1200,45),Edge::Top),((-1200,253),Edge::Bottom)]{let d=dock(p,size,area,1.).unwrap();assert_eq!(d.edge,e);assert!(d.open);match e{Edge::Left=>assert_eq!(d.hidden.0+size.0,area.0+6),Edge::Right=>assert_eq!(d.hidden.0,area.0+area.2-6),Edge::Top=>assert_eq!(d.hidden.1+size.1,area.1+6),Edge::Bottom=>assert_eq!(d.hidden.1,area.1+area.3-6)}}assert!(dock((-1200,120),size,area,1.).is_none());}
@@ -84,6 +85,8 @@ fn clip(w:&WebviewWindow,pos:Point,area:Option<Area>){
 }
 #[cfg(feature="verify-ui")]pub fn verify(app:&tauri::AppHandle,w:&WebviewWindow)->serde_json::Value{
  use serde_json::json;
+ fn frame(w:&WebviewWindow)->Option<(isize,i32)>{w.hwnd().ok().map(|h|unsafe{use windows_sys::Win32::{Graphics::Gdi::{CreateRectRgn,GetWindowRgn,DeleteObject},UI::WindowsAndMessaging::{GetWindowLongPtrW,GWL_STYLE,WS_CAPTION,WS_THICKFRAME}};let region=CreateRectRgn(0,0,0,0);let kind=GetWindowRgn(h.0 as _,region);DeleteObject(region as _);(GetWindowLongPtrW(h.0 as _,GWL_STYLE)&(WS_CAPTION|WS_THICKFRAME)as isize,kind)})}
+ let initial_frame=frame(w);
  let snap=app.state::<Snapping>();let Ok(original)=w.outer_position()else{return json!({})};let Ok(Some(m))=w.current_monitor()else{return json!({})};let a=m.work_area();let scale=w.scale_factor().unwrap_or(1.);let y=a.position.y+(40.*scale) as i32;let near=(a.position.x+(12.*scale) as i32,y);let anchor=(a.position.x,y);let wait=|ms|std::thread::sleep(Duration::from_millis(ms));
  *snap.input.lock().unwrap()=Some(Input{cursor:(-100000,-100000),down:false});snap.hold.store(false,Ordering::Relaxed);snap.enabled.store(true,Ordering::Relaxed);snap.animations.store(true,Ordering::Relaxed);
  let _=w.set_position(PhysicalPosition::new(near.0,near.1));wait(270);let half=w.outer_position().ok();wait(320);let attached=w.outer_position().map(|p|(p.x,p.y)==anchor).unwrap_or(false);let animated=half.map(|p|p.x>anchor.0&&p.x<near.0).unwrap_or(false);wait(1050);let hidden=w.outer_position().map(|p|p.x<a.position.x-100).unwrap_or(false);
@@ -92,5 +95,6 @@ fn clip(w:&WebviewWindow,pos:Point,area:Option<Area>){
  *snap.input.lock().unwrap()=Some(Input{cursor:(a.position.x+100,y+30),down:true});let free=PhysicalPosition::new(a.position.x+(50.*scale) as i32,y);let _=w.set_position(free);wait(80);*snap.input.lock().unwrap()=Some(Input{cursor:(-100000,-100000),down:false});wait(1100);let drag=w.outer_position().map(|p|p==free).unwrap_or(false)&&snap.state.lock().unwrap().dock.is_none();
  let _=w.set_position(PhysicalPosition::new(near.0,near.1));wait(1600);snap.enabled.store(false,Ordering::Relaxed);wait(350);let restored=w.outer_position().map(|p|p.x==anchor.0).unwrap_or(false);let _=w.set_position(PhysicalPosition::new(near.0,near.1));wait(500);let disabled=w.outer_position().map(|p|(p.x,p.y)==near).unwrap_or(false);
  snap.release(w);let _=w.set_position(original);wait(200);*snap.input.lock().unwrap()=None;snap.enabled.store(true,Ordering::Relaxed);
- json!({"attached":attached,"animated":animated,"hidden":hidden,"hover":hover,"revealAnimated":reveal_animated,"tray":tray,"drag":drag,"restored":restored,"disabled":disabled})
+ let frame_clean=initial_frame.is_some()&&frame(w)==initial_frame;
+ json!({"attached":attached,"animated":animated,"hidden":hidden,"hover":hover,"revealAnimated":reveal_animated,"tray":tray,"drag":drag,"restored":restored,"disabled":disabled,"frameClean":frame_clean})
 }
