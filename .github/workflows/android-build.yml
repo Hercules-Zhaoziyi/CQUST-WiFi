@@ -74,6 +74,7 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_6
+          disk-size: 8192M
           working-directory: android
           script: adb shell svc wifi disable && adb shell svc data disable && gradle --no-daemon :vpnprobe:assembleDebug && adb install -r vpnprobe/build/outputs/apk/debug/vpnprobe-debug.apk && gradle --no-daemon -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true :app:connectedDebugAndroidTest && mkdir -p artifacts && adb pull /sdcard/Android/data/cn.ziyis.cqustwifi/files/screenshots artifacts/screenshots
       - uses: actions/upload-artifact@v4
