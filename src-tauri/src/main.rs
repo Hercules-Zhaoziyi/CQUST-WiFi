@@ -78,6 +78,7 @@ fn main(){
  }).setup(|app|{
   let verification=cfg!(feature="verify-ui")&&std::env::args().any(|a|a=="--verify");
   let mut service=service::Service::new(if verification{Some(std::env::temp_dir().join(format!("cqust-verify-{}",std::process::id())))}else{None});service.enable_browser_probe(app.handle().clone());app.manage(Snapping::new(service.settings.window_snapping));app.manage(updates::Updates::default());let state=Backend(Arc::new(Mutex::new(service)),verification);app.manage(state.clone());
+  #[cfg(target_os="macos")]if !verification{if let Err(message)=startup::reconcile(){state.0.lock().unwrap().log(app.handle(),&format!("macOS 开机启动检查失败：{message}"));}}
   app.state::<Snapping>().animations.store(state.0.lock().unwrap().settings.animations,std::sync::atomic::Ordering::Relaxed);
   #[cfg(windows)]{let snap_handle=app.handle().clone();std::thread::spawn(move||loop{std::thread::sleep(std::time::Duration::from_millis(16));snap_handle.state::<Snapping>().tick(&snap_handle);});}
   let show_item=MenuItem::with_id(app,"show","显示主窗口",true,None::<&str>)?;let quit_item=MenuItem::with_id(app,"quit","退出软件",true,None::<&str>)?;
