@@ -28,7 +28,7 @@ impl Service{
  }
  pub fn snapshot(&self)->Value{json!({"connected":self.session.is_some(),"username":self.username,"display_name":self.session.as_ref().map(|s|s.display_name.as_str()).filter(|s|!s.is_empty()).unwrap_or(&self.display_name),"accounts":self.accounts,"started":self.started,"ip":self.session.as_ref().map(|s|s.ip.as_str()).unwrap_or(&self.ip),"logs":self.logs,"settings":self.settings})}
  fn emit(&self,app:&AppHandle){let _=app.emit("cqust-event",json!({"event":"state","data":self.snapshot()}));}
- fn log(&mut self,app:&AppHandle,message:&str){let line=format!("{}  {}",chrono::Local::now().format("%H:%M:%S"),message);self.logs.push(line.clone());if self.logs.len()>250{self.logs.remove(0);}let _=app.emit("cqust-event",json!({"event":"log","data":line}));}
+ pub(crate) fn log(&mut self,app:&AppHandle,message:&str){let line=format!("{}  {}",chrono::Local::now().format("%H:%M:%S"),message);self.logs.push(line.clone());if self.logs.len()>250{self.logs.remove(0);}let _=app.emit("cqust-event",json!({"event":"log","data":line}));}
  fn write<T:Serialize>(&self,name:&str,data:&T)->Result<(),Error>{let path=self.folder.join(name);let temp=path.with_extension("tmp");let bytes=serde_json::to_vec_pretty(data).map_err(|_|Error::new("error","偏好保存失败。"))?;std::fs::write(&temp,bytes).and_then(|_|std::fs::rename(&temp,&path)).map_err(|_|Error::new("error","本机配置保存失败，请检查用户目录权限。"))}
  fn login(&mut self,app:&AppHandle,args:Value,reconnect:bool,silent:bool)->Result<Value,Error>{
   if self.session.is_some(){return Ok(self.snapshot())}
