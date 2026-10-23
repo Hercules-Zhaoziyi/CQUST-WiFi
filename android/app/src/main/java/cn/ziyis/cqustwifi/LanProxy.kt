@@ -178,5 +178,5 @@ class LanProxy(
             }
         }}finally{relay.close();sockets.remove(relay);control.cancel(true)}
     }
-    override fun close(){sockets.forEach{runCatching{it.close()}};sockets.clear();pool.shutdownNow();listener=null}
+    override fun close(){runCatching{listener?.close()};listener=null;sockets.toList().forEach{runCatching{it.close()}};sockets.clear();pool.shutdownNow()}
 }
