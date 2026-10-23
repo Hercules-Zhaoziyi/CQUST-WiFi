@@ -514,7 +514,11 @@ impl VpnSession {
     }
 
     fn has_ticket(&self) -> bool {
-        self.cookies.values().any(|cookie| cookie.name == VPN_TICKET)
+        let Ok(gateway) = Url::parse(GATEWAY) else { return false };
+        let now = chrono::Utc::now().timestamp();
+        self.cookies.values().any(|cookie| {
+            cookie.name == VPN_TICKET && cookie.matches(&gateway, now)
+        })
     }
 
     fn send(&mut self, method: reqwest::Method, url: &str, body: Option<String>, referer: Option<&str>, ajax: bool, origin: Option<&str>) -> Result<Page, Error> {
