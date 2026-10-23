@@ -66,12 +66,7 @@ jobs:
           arch: x86_64
           profile: pixel_6
           working-directory: android
-          script: gradle --no-daemon :app:connectedDebugAndroidTest
-      - name: Collect UI captures
-        if: always()
-        run: |
-          mkdir -p artifacts
-          adb pull /sdcard/Android/data/cn.ziyis.cqustwifi/files/screenshots artifacts/screenshots || true
+          script: gradle --no-daemon :app:connectedDebugAndroidTest && mkdir -p artifacts && adb pull /sdcard/Android/data/cn.ziyis.cqustwifi/files/screenshots artifacts/screenshots
       - uses: actions/upload-artifact@v4
         if: always()
         with:
