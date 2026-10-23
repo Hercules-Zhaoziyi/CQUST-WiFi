@@ -201,7 +201,7 @@ fn sync(app: &AppHandle, state: &Schedule, args: Value, ctx: CampusContext) -> R
     {
         return Err(credentials("请输入有效的学号。"));
     }
-    let typed = args["password"].as_str().unwrap_or("").trim();
+    let typed = args["password"].as_str().unwrap_or("");
     let password = if typed.is_empty() {
         if args["use_campus_password"].as_bool().unwrap_or(true) {
             ctx.password.clone().ok_or_else(|| credentials("请输入统一身份认证密码。"))?
@@ -379,9 +379,42 @@ struct Page {
     text: String,
 }
 
+#[derive(Clone)]
+struct StoredCookie {
+    name: String,
+    value: String,
+    domain: String,
+    path: String,
+    host_only: bool,
+    secure: bool,
+    expires_at: Option<i64>,
+}
+
+impl StoredCookie {
+    fn matches(&self, url: &Url, now: i64) -> bool {
+        let Some(host) = url.host_str() else { return false };
+        let host = host.to_ascii_lowercase();
+        let domain = self.domain.to_ascii_lowercase();
+        let domain_matches = if self.host_only {
+            host == domain
+        } else {
+            host == domain || host.ends_with(&format!(".{domain}"))
+        };
+        let request_path = if url.path().is_empty() { "/" } else { url.path() };
+        let path_matches = request_path == self.path
+            || request_path.strip_prefix(&self.path).map(|rest| {
+                self.path.ends_with('/') || rest.starts_with('/')
+            }).unwrap_or(false);
+        domain_matches
+            && path_matches
+            && (!self.secure || url.scheme() == "https")
+            && self.expires_at.map(|expiry| expiry > now).unwrap_or(true)
+    }
+}
+
 struct VpnSession {
     client: Client,
-    cookies: HashMap<String, String>,
+    cookies: HashMap<String, StoredCookie>,
     eams_base: Option<String>,
 }
 
@@ -398,24 +431,90 @@ impl VpnSession {
         Ok(Self { client, cookies: HashMap::new(), eams_base: None })
     }
 
-    fn cookie_header(&self) -> String {
-        self.cookies.iter().map(|(key, value)| format!("{key}={value}")).collect::<Vec<_>>().join("; ")
+    fn cookie_header(&self, url: &Url) -> String {
+        let now = chrono::Utc::now().timestamp();
+        let mut matching = self.cookies.values()
+            .filter(|cookie| cookie.matches(url, now))
+            .collect::<Vec<_>>();
+        matching.sort_by_key(|cookie| std::cmp::Reverse(cookie.path.len()));
+        matching.iter()
+            .map(|cookie| format!("{}={}", cookie.name, cookie.value))
+            .collect::<Vec<_>>()
+            .join("; ")
     }
 
-    fn store_cookies(&mut self, headers: &HeaderMap) {
+    fn store_cookies(&mut self, headers: &HeaderMap, response_url: &Url) {
+        let Some(response_host) = response_url.host_str().map(str::to_ascii_lowercase) else { return };
         for value in headers.get_all(SET_COOKIE).iter() {
             let Ok(line) = value.to_str() else { continue };
-            let Some(pair) = line.split(';').next() else { continue };
-            let Some((key, value)) = pair.split_once('=') else { continue };
-            let key = key.trim();
-            if !key.is_empty() {
-                self.cookies.insert(key.to_string(), value.trim().to_string());
+            let mut parts = line.split(';');
+            let Some(pair) = parts.next() else { continue };
+            let Some((name, value)) = pair.split_once('=') else { continue };
+            let name = name.trim();
+            if name.is_empty() { continue; }
+            let value = value.trim().to_string();
+            let mut domain = response_host.clone();
+            let mut host_only = true;
+            let mut path = response_url.path().rsplit_once('/')
+                .map(|(parent, _)| if parent.is_empty() { "/".to_string() } else { parent.to_string() })
+                .unwrap_or_else(|| "/".to_string());
+            if path.is_empty() { path = "/".to_string(); }
+            let mut secure = false;
+            let mut expires_at: Option<i64> = None;
+            let mut max_age: Option<i64> = None;
+            for attribute in parts {
+                let attribute = attribute.trim();
+                let (key, attr_value) = attribute.split_once('=')
+                    .map(|(k, v)| (k.trim().to_ascii_lowercase(), Some(v.trim())))
+                    .unwrap_or_else(|| (attribute.to_ascii_lowercase(), None));
+                match key.as_str() {
+                    "domain" => {
+                        if let Some(candidate) = attr_value {
+                            let candidate = candidate.trim_start_matches('.').to_ascii_lowercase();
+                            if candidate.is_empty()
+                                || !(response_host == candidate || response_host.ends_with(&format!(".{candidate}")))
+                                || !(candidate == "cqust.edu.cn" || candidate.ends_with(".cqust.edu.cn"))
+                            {
+                                domain.clear();
+                                break;
+                            }
+                            domain = candidate;
+                            host_only = false;
+                        }
+                    }
+                    "path" => {
+                        if let Some(candidate) = attr_value {
+                            if candidate.starts_with('/') { path = candidate.to_string(); }
+                        }
+                    }
+                    "secure" => secure = true,
+                    "max-age" => max_age = attr_value.and_then(|v| v.parse::<i64>().ok()),
+                    "expires" => {
+                        expires_at = attr_value.and_then(|v| chrono::DateTime::parse_from_rfc2822(v).ok())
+                            .map(|date| date.timestamp());
+                    }
+                    _ => {}
+                }
             }
+            if domain.is_empty() { continue; }
+            if let Some(age) = max_age {
+                expires_at = Some(chrono::Utc::now().timestamp().saturating_add(age));
+            }
+            let key = format!("{}|{}|{}", name, domain, path);
+            if expires_at.map(|expiry| expiry <= chrono::Utc::now().timestamp()).unwrap_or(false) {
+                self.cookies.remove(&key);
+                continue;
+            }
+            self.cookies.insert(key, StoredCookie {
+                name: name.to_string(), value, domain, path, host_only, secure, expires_at
+            });
         }
+        let now = chrono::Utc::now().timestamp();
+        self.cookies.retain(|_, cookie| cookie.expires_at.map(|expiry| expiry > now).unwrap_or(true));
     }
 
     fn has_ticket(&self) -> bool {
-        self.cookies.contains_key(VPN_TICKET)
+        self.cookies.values().any(|cookie| cookie.name == VPN_TICKET)
     }
 
     fn send(&mut self, method: reqwest::Method, url: &str, body: Option<String>, referer: Option<&str>, ajax: bool, origin: Option<&str>) -> Result<Page, Error> {
@@ -425,7 +524,7 @@ impl VpnSession {
         }
         let mut request = self
             .client
-            .request(method, target)
+            .request(method, target.clone())
             .header(USER_AGENT, USER_AGENT_VALUE)
             .header(ACCEPT, "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
             .header(ACCEPT_LANGUAGE, "zh-CN,zh;q=0.9");
@@ -438,7 +537,7 @@ impl VpnSession {
         if let Some(origin) = origin {
             request = request.header("Origin", origin);
         }
-        let cookies = self.cookie_header();
+        let cookies = self.cookie_header(&target);
         if !cookies.is_empty() {
             request = request.header(COOKIE, cookies);
         }
@@ -448,7 +547,7 @@ impl VpnSession {
         let response = request.send().map_err(|_| network())?;
         let status = response.status().as_u16();
         let location = response.headers().get(LOCATION).and_then(|value| value.to_str().ok()).map(str::to_string);
-        self.store_cookies(response.headers());
+        self.store_cookies(response.headers(), &target);
         let mut bytes = Vec::new();
         response.take((MAX_BYTES + 1) as u64).read_to_end(&mut bytes).map_err(|_| network())?;
         if bytes.len() > MAX_BYTES {
@@ -724,6 +823,9 @@ impl VpnSession {
             return Ok(Vec::new());
         }
         let mut courses = parse_task_activity(html);
+        if courses.is_empty() && rx(r"(?i)new\s+TaskActivity\s*\(").is_match(html) {
+            return Err(context("课表内容无法解析，可能是教务页面已改版；已保留原有课表，请重试或反馈问题。"));
+        }
         let plan = self.fetch_plan(semester_id).unwrap_or_default();
         for course in &mut courses {
             if let Some(info) = plan.get(&course.code) {
@@ -1696,5 +1798,51 @@ index = 1 * unitCount + 2;
         assert_eq!(slots[1].code, "A1");
         assert_eq!(slots[1].credit, "4");
         assert_eq!(slots[1].category, "必修");
+    }
+}
+
+#[cfg(test)]
+mod cookie_scope_tests {
+    use super::*;
+
+    fn cookie(domain: &str, path: &str, host_only: bool, secure: bool) -> StoredCookie {
+        StoredCookie {
+            name: "session".into(),
+            value: "secret".into(),
+            domain: domain.into(),
+            path: path.into(),
+            host_only,
+            secure,
+            expires_at: None,
+        }
+    }
+
+    #[test]
+    fn host_only_cookie_is_not_sent_to_sibling_subdomain() {
+        let c = cookie("cas.cqust.edu.cn", "/", true, true);
+        assert!(c.matches(&Url::parse("https://cas.cqust.edu.cn/login").unwrap(), 0));
+        assert!(!c.matches(&Url::parse("https://web.cqust.edu.cn/login").unwrap(), 0));
+    }
+
+    #[test]
+    fn domain_cookie_matches_subdomains_but_not_suffix_attacks() {
+        let c = cookie("cqust.edu.cn", "/", false, true);
+        assert!(c.matches(&Url::parse("https://cas.cqust.edu.cn/login").unwrap(), 0));
+        assert!(!c.matches(&Url::parse("https://notcqust.edu.cn/login").unwrap(), 0));
+    }
+
+    #[test]
+    fn cookie_path_and_secure_flags_are_enforced() {
+        let c = cookie("web.cqust.edu.cn", "/eams", true, true);
+        assert!(c.matches(&Url::parse("https://web.cqust.edu.cn/eams/home").unwrap(), 0));
+        assert!(!c.matches(&Url::parse("https://web.cqust.edu.cn/elsewhere").unwrap(), 0));
+        assert!(!c.matches(&Url::parse("http://web.cqust.edu.cn/eams/home").unwrap(), 0));
+    }
+
+    #[test]
+    fn expired_cookie_is_not_sent() {
+        let mut c = cookie("web.cqust.edu.cn", "/", true, false);
+        c.expires_at = Some(10);
+        assert!(!c.matches(&Url::parse("https://web.cqust.edu.cn/").unwrap(), 10));
     }
 }
