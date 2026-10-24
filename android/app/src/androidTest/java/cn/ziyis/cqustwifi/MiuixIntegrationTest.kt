@@ -126,7 +126,15 @@ class MiuixIntegrationTest {
     }
     private fun screenshot(name:String){
         rule.waitForIdle();Thread.sleep(700)
-        val bitmap=InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
+        val automation=InstrumentationRegistry.getInstrumentation().uiAutomation
+        val active=automation.rootInActiveWindow
+        if(active?.findAccessibilityNodeInfosByText("Pixel Launcher isn't responding")?.isNotEmpty()==true){
+            val close=active.findAccessibilityNodeInfosByText("Close app").firstOrNull()
+            check(close?.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK)==true)
+            Thread.sleep(500)
+        }
+        check(automation.rootInActiveWindow?.findAccessibilityNodeInfosByText("CQUST Wi-Fi isn't responding").isNullOrEmpty())
+        val bitmap=automation.takeScreenshot()
         val directory=File(rule.activity.getExternalFilesDir(null),"screenshots").apply{mkdirs()}
         File(directory,"$name.png").outputStream().use{bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it)}
     }
