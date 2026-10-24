@@ -23,12 +23,13 @@ section.innerHTML=`<div class="page-heading"><span class="eyebrow">COURSE TIMETA
 <button id="schedule-sync" class="primary" type="button">同步课表<span data-icon="arrow"></span></button>
 <button id="schedule-setup-cancel" class="text-button" type="button" hidden>返回上次同步的课表</button>
 <p id="schedule-setup-status" class="schedule-status" role="status"></p></div>
-<div id="schedule-view" hidden><div class="schedule-profile card"><div class="schedule-person"><strong id="schedule-name"></strong><span id="schedule-meta"></span></div><div class="schedule-actions"><button id="schedule-change-account" class="text-button" type="button">更换</button><button id="schedule-sync-again" class="secondary" type="button">同步</button><button id="schedule-settings-open" class="icon-button" type="button" title="课表设置" aria-label="课表设置" data-icon="sliders"></button></div></div>
+<div id="schedule-view" hidden>
 <div class="schedule-toolbar"><div class="schedule-week-nav"><button id="schedule-prev" class="icon-button" type="button" aria-label="上一周" title="上一周" data-icon="chevronLeft"></button><span id="schedule-week" class="schedule-week-label"></span><button id="schedule-next" class="icon-button" type="button" aria-label="下一周" title="下一周" data-icon="chevronRight"></button></div><button id="schedule-today" class="text-button" type="button">回到本周</button></div>
 <p id="schedule-range" class="schedule-range"></p>
 <div id="schedule-grid" class="schedule-grid" role="table" aria-label="周课表"></div>
 <p id="schedule-empty-week" class="schedule-empty-week" hidden>本周暂无课程。</p>
-<p id="schedule-sync-note" class="schedule-sync-note"></p></div>`;
+<p id="schedule-sync-note" class="schedule-sync-note"></p>
+<div class="schedule-profile card"><div class="schedule-person"><strong id="schedule-name"></strong><span id="schedule-meta"></span></div><div class="schedule-actions"><button id="schedule-change-account" class="text-button" type="button">更换</button><button id="schedule-sync-again" class="secondary" type="button">同步</button><button id="schedule-settings-open" class="icon-button" type="button" title="课表设置" aria-label="课表设置" data-icon="sliders"></button></div></div></div>`;
 document.querySelector('main').append(section);
 section.querySelectorAll('[data-icon]').forEach(node=>icon(node,node.dataset.icon));
 

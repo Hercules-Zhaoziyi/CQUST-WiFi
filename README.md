@@ -1,6 +1,14 @@
 # CQUST Wi-Fi
 
-重庆科技大学校园网与课表客户端。当前 Windows 版本：**v5.3.1**；Android：**1.1.0-beta01**。Windows 使用 **Tauri 2 + Rust**；Android 使用 Kotlin / Jetpack Compose。macOS 仍提供此前 v5.1.1 Apple Silicon 安装包，本次未重新构建或验证 Mac。
+重庆科技大学校园网与课表客户端。当前 Windows 版本：**v5.3.2**；Android：**1.1.0-beta02**。Windows 使用 **Tauri 2 + Rust**；Android 使用 Kotlin / Jetpack Compose / Miuix。macOS 仍提供此前 v5.1.1 Apple Silicon 安装包，本次未重新构建或验证 Mac。
+
+## v5.3.2 与 Android 1.1.0-beta02
+
+- Windows 课表的账号、更换、同步和设置操作区移至课表最底部。
+- 安卓统一设置、账号和联名关于页；相同学校账号合并展示，不同账号明确标注，设置内不显示底部主导航。
+- 安卓移除失效的内嵌认证网页，使用 Wi-Fi 原生探测、明确状态与官方网址校验。
+- 两个 GitHub 仓库与两个 QQ 群分列显示，QQ 官方接口唤起失败时可复制群号。
+- 宣传页静态源码同步新版本下载链接与功能说明，不自动部署到任何站点。
 
 ## v5.3.1 更新
 
@@ -38,8 +46,8 @@
 
 ## 下载与安装
 
-- [Windows v5.3.1](https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases/tag/v5.3.1)
-- [Android 1.1.0-beta01](https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases/tag/android-v1.1.0-beta01)
+- [Windows v5.3.2](https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases/tag/v5.3.2)
+- [Android 1.1.0-beta02](https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases/tag/android-v1.1.0-beta02)
 - [全部历史版本](https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases)
 - [版本索引与架构演进](docs/HISTORY.md)
 

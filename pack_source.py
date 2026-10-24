@@ -50,7 +50,7 @@ for executable in payloads:
     if any(secret and secret in executable for secret in secrets):raise RuntimeError('Private data found in executable; release rejected')
     for synthetic in ('synthetic-secret','synthetic-test','private-fixture','local-test-password','verifyPortalRedirect','test-only','测试同学'):
         if synthetic.encode() in executable:raise RuntimeError('Verification backend or fixture found in release executable')
-output=root.parent.parent/'outputs'/'CQUST_Wifi_Tauri_v5.3.1_Source.zip'
+output=root.parent.parent/'outputs'/'CQUST_Wifi_Tauri_v5.3.2_Source.zip'
 with zipfile.ZipFile(output,'w',zipfile.ZIP_DEFLATED) as archive:
     for name in names:archive.write(root/name,'CQUST_Wifi_Tauri/'+name)
 print('Source archive and release executable passed credential/verification-backend scan.')

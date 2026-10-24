@@ -18,6 +18,7 @@ thanks.append(thanksList);
 const release=document.createElement('article');release.innerHTML='<span>5.3.0</span><div><strong>课表与设备，轻松连接</strong><p>共用账号密码入口，课表认证不依赖校园网开通；通用代理二维码一键连接安卓；优化账号列表、导航与关于页面。</p></div>';
 document.querySelector('.changelog h3').after(release);
 const patchRelease=document.createElement('article');patchRelease.innerHTML='<span>5.3.1</span><div><strong>课表访问与扫码体验优化</strong><p>兼容学校官方 HTTP 与 CAS 跳转，保留未知来源拦截；重新设计手机扫码入口和连接二维码面板。</p></div>';document.querySelector('.changelog h3').after(patchRelease);
+const layoutRelease=document.createElement('article');layoutRelease.innerHTML='<span>5.3.2</span><div><strong>课表优先，操作归位</strong><p>账号、更换、同步与课表设置移至课表底部，为课程安排留出更完整的展示空间。</p></div>';document.querySelector('.changelog h3').after(layoutRelease);
 
 document.querySelector('#login-card h1').textContent='统一登录';
 document.querySelector('#login-card .card-heading p').textContent='一套账号，校园网与课表按需使用。';

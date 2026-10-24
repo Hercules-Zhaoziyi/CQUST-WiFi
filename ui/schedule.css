@@ -15,7 +15,7 @@
 .schedule-status.error{color:#d95b5b}
 #schedule-sync{margin-top:16px}
 #schedule-setup-cancel{margin:10px auto 0;display:block;font-size:11px}
-.schedule-profile{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-radius:18px;margin-bottom:14px}
+.schedule-profile{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-radius:18px;margin-top:20px;margin-bottom:14px}
 .schedule-person{min-width:0}
 .schedule-person strong{display:block;font-size:13px;font-weight:600;overflow-wrap:anywhere}
 .schedule-person span{display:block;font-size:10px;color:var(--muted);margin-top:3px;overflow-wrap:anywhere}
