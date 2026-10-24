@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 224 96" role="img" aria-label="CQUST Wi-Fi × 课程表">
+  <rect width="96" height="96" rx="20" fill="#2563eb"/>
+  <g fill="none" stroke="#fff" stroke-width="4.5" stroke-linecap="round"><path d="M25 40C38 27 58 27 71 40M32 49C41 40 55 40 64 49M40 59C45 54 51 54 56 59"/></g><circle cx="48" cy="69" r="2.4" fill="#fff"/>
+  <path d="m106 42 12 12m0-12-12 12" fill="none" stroke="#8191ad" stroke-width="3.5" stroke-linecap="round"/>
+  <g transform="translate(128)"><rect width="96" height="96" rx="20" fill="#eef1f6"/>
+    <g transform="translate(48 48) scale(1.2) translate(-54 -54)" fill="#212429"><path d="M43.5 31 51 26.7v47.8L54 83 29 68.5v-29l7.5-4.3v29l7 4Z"/><path d="M64.5 77 57 81.3V33.5L54 25 79 39.5v29l-7.5 4.3v-29l-7-4Z"/></g>
+  </g>
+</svg>

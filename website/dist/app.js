@@ -1,4 +1,5 @@
 const icons={
+  android:'<path d="m6.4 8-2-3.5m13.2 3.5 2-3.5" stroke-width="1.8"/><path fill="currentColor" stroke="none" fill-rule="evenodd" d="M2 18a10 10 0 0 1 20 0H2Zm5.5-5.5a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm9 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2Z"/>',
   apple:'<path fill="currentColor" stroke="none" d="M16.4 5.1c.9-1 1.4-2.3 1.3-3.6-1.3.1-2.7.9-3.5 1.8-.8.9-1.4 2.2-1.2 3.5 1.4.1 2.6-.7 3.4-1.7ZM20.5 17.5c-.5 1.2-.8 1.7-1.5 2.7-.9 1.3-2.1 2.9-3.6 2.9-1.3 0-1.6-.8-3.4-.8s-2.1.8-3.4.8c-1.5.1-2.6-1.4-3.5-2.7C2.6 16.8 2 12.2 3.5 9.8c1.1-1.8 2.8-2.8 4.5-2.8 1.4 0 2.3.8 3.5.8 1.1 0 1.9-.8 3.5-.8 1.4 0 2.9.8 4 2.1-3.5 1.9-2.9 6.8 1.5 8.4Z"/>',
   users:'<circle cx="9" cy="7" r="3"/><path d="M2 21v-3a7 7 0 0 1 14 0v3M16 4a3 3 0 0 1 0 6m2 4a6 6 0 0 1 4 6v1"/>',
   switch:'<path d="M3 7h17m-4-4 4 4-4 4M21 17H4m4-4-4 4 4 4"/>',
@@ -30,12 +31,18 @@ root.dataset.platform=isMacOS?'macos':isAndroid?'android':'other';
 const preferredHero=isMacOS?'hero-macos':isAndroid?'hero-android':'hero-windows';
 const preferredPlatform=isMacOS?'mac-download':isAndroid?'android-download':'windows-download';
 document.getElementById('hero-downloads').prepend(document.getElementById(preferredHero));document.getElementById('platform-downloads').prepend(document.getElementById(preferredPlatform));
+const secondaryPlatforms=document.getElementById('secondary-downloads');
+for(const id of ['windows-download','mac-download','android-download']){
+  const card=document.getElementById(id);
+  if(id===preferredPlatform)card.classList.add('download-current');
+  else{card.classList.add('download-secondary');secondaryPlatforms.append(card);}
+}
 let currentGallery='sites',toastTimer,explicitTheme=false;
 try{const saved=localStorage.getItem('cqust-site-theme');if(saved==='dark'||saved==='light'){root.dataset.theme=saved;explicitTheme=true;}else root.dataset.theme=media.matches?'dark':'light';}catch{root.dataset.theme=media.matches?'dark':'light';}
 const galleryNames={sites:'常用网站',schedule:'课程表',proxy:'代理与扫码连接'};
 function updateGallery(){
   const theme=root.dataset.theme==='dark'?'dark':'light',image=document.getElementById('gallery-image');
-  image.src='./assets/'+currentGallery+'-'+theme+'.png';image.alt='CQUST Wi-Fi '+(theme==='dark'?'深色':'亮色')+galleryNames[currentGallery]+'界面';
+  image.src='./assets/'+currentGallery+'-'+theme+'-w532.png';image.alt='CQUST Wi-Fi '+(theme==='dark'?'深色':'亮色')+galleryNames[currentGallery]+'界面';
   document.getElementById('gallery-label').textContent=galleryNames[currentGallery]+' · '+(theme==='dark'?'深色模式':'亮色模式');
   document.getElementById('gallery-panel').setAttribute('aria-labelledby','tab-'+currentGallery);
 }
@@ -73,6 +80,6 @@ function closeMenu(){navigation.classList.remove('open');menu.setAttribute('aria
 menu.addEventListener('click',()=>{const open=!navigation.classList.contains('open');navigation.classList.toggle('open',open);menu.setAttribute('aria-expanded',String(open));menu.setAttribute('aria-label',open?'收起导航':'展开导航');});
 navigation.querySelectorAll('a').forEach(link=>link.addEventListener('click',closeMenu));document.addEventListener('keydown',event=>{if(event.key==='Escape')closeMenu();});document.addEventListener('click',event=>{if(!event.target.closest('.nav-wrap'))closeMenu();});
 function toast(message){const node=document.getElementById('toast');node.textContent=message;node.classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>node.classList.remove('visible'),3000);}
-document.getElementById('copy-checksum').addEventListener('click',async()=>{try{await navigator.clipboard.writeText('76430446f0c4843a2a3dc7d032a4d3bfac1124d145dc010bae2f4c34fe2ce22b');toast('完整 SHA-256 校验值已复制');}catch{toast('请在 GitHub Release 中查看 SHA256SUMS.txt');}});
-document.getElementById('copy-android-checksum').addEventListener('click',async()=>{try{await navigator.clipboard.writeText('f8f405a7b570001af1e1fa21cd011d96e04e8122b16eee3d1126b1624a4103ab');toast('Android 完整 SHA-256 校验值已复制');}catch{toast('请在 Android 发布页查看 SHA-256 校验值');}});
+document.getElementById('copy-checksum').addEventListener('click',async()=>{try{await navigator.clipboard.writeText('1bd1f20e81a2e24b2284405f6acbc2eacce17d727c2657ba18f0ee2f15f1fc2c');toast('完整 SHA-256 校验值已复制');}catch{toast('请在 GitHub Release 中查看 SHA256SUMS.txt');}});
+document.getElementById('copy-android-checksum').addEventListener('click',async()=>{try{await navigator.clipboard.writeText('e0c1f9c1866d52ec70cbf17afe0b4a398f2441a02a432afb3f97d0b0d87e6815');toast('Android 完整 SHA-256 校验值已复制');}catch{toast('请在 Android 发布页查看 SHA-256 校验值');}});
 if('IntersectionObserver'in window&&!reduceMotion.matches){root.classList.add('js-motion');const observer=new IntersectionObserver(entries=>{for(const entry of entries)if(entry.isIntersecting){entry.target.classList.add('in-view');observer.unobserve(entry.target);}},{threshold:.08});document.querySelectorAll('[data-reveal]').forEach(node=>observer.observe(node));}

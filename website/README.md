@@ -4,10 +4,12 @@
 
 ## 本次内容
 
-- Windows v5.3.2：3.85 MiB，连接 GitHub 安装包，完整 SHA-256 可复制。
+- Windows v5.3.2：3.84 MiB，连接 GitHub 安装包，完整 SHA-256 可复制。
 - Android 1.1.0-beta02：64.13 MiB，提供真实 APK 下载，标明 Android 10+、测试版与旧签名迁移注意事项。
 - macOS 保留已经发布的 v5.1.1 Apple Silicon arm64 DMG，不冒称已包含本次新功能。
 - Mac 访客优先看到 Mac 下载，Android 访客优先看到 Android 下载；触屏 iPad 不误判成 Mac。
+- 底部下载区只展开当前平台，另外两个平台收为一排紧凑按钮；下载与导航按钮不再带向下箭头，Android 使用机器人头像图标。
+- 网站头部、页脚和下载区使用 Wi-Fi × 课程表联合标识。
 - 新增独立课表认证、通用代理二维码、应用内更新介绍；桌面自启与安卓后台运行的差异明确说明。
 - 安卓 1.1.0-beta02：统一设置与账号、联名关于、两个交流群，移除失效内嵌认证页，使用原生 Wi-Fi 探测。
 - Windows 5.3.2：课表账号与操作移至课表底部。补充 Android 安装包校验值和准确的同签名升级提示。
@@ -31,8 +33,8 @@
 
 上传前备份旧站点，覆盖本次对应文件即可，不要删除其他站点内容。若 Nginx root 本就指向 dist，以实际 root 为准。
 
-HTML 构建标记：`20261024-w532-m511-a110beta02`。
-CSS/JS 查询版本：`532-android-110beta02`。
+HTML 构建标记：`20261024-w532-m511-a110beta02-joint`。
+CSS/JS 查询版本：`532-android-110beta02-joint`。
 页脚应显示“Windows v5.3.2 · macOS v5.1.1 · Android 1.1.0-beta02”。
 
 如果页面仍旧，先核对域名对应的站点根目录和实际返回的 index.html，再清理该域名首页的 CDN／反代缓存。查询参数不能替代正确的服务端缓存策略。`deploy/nginx-cache.example.conf` 仅为可合并的缓存参考，不是完整站点配置。
