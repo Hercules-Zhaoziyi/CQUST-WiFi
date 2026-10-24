@@ -1,6 +1,7 @@
 package cn.ziyis.cqustwifi
 
 import androidx.compose.ui.test.*
+import androidx.activity.compose.setContent
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -54,7 +55,7 @@ class MiuixIntegrationTest {
         assertFalse(settings.autoDndEnabled);assertFalse(settings.autoSyncToCalendar)
     }
     @Test fun scannerLayoutCanBeRenderedWithoutAccessingCamera(){
-        rule.activity.setContentForScannerTest()
+        rule.runOnUiThread{rule.activity.setContentForScannerTest()}
         rule.onNodeWithText("扫码连接").assertExists()
         rule.onNodeWithText("从相册导入").assertExists()
         rule.onNodeWithText("手动填写").assertExists()
@@ -79,7 +80,7 @@ class MiuixIntegrationTest {
 }
 
 private fun MainActivity.setContentForScannerTest(){
-    androidx.activity.compose.setContent {
+    setContent {
         MiuixTheme(controller=androidx.compose.runtime.remember{ThemeController(ColorSchemeMode.Dark)}){
             ScannerScreen(ScannerUiState(camera=true),null,{})
         }
