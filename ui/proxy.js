@@ -30,6 +30,8 @@ function drawProxy(value){
  proxyInfo=value;const running=value.running===true,campus=value.campus_password===true;
  if(!running&&!proxyUsernameEdited&&typeof state!=='undefined')$('proxy-username').value=state.username||'';
  $('proxy-enabled').checked=running;$('proxy-details').hidden=!running;$('proxy-fields').hidden=running;
+ if(!running&&$('proxy-qr-dialog')?.open)$('proxy-qr-dialog').close();
+ const qrAction=document.querySelector('.proxy-scan-entry');if(qrAction){qrAction.disabled=!running||!value.lan||value.mode==='http';qrAction.title=qrAction.disabled?'开启局域网 SOCKS5 或混合代理后可扫码连接':'显示手机连接二维码';}
  document.querySelectorAll('#proxy-fields input,#proxy-fields button').forEach(n=>n.disabled=running||proxyWorking);$('proxy-enabled').disabled=proxyWorking;
  $('proxy-status').textContent=running?(value.lan?'局域网代理运行中 · 账号密码认证已启用':'仅本机代理运行中'):'已关闭 · 不监听任何端口';
  const endpoint=running?`${value.ip}:${value.port}`:'';
@@ -56,4 +58,4 @@ $('proxy-copy-address').onclick=()=>copyProxy($('proxy-endpoint').textContent);$
 $('proxy-copy-password').onclick=()=>{if(!proxyInfo.campus_password)copyProxy($('proxy-password').value);};
 $('proxy-firewall').onclick=async()=>{try{await window.cqust.desktop('proxyFirewall');toast('请在系统设置中确认放行；软件不会自动更改规则。');}catch(error){toast(typeof error==='string'?error:'无法打开防火墙设置。');}};
 async function refreshProxy(){if(proxyWorking)return;try{drawProxy(await window.cqust.desktop('proxyStatus'));}catch{}}
-refreshProxy();setInterval(()=>{if(!document.hidden&&proxyPage.classList.contains('active'))refreshProxy();},1500);
+refreshProxy();const proxyPoll=setInterval(()=>{if(!document.hidden&&proxyPage.classList.contains('active'))refreshProxy();},1500);

@@ -62,6 +62,8 @@ async fn desktop(app:tauri::AppHandle,window:tauri::WebviewWindow,command:String
   #[cfg(feature="verify-ui")]
   "verifyProxyPort" if app.state::<Backend>().1=>{let listener=std::net::TcpListener::bind("127.0.0.1:0").map_err(|_|"Port unavailable")?;Ok(json!(listener.local_addr().map_err(|_|"Port unavailable")?.port()))},
   "proxyStatus"=>Ok(app.state::<proxy::ProxyManager>().snapshot()),
+  #[cfg(feature="verify-ui")]
+  "proxyQr" if app.state::<Backend>().1=>{let code=qrcode::QrCode::new(br#"{"type":"cqust-wifi-proxy","version":1,"protocol":"socks5","host":"172.21.1.2","port":7890,"username":"qr-test-user","password":"qr-test-password"}"#).map_err(|_|"测试二维码失败")?;Ok(json!(code.render::<qrcode::render::svg::Color>().min_dimensions(512,512).build()))},
   "proxyQr"=>Ok(json!(app.state::<proxy::ProxyManager>().qr_svg()?)),
   "qrPrivacy"=>{window.set_content_protected(value.as_bool().unwrap_or(false)).map_err(|_|"屏幕保护设置不可用")?;Ok(json!(true))},
   "proxyPassword"=>Ok(json!(proxy::recommend_password()?)),

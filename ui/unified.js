@@ -17,6 +17,7 @@ for(const [target,label] of [['thanks','AutoLogin · 锐捷认证'],['probeThank
 thanks.append(thanksList);
 const release=document.createElement('article');release.innerHTML='<span>5.3.0</span><div><strong>课表与设备，轻松连接</strong><p>共用账号密码入口，课表认证不依赖校园网开通；通用代理二维码一键连接安卓；优化账号列表、导航与关于页面。</p></div>';
 document.querySelector('.changelog h3').after(release);
+const patchRelease=document.createElement('article');patchRelease.innerHTML='<span>5.3.1</span><div><strong>课表访问与扫码体验优化</strong><p>兼容学校官方 HTTP 与 CAS 跳转，保留未知来源拦截；重新设计手机扫码入口和连接二维码面板。</p></div>';document.querySelector('.changelog h3').after(patchRelease);
 
 document.querySelector('#login-card h1').textContent='统一登录';
 document.querySelector('#login-card .card-heading p').textContent='一套账号，校园网与课表按需使用。';
@@ -50,11 +51,14 @@ $('schedule-sync-again').onclick=()=>window.openUnifiedLogin('schedule');
 document.querySelector('#schedule-setup p').textContent='只看课表无需开通校园网，可通过移动热点等可用网络登录统一认证。';
 
 // Explicit credential disclosure only after the user asks to show a QR code.
-const qrButton=document.createElement('button');qrButton.type='button';qrButton.className='secondary';qrButton.textContent='扫码连接（含代理凭据）';$('proxy-copy-uri').after(qrButton);
-document.body.insertAdjacentHTML('beforeend','<dialog id="proxy-qr-dialog"><div class="dialog-top"><h2>扫码连接代理</h2><button id="proxy-qr-close" class="icon-button" aria-label="关闭二维码" data-icon="close"></button></div><p>二维码包含代理账号和密码，请勿公开分享。仅让本人可信设备扫描。</p><img id="proxy-qr-image" alt="局域网代理连接二维码"><p class="qr-hint">安卓端：代理 → 扫码导入并连接。需要开启局域网 SOCKS5 或混合模式。</p></dialog>');icon($('proxy-qr-close'),'close');
+const qrButton=document.createElement('button');qrButton.type='button';qrButton.className='proxy-scan-entry';qrButton.setAttribute('aria-label','扫码连接手机');
+qrButton.innerHTML='<span class="proxy-scan-mark" data-icon="qr"></span><span class="proxy-scan-copy"><strong>扫码连接手机</strong><small>自动导入地址与账号，无需逐项填写</small></span><span data-icon="chevronRight"></span>';
+shapes.qr='<rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="3" width="6" height="6" rx="1"/><rect x="3" y="15" width="6" height="6" rx="1"/><path d="M15 15h3v3h3m-6 3h3m3-6v-3m-9-9v3m0 6h3M3 12h3m6 3v6"/>';
+qrButton.querySelectorAll('[data-icon]').forEach(node=>icon(node,node.dataset.icon));document.querySelector('#proxy-details .proxy-address').after(qrButton);
+document.body.insertAdjacentHTML('beforeend','<dialog id="proxy-qr-dialog"><div class="dialog-top"><h2>连接到这台电脑</h2><button id="proxy-qr-close" class="icon-button" aria-label="关闭二维码" data-icon="close"></button></div><p class="qr-intro">在手机 CQUST Wi-Fi 的代理页，点击“扫码连接”</p><div class="qr-paper"><img id="proxy-qr-image" alt="局域网代理连接二维码"></div><div class="qr-endpoint" id="proxy-qr-endpoint"></div><p class="qr-hint">二维码含代理凭据，仅供本人可信设备使用，请勿公开分享。</p></dialog>');icon($('proxy-qr-close'),'close');
 qrButton.onclick=async()=>{try{
  await window.cqust.desktop('qrPrivacy',true).catch(()=>{});
- const svg=await window.cqust.desktop('proxyQr');$('proxy-qr-image').src='data:image/svg+xml;base64,'+btoa(svg);$('proxy-qr-dialog').showModal();
+ const svg=await window.cqust.desktop('proxyQr');$('proxy-qr-image').src='data:image/svg+xml;base64,'+btoa(svg);$('proxy-qr-endpoint').textContent=$('proxy-endpoint').textContent;$('proxy-qr-dialog').showModal();
 }catch(error){await window.cqust.desktop('qrPrivacy',false).catch(()=>{});toast(typeof error==='string'?error:'当前代理配置不能生成二维码。');}};
 $('proxy-qr-close').onclick=()=>$('proxy-qr-dialog').close();
 $('proxy-qr-dialog').addEventListener('close',()=>{$('proxy-qr-image').removeAttribute('src');window.cqust.desktop('qrPrivacy',false).catch(()=>{});});

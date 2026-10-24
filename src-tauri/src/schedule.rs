@@ -305,11 +305,16 @@ fn default_start_date(school_year: &str, name: &str) -> String {
 
 // WebVPN 只允许访问学校域名，防止重定向到外部主机。
 fn school_url(url: &Url) -> bool {
-    matches!(url.scheme(), "https")
-        && url.port_or_known_default() == Some(443)
-        && url.username().is_empty()
-        && url.password().is_none()
-        && url.host_str().map(|host| host == "cqust.edu.cn" || host.ends_with(".cqust.edu.cn")).unwrap_or(false)
+    if !url.username().is_empty() || url.password().is_some() { return false; }
+    let Some(host) = url.host_str() else { return false; };
+    let official = matches!(host, "web.cqust.edu.cn" | "cas.cqust.edu.cn" | "casp.cqust.edu.cn"
+        | "authserver.cqust.edu.cn" | "sso.cqust.edu.cn" | "ids.cqust.edu.cn"
+        | "jwnew.cqust.edu.cn" | "sjjx.cqust.edu.cn" | "icon.cqust.edu.cn");
+    official && match url.scheme() {
+        "https" => url.port_or_known_default() == Some(443),
+        "http" => url.port_or_known_default() == Some(80),
+        _ => false,
+    }
 }
 
 fn vpn_token(host: &str) -> Option<&'static str> {
@@ -1727,9 +1732,15 @@ index = 1 * unitCount + 2;
     }
 
     #[test]
-    fn accepts_only_school_https_urls() {
+    fn accepts_verified_school_http_and_https_urls() {
         assert!(school_url(&Url::parse("https://web.cqust.edu.cn/http/token/eams").unwrap()));
-        assert!(!school_url(&Url::parse("http://web.cqust.edu.cn/login").unwrap()));
+        for address in ["http://jwnew.cqust.edu.cn/eams/login.action?cqustadminweb=1", "http://cas.cqust.edu.cn/authserver/login", "https://casp.cqust.edu.cn/authserver/login", "http://sjjx.cqust.edu.cn/"] {
+            assert!(school_url(&Url::parse(address).unwrap()));
+        }
+        assert!(!school_url(&Url::parse("http://unknown.cqust.edu.cn/login").unwrap()));
+        assert!(!school_url(&Url::parse("http://jwnew.cqust.edu.cn:8080/eams").unwrap()));
+        assert!(!school_url(&Url::parse("https://jwnew.cqust.edu.cn:444/eams").unwrap()));
+        assert!(!school_url(&Url::parse("http://jwnew.cqust.edu.cn@evil.test/eams").unwrap()));
         assert!(!school_url(&Url::parse("https://cqust.edu.cn.evil.test/login").unwrap()));
         assert!(!school_url(&Url::parse("https://evil.test/login").unwrap()));
         assert!(!school_url(&Url::parse("https://user@web.cqust.edu.cn/login").unwrap()));

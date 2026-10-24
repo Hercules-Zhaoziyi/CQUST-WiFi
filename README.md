@@ -1,6 +1,19 @@
 # CQUST Wi-Fi
 
-重庆科技大学校园网与课表客户端。当前 Windows 版本：**v5.3.0**；Android：**1.0.0-beta02**。Windows 使用 **Tauri 2 + Rust**；Android 使用 Kotlin / Jetpack Compose。macOS 仍提供此前 v5.1.1 Apple Silicon 安装包，本次未重新构建或验证 Mac。
+重庆科技大学校园网与课表客户端。当前 Windows 版本：**v5.3.1**；Android：**1.1.0-beta01**。Windows 使用 **Tauri 2 + Rust**；Android 使用 Kotlin / Jetpack Compose。macOS 仍提供此前 v5.1.1 Apple Silicon 安装包，本次未重新构建或验证 Mac。
+
+## v5.3.1 更新
+
+- 兼容学校已核实官方域名的 HTTP / HTTPS 与 CAS 跳转，不再将正常教务地址误判为未知来源；仍保留来源、端口及证书校验。
+- 二维码入口改为连接信息上方的独立卡片，重设计连接二维码面板。
+
+## Android 1.1.0-beta01 更新
+
+- 使用 Miuix 原生 Compose 控件，统一卡片、按钮、表单、导航、分栏及对话框。
+- 完整整合获授权的课表模块：周视图、课程总览、学期选择、课程与排课编辑、个性化、课前提醒、日历同步、上课自动化、权限管理和桌面小组件。
+- 保留校园网、代理共享、SOCKS5 VPN、多账号、安全凭据及应用内更新；共用登录入口，两条认证链独立。
+- 扫码入口固定在代理两分栏上方；全新全屏扫码页，支持相机、相册和手动配置。旧课表缓存保留并迁移。
+- 使用与 1.0.0-beta02 相同的本机保管发布签名，可直接覆盖更新。Android 仍无校园网开机自启，默认跟随系统主题。
 
 ## v5.3.0 更新
 
@@ -25,8 +38,8 @@
 
 ## 下载与安装
 
-- [Windows v5.3.0](https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases/tag/v5.3.0)
-- [Android beta02](https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases/tag/android-v1.0.0-beta02)
+- [Windows v5.3.1](https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases/tag/v5.3.1)
+- [Android 1.1.0-beta01](https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases/tag/android-v1.1.0-beta01)
 - [全部历史版本](https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases)
 - [版本索引与架构演进](docs/HISTORY.md)
 
