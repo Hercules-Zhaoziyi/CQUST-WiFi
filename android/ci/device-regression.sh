@@ -20,3 +20,7 @@ if [ "${1:-35}" = "37" ]; then
 else
   gradle --no-daemon -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true :app:connectedDebugAndroidTest
 fi
+if [ -d artifacts/release-current ]; then
+  collect
+  bash ci/release-install-smoke.sh
+fi

@@ -11,6 +11,10 @@ on:
         type: choice
         options: ['35', '37']
         default: '35'
+      release_smoke_tag:
+        description: Optional draft release APK installation and upgrade check
+        type: string
+        default: ''
 permissions:
   contents: read
 jobs:
@@ -31,7 +35,7 @@ jobs:
           gradle-version: '9.7.1'
           cache-read-only: false
       - name: Install matching compile SDK
-        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0" "build-tools;37.0.0"'
+        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0" "build-tools;37.0.0" "build-tools;35.0.0"'
       - name: Verify native dependency
         run: test "$(sha256sum app/libs/hev-socks5-tunnel-2.19.1.aar | cut -d' ' -f1)" = '107958f7a07051386248ba8dba778b63d8dcefdfb2c3665b0ee9a8c93de5f6ca'
       - name: Build complete feature module and host
@@ -41,6 +45,8 @@ jobs:
           mkdir -p artifacts
           cp app/build/outputs/apk/release/app-release-unsigned.apk artifacts/app-release-unsigned.apk
           cp "$ANDROID_HOME/build-tools/37.0.0/lib/apksigner.jar" artifacts/apksigner.jar
+          cp "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" artifacts/apksigner-api35.jar
+          "$ANDROID_HOME/build-tools/35.0.0/aapt2" dump badging artifacts/app-release-unsigned.apk > artifacts/apk-badging-api35.txt
           cp "$ANDROID_HOME/build-tools/37.0.0/NOTICE.txt" artifacts/BUILD-TOOLS-NOTICE.txt
           sha256sum artifacts/* > artifacts/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
@@ -75,6 +81,14 @@ jobs:
       - run: sudo chmod 666 /dev/kvm
       - name: Controlled SOCKS fixture
         run: python3 app/src/androidTest/fixtures/socks_fixture.py > /tmp/cqust-socks-fixture.log 2>&1 &
+      - name: Fetch locally signed release for installation check
+        if: ${{ inputs.release_smoke_tag != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_smoke_tag }}
+        run: |
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern 'CQUST-WiFi-Android-*.apk' --dir artifacts/release-current
+          gh release download android-v1.1.0-beta01 --repo "$GITHUB_REPOSITORY" --pattern 'CQUST-WiFi-Android-*.apk' --dir artifacts/release-previous
       - uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: ${{ inputs.emulator_api == '37' && '37.0' || '35' }}
@@ -94,5 +108,6 @@ jobs:
             android/artifacts/screenshots/
             android/artifacts/instrumentation.txt
             android/artifacts/emulator-crash.log
+            android/artifacts/release-install.txt
             android/app/build/reports/androidTests/
             android/app/build/outputs/androidTest-results/
