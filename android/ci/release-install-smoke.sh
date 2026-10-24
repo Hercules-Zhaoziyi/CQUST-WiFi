@@ -8,7 +8,9 @@ previous=(artifacts/release-previous/*.apk)
 test "${#current[@]}" -eq 1 && test -f "${current[0]}"
 exec > >(tee artifacts/release-install.txt) 2>&1
 adb -s "$serial" uninstall "$package.test" || true
-adb -s "$serial" uninstall "$package"
+adb -s "$serial" uninstall "$package" || true
+adb -s "$serial" shell svc wifi disable
+adb -s "$serial" shell svc data disable
 upgrading=false
 if adb -s "$serial" install --no-streaming "${previous[0]}"; then
   echo 'Previous published release accepted by stock Android package manager.'

@@ -23,10 +23,15 @@ on:
         description: Required SHA-256 for the signed APK test object
         type: string
         default: ''
+      signed_smoke_only:
+        description: Only install and launch signed APKs, without recompilation
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
   build:
+    if: ${{ !inputs.signed_smoke_only }}
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     defaults:
@@ -67,7 +72,7 @@ jobs:
             android/schedule/build/reports/
           if-no-files-found: warn
   emulator:
-    if: ${{ inputs.run_emulator }}
+    if: ${{ inputs.run_emulator && !inputs.signed_smoke_only }}
     needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 35
@@ -96,18 +101,7 @@ jobs:
           RELEASE_TAG: ${{ inputs.release_smoke_tag }}
           SIGNED_APK_BLOB: ${{ inputs.signed_apk_blob }}
           SIGNED_APK_SHA256: ${{ inputs.signed_apk_sha256 }}
-        run: |
-          if [ -n "$SIGNED_APK_BLOB" ]; then
-            [[ "$SIGNED_APK_BLOB" =~ ^[0-9a-f]{40}(,[0-9a-f]{40}){0,63}$ ]] && [[ "$SIGNED_APK_SHA256" =~ ^[0-9a-f]{64}$ ]]
-            mkdir -p artifacts/release-current
-            : > artifacts/release-current/CQUST-WiFi-Android-1.1.0-beta02.apk
-            IFS=',' read -ra chunks <<< "$SIGNED_APK_BLOB"
-            for chunk in "${chunks[@]}"; do gh api -H 'Accept: application/vnd.github.raw+json' "repos/$GITHUB_REPOSITORY/git/blobs/$chunk" >> artifacts/release-current/CQUST-WiFi-Android-1.1.0-beta02.apk; done
-            printf '%s  %s\n' "$SIGNED_APK_SHA256" artifacts/release-current/CQUST-WiFi-Android-1.1.0-beta02.apk | sha256sum --check --strict
-          else
-            gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern 'CQUST-WiFi-Android-*.apk' --dir artifacts/release-current
-          fi
-          gh release download android-v1.1.0-beta01 --repo "$GITHUB_REPOSITORY" --pattern 'CQUST-WiFi-Android-*.apk' --dir artifacts/release-previous
+        run: bash ci/fetch-signed-apk.sh
       - uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: ${{ inputs.emulator_api == '37' && '37.0' || '35' }}
@@ -130,3 +124,38 @@ jobs:
             android/artifacts/release-install.txt
             android/app/build/reports/androidTests/
             android/app/build/outputs/androidTest-results/
+  signed_install:
+    if: ${{ inputs.signed_smoke_only && inputs.signed_apk_blob != '' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch exact signed APK using read-only access
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SIGNED_APK_BLOB: ${{ inputs.signed_apk_blob }}
+          SIGNED_APK_SHA256: ${{ inputs.signed_apk_sha256 }}
+        run: bash ci/fetch-signed-apk.sh
+      - run: sudo chmod 666 /dev/kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          ram-size: 3072M
+          disk-size: 8192M
+          working-directory: android
+          script: bash ci/release-install-smoke.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: signed-release-install-results
+          path: |
+            android/artifacts/release-install.txt
+            android/artifacts/release-package.txt
+            android/artifacts/release-window.xml
+            android/artifacts/screenshots/14-signed-release.png
