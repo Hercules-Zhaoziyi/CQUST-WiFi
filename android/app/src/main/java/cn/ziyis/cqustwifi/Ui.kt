@@ -91,6 +91,7 @@ private val CardShape=RoundedCornerShape(26.dp)
     val snackbar=remember{SnackbarHostState()}
     LaunchedEffect(state.message){if(state.message.isNotEmpty()){snackbar.showSnackbar(state.message);Repository.dismissMessage()}}
     LaunchedEffect(Unit){ScheduleStore.completed.collect{if(page=="连接"&&loginTarget!=0)page="课程表"}}
+    LaunchedEffect(Unit){Repository.navigation.collect{if(it=="schedule"){page="课程表";Repository.navigation.value=null}}}
     LaunchedEffect(issue){if(issue==null)manualAuth=false}
     val mode=when(state.prefs.theme){"dark"->ColorSchemeMode.Dark;"light"->ColorSchemeMode.Light;else->ColorSchemeMode.System}
     val controller=remember(mode){ThemeController(mode)}

@@ -20,6 +20,7 @@ class MainActivity:ComponentActivity() {
     private val notifications=registerForActivityResult(ActivityResultContracts.RequestPermission()){}
     override fun onCreate(savedInstanceState:Bundle?) {
         super.onCreate(savedInstanceState);enableEdgeToEdge()
+        if(intent.getStringExtra("cqust-open-page")=="schedule")Repository.navigation.value="schedule"
         setContent{CampusUi(onVpn={if(Repository.state.value.vpn){
             Repository.vpnStoppedByUser();startService(Intent(this,CampusVpnService::class.java).setAction("STOP"))
         }else{val request=VpnService.prepare(this);if(request!=null)vpnPermission.launch(request)else startVpn()}},
@@ -32,6 +33,7 @@ class MainActivity:ComponentActivity() {
         Repository.ensureMonitor()
     }
     override fun onResume(){super.onResume();AppUpdates.onResume()}
+    override fun onNewIntent(intent:Intent){super.onNewIntent(intent);setIntent(intent);if(intent.getStringExtra("cqust-open-page")=="schedule")Repository.navigation.value="schedule"}
     private fun startVpn(){runCatching{ContextCompat.startForegroundService(this,Intent(this,CampusVpnService::class.java))}
         .onFailure{Repository.message("系统暂不允许启动 VPN，请保持应用在前台后重试。")}}
 }

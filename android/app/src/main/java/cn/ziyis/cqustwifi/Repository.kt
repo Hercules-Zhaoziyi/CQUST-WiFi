@@ -29,6 +29,7 @@ object Repository {
     private val mutable=MutableStateFlow(ViewState())
     val state=mutable.asStateFlow()
     val issues=MutableStateFlow<AuthIssue?>(null)
+    val navigation=MutableStateFlow<String?>(null)
     private var session:CampusSession?=null
     private var manualPause=false
     @Volatile private var networkRequested=true
