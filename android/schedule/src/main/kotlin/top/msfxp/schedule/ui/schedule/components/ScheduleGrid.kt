@@ -14,6 +14,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
@@ -78,6 +80,9 @@ fun ScheduleGrid(
     val effectiveSlots = remember(timeSlots) {
         if (timeSlots.isNotEmpty()) timeSlots else DefaultTimeSlots
     }
+    val totalSections = remember(effectiveSlots, mergedBlocks) {
+        scheduleSectionCount(effectiveSlots.map { it.sectionNumber }, mergedBlocks.map { it.endSection })
+    }
 
     // 计算当前进行中或即将开始的节次
     val currentSectionNumber = remember(effectiveSlots, currentTime) {
@@ -114,6 +119,7 @@ fun ScheduleGrid(
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .testTag("schedule-grid-scroll")
                 .verticalScroll(rememberScrollState())
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
@@ -122,14 +128,16 @@ fun ScheduleGrid(
                     ScheduleTimeColumn(
                         effectiveSlots = effectiveSlots,
                         currentSectionNumber = currentSectionNumber,
-                        isCurrentWeek = isCurrentWeek
+                        isCurrentWeek = isCurrentWeek,
+                        totalSections = totalSections
                     )
 
                     // 右侧课程网格区域
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .height(SectionHeight * 11)
+                            .height(SectionHeight * totalSections)
+                            .clipToBounds()
                     ) {
                         // 背景网格分割线
                         val dividerColor = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.12f)
@@ -137,7 +145,7 @@ fun ScheduleGrid(
                             val sectionHeightPx = SectionHeight.toPx()
                             val dashEffect = PathEffect.dashPathEffect(floatArrayOf(5.dp.toPx(), 4.dp.toPx()), 0f)
 
-                            for (i in 1..10) {
+                            for (i in 1 until totalSections) {
                                 val y = sectionHeightPx * i
                                 drawLine(dividerColor, Offset(0f, y), Offset(size.width, y), 1.dp.toPx(), pathEffect = dashEffect)
                             }
@@ -160,9 +168,10 @@ fun ScheduleGrid(
                                         .padding(horizontal = 2.dp)
                                 ) {
                                     val dayBlocks = blocksByDay[dayIndex] ?: emptyList()
-                                    dayBlocks.forEach { block ->
+                                    dayBlocks.filter { it.startSection in 1..totalSections && it.endSection >= it.startSection && it.events.isNotEmpty() }.forEach { block ->
                                         ScheduleCourseBlockItem(
                                             block = block,
+                                            lastSection = totalSections,
                                             courseColors = courseColors,
                                             cardAlpha = cardAlpha,
                                             onClick = { onCourseBlockClick(block) }
@@ -261,13 +270,14 @@ private fun ScheduleGridHeader(
 private fun ScheduleTimeColumn(
     effectiveSlots: List<TimeSlot>,
     currentSectionNumber: Int,
-    isCurrentWeek: Boolean
+    isCurrentWeek: Boolean,
+    totalSections: Int
 ) {
     Column(
         modifier = Modifier.width(TimeColumnWidth),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        for (section in 1..11) {
+        for (section in 1..totalSections) {
             val slot = effectiveSlots.find { it.sectionNumber == section }
             val isCurrentSection = section == currentSectionNumber && isCurrentWeek
 
@@ -318,13 +328,14 @@ private fun ScheduleTimeColumn(
 @Composable
 private fun ScheduleCourseBlockItem(
     block: MergedCourseBlock,
+    lastSection: Int,
     courseColors: List<CourseColor>,
     cardAlpha: Float,
     onClick: () -> Unit
 ) {
     val cardVerticalMargin = 2.dp
     val topOffset = SectionHeight * (block.startSection - 1) + cardVerticalMargin
-    val blockHeight = SectionHeight * (block.endSection - block.startSection + 1) - (cardVerticalMargin * 2)
+    val blockHeight = SectionHeight * (block.endSection.coerceAtMost(lastSection) - block.startSection + 1) - (cardVerticalMargin * 2)
     val primary = block.primaryEvent
     val courseColor = courseColors.getCourseColor(primary.colorIndex).light.copy(alpha = cardAlpha)
 
@@ -333,6 +344,7 @@ private fun ScheduleCourseBlockItem(
             .offset(y = topOffset)
             .fillMaxWidth()
             .height(blockHeight)
+            .testTag("schedule-block-${block.day}-${block.startSection}-${block.endSection}")
             .clip(RoundedCornerShape(CardCornerRadius))
             .background(courseColor)
             .clickable(onClick = onClick)
@@ -420,7 +432,7 @@ private fun ScheduleUnarrangedCourseSection(
             text = stringResource(R.string.schedule_grid_unarranged_title),
             style = MiuixTheme.textStyles.footnote1.copy(fontWeight = FontWeight.Bold),
             color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-            modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
+            modifier = Modifier.testTag("schedule-unarranged-title").padding(start = 4.dp, bottom = 6.dp)
         )
 
         val stopParentScrollConnection = remember {

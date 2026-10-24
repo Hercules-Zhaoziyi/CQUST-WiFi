@@ -2,6 +2,9 @@ package cn.ziyis.cqustwifi
 
 import androidx.compose.ui.test.*
 import androidx.activity.compose.setContent
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -16,6 +19,9 @@ import top.msfxp.schedule.data.repository.SettingsRepository
 import top.msfxp.schedule.data.model.Course
 import top.msfxp.schedule.data.model.CourseEvent
 import top.msfxp.schedule.data.model.Semester
+import top.msfxp.schedule.data.model.CourseEventWithMeta
+import top.msfxp.schedule.data.model.MergedCourseBlock
+import top.msfxp.schedule.ui.schedule.components.ScheduleGrid
 import top.yukonga.miuix.kmp.theme.*
 import java.io.File
 import java.time.LocalDate
@@ -25,6 +31,48 @@ import java.time.temporal.TemporalAdjusters
 @RunWith(AndroidJUnit4::class)
 class MiuixIntegrationTest {
     @get:Rule val rule=createAndroidComposeRule<MainActivity>()
+    @Test fun nightModeInterpolatesAndAnimationCanBeDisabled(){
+        val dark=mutableStateOf(false)
+        val animations=mutableStateOf(true)
+        var fraction=-1f
+        rule.runOnUiThread { rule.activity.setContent {
+            val theme=rememberAnimatedTheme(dark.value,animations.value,if(dark.value)ColorSchemeMode.Dark else ColorSchemeMode.Light)
+            fraction=theme.darkFraction
+            MiuixTheme(controller=theme.controller){top.yukonga.miuix.kmp.basic.Text("theme-fixture")}
+        }}
+        rule.waitForIdle()
+        rule.mainClock.autoAdvance=false
+        rule.runOnUiThread{dark.value=true}
+        rule.mainClock.advanceTimeByFrame()
+        rule.mainClock.advanceTimeBy(160)
+        assertTrue("Theme must render an intermediate palette",fraction>0f&&fraction<1f)
+        rule.mainClock.advanceTimeBy(600)
+        assertEquals(1f,fraction,.001f)
+        rule.runOnUiThread{animations.value=false;dark.value=false}
+        rule.mainClock.advanceTimeByFrame()
+        rule.mainClock.advanceTimeByFrame()
+        assertEquals(0f,fraction,.001f)
+        rule.mainClock.autoAdvance=true
+    }
+    @Test fun lateClassDoesNotOverlapUnarrangedCourses(){
+        val late=CourseEventWithMeta(1,"late","fixture",1,2,11,12,"测试教室","测试教师","",0,"晚课测试","LATE","1","","theory",0)
+        val pending=late.copy(id=2,courseId="pending",day=0,startSection=0,endSection=0,courseName="待安排测试")
+        rule.runOnUiThread { rule.activity.setContent {
+            MiuixTheme(controller=ThemeController(ColorSchemeMode.Light)){
+                ScheduleGrid(pageMondayDate=LocalDate.now(),mergedBlocks=listOf(MergedCourseBlock(2,11,12,listOf(late))),
+                    unarrangedCourses=listOf(pending),isCurrentWeek=false,onCourseBlockClick={},onUnarrangedCourseClick={},
+                    modifier=Modifier.fillMaxSize())
+            }
+        }}
+        rule.onNodeWithTag("schedule-unarranged-title").performScrollTo()
+        rule.onNodeWithText("12",useUnmergedTree=true).assertExists()
+        val block=rule.onNodeWithTag("schedule-block-2-11-12").fetchSemanticsNode().boundsInRoot
+        val pendingTitle=rule.onNodeWithTag("schedule-unarranged-title").fetchSemanticsNode().boundsInRoot
+        assertTrue("Last class must finish above pending courses",block.bottom<=pendingTitle.top)
+        rule.onNodeWithText("晚课测试").assertExists()
+        rule.onNodeWithText("待安排测试").assertExists()
+        screenshot("15-late-class-unarranged")
+    }
     @Test fun scanEntryStaysAboveBothProxyModes(){
         rule.onNodeWithText("代理",useUnmergedTree=true).performClick()
         val before=rule.onNodeWithTag("proxy-scan-entry").fetchSemanticsNode().boundsInRoot.top

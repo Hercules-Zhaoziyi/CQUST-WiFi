@@ -81,10 +81,14 @@ private val CardShape=RoundedCornerShape(26.dp)
     var manualAuth by remember{mutableStateOf(false)}
     val systemDark=isSystemInDarkTheme()
     val dark=when(state.prefs.theme){"dark"->true;"light"->false;else->systemDark}
+    val mode=when(state.prefs.theme){"dark"->ColorSchemeMode.Dark;"light"->ColorSchemeMode.Light;else->ColorSchemeMode.System}
+    val animatedTheme=rememberAnimatedTheme(dark,state.prefs.animations,mode)
+    val controller=animatedTheme.controller
+    val darkSystemBars=animatedTheme.darkFraction>=.5f
     val activity=LocalContext.current as? android.app.Activity
     SideEffect{activity?.let{
         androidx.core.view.WindowInsetsControllerCompat(it.window,it.window.decorView).apply{
-            isAppearanceLightStatusBars=!dark;isAppearanceLightNavigationBars=!dark
+            isAppearanceLightStatusBars=!darkSystemBars;isAppearanceLightNavigationBars=!darkSystemBars
         }
     }}
     val scheme=if(dark)darkColorScheme(primary=Color(0xff8ca4ff),background=Color(0xff101725),
@@ -95,18 +99,19 @@ private val CardShape=RoundedCornerShape(26.dp)
             surfaceVariant=Color(0xffedf1fa),onSurface=Color(0xff1b293e),onBackground=Color(0xff1b293e),
             onSurfaceVariant=Color(0xff7e8faa),outline=Color(0xffc4cfe0),outlineVariant=Color(0xffe1e7f1),
             secondaryContainer=Color(0xffe5ebff),onSecondaryContainer=Blue)
-    val background by animateColorAsState(scheme.background,tween(if(state.prefs.animations)450 else 0),label="theme")
     val snackbar=remember{SnackbarHostState()}
     LaunchedEffect(state.message){if(state.message.isNotEmpty()){snackbar.showSnackbar(state.message);Repository.dismissMessage()}}
     LaunchedEffect(Unit){ScheduleStore.completed.collect{if(page=="连接"&&loginTarget!=0)page="课程表"}}
     LaunchedEffect(Unit){Repository.navigation.collect{if(it=="schedule"){page="课程表";Repository.navigation.value=null}}}
     LaunchedEffect(issue){if(issue==null)manualAuth=false}
-    val mode=when(state.prefs.theme){"dark"->ColorSchemeMode.Dark;"light"->ColorSchemeMode.Light;else->ColorSchemeMode.System}
-    val controller=remember(mode){ThemeController(mode)}
     MiuixTheme(controller=controller){
     val palette=MiuixTheme.colorScheme
     val aligned=scheme.copy(background=palette.surface,surface=palette.surfaceContainer,onSurface=palette.onSurface,
-        primary=palette.primary,onSurfaceVariant=palette.onSurfaceVariantSummary,surfaceVariant=palette.surfaceVariant)
+        primary=palette.primary,onPrimary=palette.onPrimary,onBackground=palette.onSurface,
+        onSurfaceVariant=palette.onSurfaceVariantSummary,surfaceVariant=palette.surfaceVariant,
+        outline=palette.outline,outlineVariant=palette.dividerLine,secondary=palette.secondary,onSecondary=palette.onSecondary,
+        secondaryContainer=palette.secondaryContainer,onSecondaryContainer=palette.onSecondaryContainer,
+        error=palette.error,onError=palette.onError,errorContainer=palette.errorContainer,onErrorContainer=palette.onErrorContainer)
     MaterialTheme(colorScheme=aligned) {
         Scaffold(containerColor=palette.surface,snackbarHost={SnackbarHost(snackbar)},topBar={
             if(page in listOf("关于","日志"))SmallTopAppBar(title=page,navigationIcon={IconButton(onClick={back()}){Icon(Icons.Outlined.ArrowBack,stringResource(R.string.unified_back))}})
