@@ -15,7 +15,7 @@ if [ "${1:-35}" = "37" ]; then
   adb install --no-streaming -r app/build/outputs/apk/debug/app-debug.apk
   adb install --no-streaming -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
   adb shell am instrument -w -r cn.ziyis.cqustwifi.test/androidx.test.runner.AndroidJUnitRunner | tee artifacts/instrumentation.txt
-  grep -Eq '^OK \(9 tests\)' artifacts/instrumentation.txt
+  grep -Eq '^OK \(12 tests\)' artifacts/instrumentation.txt
   if grep -Eq 'FAILURES!!!|INSTRUMENTATION_FAILED|shortMsg=' artifacts/instrumentation.txt; then exit 1; fi
 else
   gradle --no-daemon -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true :app:connectedDebugAndroidTest

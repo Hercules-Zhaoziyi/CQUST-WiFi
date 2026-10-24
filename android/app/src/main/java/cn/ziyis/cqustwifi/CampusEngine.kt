@@ -139,7 +139,7 @@ class CampusEngine(private val context:Context,private val diagnostic:(String)->
             }.getOrElse{throw AuthIssue("server","认证服务器返回格式异常。")}
         }
     }
-    private fun discover(net:Network,manual:String):Pair<String,String> {
+    private fun discover(net:Network,manual:String):Triple<OkHttpClient,String,String> {
         if(manual.isNotBlank()&&!Protocol.trusted(manual))throw AuthIssue("url","仅接受学校认证域名或认证 IP 的网址。")
         val key=networkKey(net)+"/"+ip(net)
         if(key!=hintNetwork){hint=null;hintNetwork=key}
@@ -154,13 +154,13 @@ class CampusEngine(private val context:Context,private val diagnostic:(String)->
         }
         val page=found?:throw AuthIssue("url",context.getString(R.string.auth_probe_failed))
         hint=page.first
-        return page
+        return Triple(http,page.first,page.second)
     }
     fun probePortal(net:Network):Detection=try{
-        Detection.Portal(discover(net,"").first)
+        Detection.Portal(discover(net,"").second)
     }catch(e:AuthIssue){if(e.kind=="online")Detection.Online else Detection.Unknown}
     private fun prepare(net:Network,manual:String,selected:String):Challenge {
-        val(page,html)=discover(net,manual)
+        val(http,page,html)=discover(net,manual)
         val query=URI(page).rawQuery.orEmpty();val doc=Jsoup.parse(html)
         val values=doc.select("input").associate{it.id().ifBlank{it.attr("name")} to it.attr("value")}.toMutableMap()
         val init=Regex("""AuthInterFace\.init\(\s*["']([^"']*)["']""").find(html)?.groupValues?.get(1)?:"./"

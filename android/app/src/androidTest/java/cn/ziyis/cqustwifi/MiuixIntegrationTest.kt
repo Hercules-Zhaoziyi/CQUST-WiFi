@@ -45,8 +45,10 @@ class MiuixIntegrationTest {
         screenshot("09-miuix-week-grid")
         rule.onNodeWithContentDescription("设置").performTouchInput{click()}
         screenshot("10-miuix-course-settings")
+        rule.onNodeWithTag("main-navigation").assertDoesNotExist()
         for(title in listOf("个性化设置","课前通知提醒","同步日历日程","自动化功能","权限管理")){
-            rule.onNodeWithText(title).performScrollTo().performTouchInput{click()}
+            rule.onNodeWithTag("unified-settings-list").performScrollToNode(hasText(title))
+            rule.onNodeWithText(title).performTouchInput{click()}
             Thread.sleep(350)
             val width=rule.activity.resources.displayMetrics.widthPixels.toFloat()
             val shown=SemanticsMatcher("visible route back button"){node->
@@ -55,7 +57,8 @@ class MiuixIntegrationTest {
             rule.onNode(hasContentDescription("返回") and shown).assertExists().performTouchInput{click()}
             Thread.sleep(350)
         }
-        rule.onNodeWithText("课程总览 ›").performScrollTo().performTouchInput{click()}
+        rule.onNodeWithTag("unified-settings-list").performScrollToNode(hasText("课程总览 ›"))
+        rule.onNodeWithText("课程总览 ›").performTouchInput{click()}
         rule.onNodeWithText("课程总览").assertExists()
         val settings=runBlocking{GlobalContext.get().get<SettingsRepository>().getAppSettingsOnce()}
         assertFalse(settings.autoDndEnabled);assertFalse(settings.autoSyncToCalendar)
@@ -66,6 +69,38 @@ class MiuixIntegrationTest {
         rule.onNodeWithText("从相册导入").assertExists()
         rule.onNodeWithText("手动填写").assertExists()
         screenshot("11-miuix-scanner-layout")
+    }
+    @Test fun allMainPagesShareOneSettingsWithoutBottomNavigation(){
+        for(page in listOf("常用网站","代理","课程表","连接")){
+            rule.onNodeWithText(page,useUnmergedTree=true).performClick()
+            rule.onNodeWithContentDescription("设置").performClick()
+            rule.onNodeWithTag("main-navigation").assertDoesNotExist()
+            rule.onNodeWithTag("unified-settings-list").performScrollToNode(hasText("连接与外观"))
+            rule.onNodeWithText("连接与外观").assertExists()
+            rule.onNodeWithTag("unified-settings-list").performScrollToNode(hasText("个性化设置"))
+            rule.onNodeWithText("个性化设置").assertExists()
+            rule.runOnUiThread{rule.activity.onBackPressedDispatcher.onBackPressed()};rule.waitForIdle();Thread.sleep(400)
+            rule.onNodeWithTag("main-navigation").assertExists()
+        }
+    }
+    @Test fun differentSchoolAccountsAreLabelledInUnifiedSettings(){
+        runBlocking(Dispatchers.IO){
+            Repository.rememberIdentity("wifi-fixture","fixture-password",false)
+            GlobalContext.get().get<SettingsRepository>().saveFullProfileAndCredentials("course-fixture","课表测试同学","","","","")
+        }
+        Repository.chooseAccount("wifi-fixture")
+        rule.waitUntil(5000){Repository.state.value.username=="wifi-fixture"}
+        rule.onNodeWithContentDescription("设置").performClick()
+        rule.onNodeWithText("校园网账号").assertExists();rule.onNodeWithText("课表账号").assertExists()
+        rule.onNodeWithText("wifi-fixture").assertExists();rule.onNodeWithText("course-fixture").assertExists()
+        screenshot("12-unified-accounts")
+    }
+    @Test fun authenticationHelpIsNativeAndExplainsMissingWifi(){
+        rule.onNodeWithText("认证帮助").performScrollTo().performClick()
+        rule.onNodeWithText("校园网认证帮助").assertExists()
+        rule.onNodeWithText("重新探测认证入口").performClick()
+        rule.onNodeWithText("未连接可用 Wi-Fi。请先连接校园无线网络。").assertExists()
+        screenshot("13-native-auth-help")
     }
     @Test fun forgettingAnAccountClearsBothCredentialStores(){
         val user="fixture-account"

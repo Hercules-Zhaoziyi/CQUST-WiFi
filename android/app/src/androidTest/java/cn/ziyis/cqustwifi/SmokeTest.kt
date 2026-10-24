@@ -35,10 +35,16 @@ class SmokeTest {
         screenshot("05-schedule")
         rule.onNodeWithText("连接",useUnmergedTree=true).performClick()
         rule.onNodeWithContentDescription("关于").performClick()
-        rule.onNodeWithText("加入内测群").assertExists()
+        rule.onNodeWithText("CQUST Wi-Fi × 课程表").assertExists()
         screenshot("05-about")
+        rule.onNodeWithText("CQUST Wi-Fi 内测群").performScrollTo().assertExists()
+        rule.onNodeWithText("课程表 QQ 交流群").assertExists()
+        screenshot("05b-about-links")
+        rule.runOnUiThread{rule.activity.onBackPressedDispatcher.onBackPressed()};rule.waitForIdle();Thread.sleep(400)
         rule.onNodeWithContentDescription("设置").performClick()
-        rule.onNodeWithText("软件更新").performScrollTo().assertExists()
+        rule.onNodeWithTag("main-navigation").assertDoesNotExist()
+        rule.onNodeWithTag("unified-settings-list").performScrollToNode(hasText("软件更新"))
+        rule.onNodeWithText("软件更新").assertExists()
         screenshot("06-settings-update")
     }
     @Test fun nativeCoreLoadsWithoutStartingVpn(){assertFalse(TProxyService.TProxyIsRunning())}
