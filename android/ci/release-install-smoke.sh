@@ -11,7 +11,7 @@ adb -s "$serial" uninstall "$package.test" || true
 adb -s "$serial" uninstall "$package"
 upgrading=false
 if adb -s "$serial" install --no-streaming "${previous[0]}"; then
-  echo 'Previous v3-only release accepted by stock Android package manager.'
+  echo 'Previous published release accepted by stock Android package manager.'
   adb -s "$serial" shell am start -W -n "$package/.MainActivity"
   adb -s "$serial" shell mkdir -p "/sdcard/Android/data/$package/files"
   adb -s "$serial" shell touch "/sdcard/Android/data/$package/files/upgrade-marker"
