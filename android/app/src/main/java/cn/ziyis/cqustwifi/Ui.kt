@@ -91,14 +91,7 @@ private val CardShape=RoundedCornerShape(26.dp)
             isAppearanceLightStatusBars=!darkSystemBars;isAppearanceLightNavigationBars=!darkSystemBars
         }
     }}
-    val scheme=if(dark)darkColorScheme(primary=Color(0xff8ca4ff),background=Color(0xff101725),
-        surface=Color(0xff192334),surfaceVariant=Color(0xff222f44),onSurface=Color(0xffe7edf9),
-        onBackground=Color(0xffe7edf9),onSurfaceVariant=Color(0xff97a7bd),outline=Color(0xff52627b),
-        secondaryContainer=Color(0xff26395f),onSecondaryContainer=Color(0xffa6b8ff))
-        else lightColorScheme(primary=Blue,background=Color(0xfff4f6fb),surface=Color.White,
-            surfaceVariant=Color(0xffedf1fa),onSurface=Color(0xff1b293e),onBackground=Color(0xff1b293e),
-            onSurfaceVariant=Color(0xff7e8faa),outline=Color(0xffc4cfe0),outlineVariant=Color(0xffe1e7f1),
-            secondaryContainer=Color(0xffe5ebff),onSecondaryContainer=Blue)
+    val scheme=lightColorScheme()
     val snackbar=remember{SnackbarHostState()}
     LaunchedEffect(state.message){if(state.message.isNotEmpty()){snackbar.showSnackbar(state.message);Repository.dismissMessage()}}
     LaunchedEffect(Unit){ScheduleStore.completed.collect{if(page=="连接"&&loginTarget!=0)page="课程表"}}
@@ -111,6 +104,16 @@ private val CardShape=RoundedCornerShape(26.dp)
         onSurfaceVariant=palette.onSurfaceVariantSummary,surfaceVariant=palette.surfaceVariant,
         outline=palette.outline,outlineVariant=palette.dividerLine,secondary=palette.secondary,onSecondary=palette.onSecondary,
         secondaryContainer=palette.secondaryContainer,onSecondaryContainer=palette.onSecondaryContainer,
+        primaryContainer=palette.primaryContainer,onPrimaryContainer=palette.onPrimaryContainer,
+        tertiary=palette.onTertiaryContainer,onTertiary=palette.tertiaryContainer,
+        tertiaryContainer=palette.tertiaryContainer,onTertiaryContainer=palette.onTertiaryContainer,
+        surfaceTint=palette.primary,surfaceDim=palette.background,surfaceBright=palette.surface,
+        surfaceContainerLowest=palette.background,surfaceContainerLow=palette.surface,
+        surfaceContainer=palette.surfaceContainer,surfaceContainerHigh=palette.surfaceContainerHigh,
+        surfaceContainerHighest=palette.surfaceContainerHighest,
+        inverseSurface=lerp(Color(0xff303030),Color(0xffeeeeee),animatedTheme.darkFraction),
+        inverseOnSurface=lerp(Color.White,Color(0xff202020),animatedTheme.darkFraction),
+        inversePrimary=lerp(Color(0xffa6b8ff),Blue,animatedTheme.darkFraction),scrim=Color.Black,
         error=palette.error,onError=palette.onError,errorContainer=palette.errorContainer,onErrorContainer=palette.onErrorContainer)
     MaterialTheme(colorScheme=aligned) {
         Scaffold(containerColor=palette.surface,snackbarHost={SnackbarHost(snackbar)},topBar={
