@@ -84,15 +84,14 @@ jobs:
           ram-size: 3072M
           disk-size: 8192M
           working-directory: android
-          script: |
-            adb shell svc wifi disable && adb shell svc data disable
-            adb install -r vpnprobe/build/outputs/apk/debug/vpnprobe-debug.apk
-            gradle --no-daemon -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true :app:connectedDebugAndroidTest; result=$?; mkdir -p artifacts; adb pull /sdcard/Android/data/cn.ziyis.cqustwifi/files/screenshots artifacts/screenshots || true; exit $result
+          script: bash ci/device-regression.sh '${{ inputs.emulator_api || '35' }}'
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: android-miuix-device-results
           path: |
             android/artifacts/screenshots/
+            android/artifacts/instrumentation.txt
+            android/artifacts/emulator-crash.log
             android/app/build/reports/androidTests/
             android/app/build/outputs/androidTest-results/
