@@ -25,7 +25,7 @@ jobs:
         with:
           gradle-version: '9.7.1'
       - name: Install matching compile SDK
-        run: sdkmanager 'platforms;android-37.0' 'build-tools;37.0.0'
+        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0" "build-tools;37.0.0"'
       - name: Verify native dependency
         run: test "$(sha256sum app/libs/hev-socks5-tunnel-2.19.1.aar | cut -d' ' -f1)" = '107958f7a07051386248ba8dba778b63d8dcefdfb2c3665b0ee9a8c93de5f6ca'
       - name: Build complete feature module and host
@@ -63,7 +63,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '9.7.1'
-      - run: sdkmanager 'platforms;android-37.0' 'build-tools;37.0.0'
+      - run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0" "build-tools;37.0.0"'
       - run: gradle --no-daemon :app:assembleDebug :app:assembleAndroidTest :vpnprobe:assembleDebug
       - run: sudo chmod 666 /dev/kvm
       - name: Controlled SOCKS fixture
