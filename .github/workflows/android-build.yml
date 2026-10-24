@@ -12,7 +12,15 @@ on:
         options: ['35', '37']
         default: '35'
       release_smoke_tag:
-        description: Optional draft release APK installation and upgrade check
+        description: Optional published release APK installation and upgrade check
+        type: string
+        default: ''
+      signed_apk_blob:
+        description: Optional locally signed APK test object (read only)
+        type: string
+        default: ''
+      signed_apk_sha256:
+        description: Required SHA-256 for the signed APK test object
         type: string
         default: ''
 permissions:
@@ -82,12 +90,23 @@ jobs:
       - name: Controlled SOCKS fixture
         run: python3 app/src/androidTest/fixtures/socks_fixture.py > /tmp/cqust-socks-fixture.log 2>&1 &
       - name: Fetch locally signed release for installation check
-        if: ${{ inputs.release_smoke_tag != '' }}
+        if: ${{ inputs.release_smoke_tag != '' || inputs.signed_apk_blob != '' }}
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.release_smoke_tag }}
+          SIGNED_APK_BLOB: ${{ inputs.signed_apk_blob }}
+          SIGNED_APK_SHA256: ${{ inputs.signed_apk_sha256 }}
         run: |
-          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern 'CQUST-WiFi-Android-*.apk' --dir artifacts/release-current
+          if [ -n "$SIGNED_APK_BLOB" ]; then
+            [[ "$SIGNED_APK_BLOB" =~ ^[0-9a-f]{40}(,[0-9a-f]{40}){0,63}$ ]] && [[ "$SIGNED_APK_SHA256" =~ ^[0-9a-f]{64}$ ]]
+            mkdir -p artifacts/release-current
+            : > artifacts/release-current/CQUST-WiFi-Android-1.1.0-beta02.apk
+            IFS=',' read -ra chunks <<< "$SIGNED_APK_BLOB"
+            for chunk in "${chunks[@]}"; do gh api -H 'Accept: application/vnd.github.raw+json' "repos/$GITHUB_REPOSITORY/git/blobs/$chunk" >> artifacts/release-current/CQUST-WiFi-Android-1.1.0-beta02.apk; done
+            printf '%s  %s\n' "$SIGNED_APK_SHA256" artifacts/release-current/CQUST-WiFi-Android-1.1.0-beta02.apk | sha256sum --check --strict
+          else
+            gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern 'CQUST-WiFi-Android-*.apk' --dir artifacts/release-current
+          fi
           gh release download android-v1.1.0-beta01 --repo "$GITHUB_REPOSITORY" --pattern 'CQUST-WiFi-Android-*.apk' --dir artifacts/release-previous
       - uses: reactivecircus/android-emulator-runner@v2
         with:
