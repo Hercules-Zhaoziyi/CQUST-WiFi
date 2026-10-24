@@ -144,6 +144,9 @@ class MiuixIntegrationTest {
         screenshot("12-unified-accounts")
     }
     @Test fun authenticationHelpIsNativeAndExplainsMissingWifi(){
+        val fd=InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand("svc wifi disable")
+        android.os.ParcelFileDescriptor.AutoCloseInputStream(fd).use{it.readBytes()}
+        rule.waitUntil(30000){Repository.engine.wifi()==null}
         rule.onNodeWithText("认证帮助").performScrollTo().performClick()
         rule.onNodeWithText("校园网认证帮助").assertExists()
         rule.onNodeWithText("重新探测认证入口").performClick()

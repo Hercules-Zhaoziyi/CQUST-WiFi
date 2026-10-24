@@ -92,8 +92,6 @@ jobs:
       - run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0" "build-tools;37.0.0"'
       - run: gradle --no-daemon :app:assembleDebug :app:assembleAndroidTest :vpnprobe:assembleDebug
       - run: sudo chmod 666 /dev/kvm
-      - name: Controlled SOCKS fixture
-        run: python3 app/src/androidTest/fixtures/socks_fixture.py > /tmp/cqust-socks-fixture.log 2>&1 &
       - name: Fetch locally signed release for installation check
         if: ${{ inputs.release_smoke_tag != '' || inputs.signed_apk_blob != '' }}
         env:
