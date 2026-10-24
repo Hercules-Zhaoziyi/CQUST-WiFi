@@ -1,5 +1,5 @@
-课程表认证与解析源自 yuexps/cqust-schedule-miuix。
+完整课表模块（界面、数据层、认证解析、调课、提醒、自动化、日历和小组件）源自 yuexps/cqust-schedule-miuix。
 https://github.com/yuexps/cqust-schedule-miuix
 本次整合已获得项目所有者在 2026-10-24 会话中的明确授权。
-保留原包名与来源署名；认证 Cookie 隔离、缓存、界面及登录编排由本项目适配。
+保留原包名与来源署名；认证地址兼容、Cookie 隔离、旧缓存迁移、共用登录和宿主功能由本项目适配。
 此授权记录不代表对上游项目额外授予通用开源许可证。

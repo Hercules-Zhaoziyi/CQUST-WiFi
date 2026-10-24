@@ -47,7 +47,13 @@ class MiuixIntegrationTest {
         screenshot("10-miuix-course-settings")
         for(title in listOf("个性化设置","课前通知提醒","同步日历日程","自动化功能","权限管理")){
             rule.onNodeWithText(title).performScrollTo().performTouchInput{click()}
-            rule.onNodeWithContentDescription("返回").assertExists().performTouchInput{click()}
+            Thread.sleep(350)
+            val width=rule.activity.resources.displayMetrics.widthPixels.toFloat()
+            val shown=SemanticsMatcher("visible route back button"){node->
+                val box=node.boundsInRoot;box.left>=0f&&box.right<=width&&box.top>=0f
+            }
+            rule.onNode(hasContentDescription("返回") and shown).assertExists().performTouchInput{click()}
+            Thread.sleep(350)
         }
         rule.onNodeWithText("课程总览 ›").performScrollTo().performTouchInput{click()}
         rule.onNodeWithText("课程总览").assertExists()

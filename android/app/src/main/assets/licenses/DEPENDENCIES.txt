@@ -40,3 +40,19 @@ Hev Socks5 Tunnel/core/task-system/yaml — see hev-MIT.txt
 lwIP — see lwIP-BSD.txt
 Gradle wrapper 8.9 — Gradle Inc. and contributors — Apache-2.0
 Full Apache 2.0 license: Apache-2.0.txt
+
+Miuix 0.9.4-rc01 — compose-miuix-ui contributors — Apache-2.0
+https://compose-miuix-ui.github.io/miuix/
+
+Ktor 3.5.2 — JetBrains and contributors — Apache-2.0
+https://github.com/ktorio/ktor
+
+Koin 4.2.2 — Kotzilla and contributors — Apache-2.0
+https://github.com/InsertKoinIO/koin
+
+Room / DataStore / WorkManager — Android Open Source Project — Apache-2.0
+https://android.googlesource.com/platform/frameworks/support/
+
+ZXing Core / Android Embedded — ZXing authors / Journey Mobile, Inc. — Apache-2.0
+https://github.com/zxing/zxing
+https://github.com/journeyapps/zxing-android-embedded

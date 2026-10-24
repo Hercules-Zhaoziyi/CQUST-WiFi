@@ -110,9 +110,13 @@ class ProxyScannerActivity:ComponentActivity(){
 @Composable internal fun ScannerScreen(state:ScannerUiState,camera:BarcodeView?,onAction:(ScannerAction)->Unit){
     val transition=rememberInfiniteTransition(label="scanner")
     val scanY by transition.animateFloat(0f,1f,infiniteRepeatable(tween(2200, easing=LinearEasing),RepeatMode.Reverse),label="scan-line")
-    Box(Modifier.fillMaxSize().background(Color(0xff11151c))){
+    BoxWithConstraints(Modifier.fillMaxSize().background(Color(0xff11151c))){
+        val frameSide=minOf(maxWidth*.72f,280.dp)
         if(state.camera&&camera!=null)AndroidView(factory={camera},modifier=Modifier.fillMaxSize())
         if(state.camera)ScannerMask(if(state.animations)scanY else .5f)
+        if(state.camera)Text(state.error.ifBlank{stringResource(R.string.proxy_scan_hint)},
+            Modifier.fillMaxWidth().padding(horizontal=26.dp).offset(y=maxHeight*.44f+frameSide/2+22.dp),
+            textAlign=TextAlign.Center,color=if(state.error.isBlank())Color.White else Color(0xffffc29b),fontSize=14.sp,lineHeight=22.sp)
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal=24.dp)){
             Row(Modifier.fillMaxWidth().padding(top=12.dp),verticalAlignment=Alignment.CenterVertically){
                 IconButton(onClick={onAction(ScannerAction.BACK)}){Icon(Icons.Outlined.ArrowBack,stringResource(R.string.proxy_scan_back),tint=Color.White)}
@@ -128,7 +132,7 @@ class ProxyScannerActivity:ComponentActivity(){
                 Button(onClick={onAction(ScannerAction.GRANT)},modifier=Modifier.fillMaxWidth(),colors=ButtonDefaults.buttonColorsPrimary()){Text(stringResource(R.string.proxy_scan_permission_button))}
             }
             Spacer(Modifier.weight(1f))
-            Text(state.error.ifBlank{stringResource(R.string.proxy_scan_hint)},Modifier.fillMaxWidth(),textAlign=TextAlign.Center,
+            if(!state.camera&&state.error.isNotEmpty())Text(state.error,Modifier.fillMaxWidth(),textAlign=TextAlign.Center,
                 color=if(state.error.isBlank())Color.White else Color(0xffffc29b),fontSize=14.sp,lineHeight=22.sp)
             Row(Modifier.fillMaxWidth().padding(top=28.dp,bottom=20.dp),horizontalArrangement=Arrangement.spacedBy(12.dp)){
                 Button(onClick={onAction(ScannerAction.GALLERY)},modifier=Modifier.weight(1f),colors=ButtonDefaults.buttonColors(color=Color.White.copy(alpha=.12f),contentColor=Color.White)){

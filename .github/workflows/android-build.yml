@@ -24,6 +24,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '9.7.1'
+          cache-read-only: false
       - name: Install matching compile SDK
         run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0" "build-tools;37.0.0"'
       - name: Verify native dependency
@@ -63,6 +64,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '9.7.1'
+          cache-read-only: false
       - run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0" "build-tools;37.0.0"'
       - run: gradle --no-daemon :app:assembleDebug :app:assembleAndroidTest :vpnprobe:assembleDebug
       - run: sudo chmod 666 /dev/kvm
@@ -80,8 +82,7 @@ jobs:
           script: |
             adb shell svc wifi disable && adb shell svc data disable
             adb install -r vpnprobe/build/outputs/apk/debug/vpnprobe-debug.apk
-            gradle --no-daemon -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true :app:connectedDebugAndroidTest
-            mkdir -p artifacts && adb pull /sdcard/Android/data/cn.ziyis.cqustwifi/files/screenshots artifacts/screenshots
+            gradle --no-daemon -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true :app:connectedDebugAndroidTest; result=$?; mkdir -p artifacts; adb pull /sdcard/Android/data/cn.ziyis.cqustwifi/files/screenshots artifacts/screenshots || true; exit $result
       - uses: actions/upload-artifact@v4
         if: always()
         with:

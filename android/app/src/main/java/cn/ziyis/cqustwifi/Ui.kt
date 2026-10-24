@@ -35,6 +35,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.ThemeController
 import top.yukonga.miuix.kmp.theme.ColorSchemeMode
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -70,6 +71,7 @@ private val CardShape=RoundedCornerShape(26.dp)
     var page by remember{mutableStateOf("连接")}
     var loginTarget by remember{mutableIntStateOf(Repository.loginPurpose())}
     var portal by remember{mutableStateOf(false)}
+    val pageState=rememberSaveableStateHolder()
     var manualAuth by remember{mutableStateOf(false)}
     val systemDark=isSystemInDarkTheme()
     val dark=when(state.prefs.theme){"dark"->true;"light"->false;else->systemDark}
@@ -125,6 +127,7 @@ private val CardShape=RoundedCornerShape(26.dp)
             AnimatedContent(page,Modifier.padding(padding).fillMaxSize(),transitionSpec={
                 fadeIn(tween(if(state.prefs.animations)220 else 0)) togetherWith fadeOut(tween(if(state.prefs.animations)100 else 0))
             },label="page"){current->
+                pageState.SaveableStateProvider(current){
                 when(current){
                     "连接"->Home(state,onPortal={if(issue!=null)manualAuth=true else portal=true},initialMode=loginTarget,onMode={loginTarget=it})
                     "常用网站"->Sites()
@@ -133,6 +136,7 @@ private val CardShape=RoundedCornerShape(26.dp)
                     "设置"->SettingsPage(state,onLogs={page="日志"},onNotifications)
                     "日志"->Logs(state)
                     else->About()
+                }
                 }
             }
         }
@@ -552,13 +556,13 @@ private fun copy(context:Context,text:String){context.getSystemService(Clipboard
         }
         Panel{
             Text("Android 版，轻松连接",fontSize=19.sp,fontWeight=FontWeight.SemiBold)
-            Text("Wi-Fi 定向认证、多账号与安全凭据、验证码、常用网站、通知栏监测，以及电脑 SOCKS5 的 VPN/TUN 转发。",fontSize=14.sp,lineHeight=24.sp)
+            Text("Miuix 界面、完整课表与调课、课前提醒、日历及桌面微件；保留校园网认证、多账号、常用网站、代理共享与 VPN 转发。",fontSize=14.sp,lineHeight=24.sp)
             Text("本软件为非学校官方工具，请使用本人有权限的账号，并遵守学校网络管理规则。",fontSize=12.sp,lineHeight=22.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Panel{
             Text("特别鸣谢",fontSize=18.sp,fontWeight=FontWeight.SemiBold)
             Column{
-                listOf("Gloridust/RuijieWIFI-AutoLogin" to "AutoLogin · 锐捷认证", "Zelm05/campus-autologin" to "campus-autologin · 网络探测", "heiher/hev-socks5-tunnel" to "HevSocks5Tunnel · 转发核心", "yuexps/cqust-schedule-miuix" to "cqust-schedule-miuix · 课程表").forEach{(repo,label)->
+                listOf("Gloridust/RuijieWIFI-AutoLogin" to "AutoLogin · 锐捷认证", "Zelm05/campus-autologin" to "campus-autologin · 网络探测", "heiher/hev-socks5-tunnel" to "HevSocks5Tunnel · 转发核心", "yuexps/cqust-schedule-miuix" to "cqust-schedule-miuix · 课程表", "compose-miuix-ui/miuix" to "Miuix · 界面组件").forEach{(repo,label)->
                     QuietButton(onClick={openLink(context,"https://github.com/$repo")},contentPadding=PaddingValues(horizontal=0.dp,vertical=2.dp)){GithubIcon();Spacer(Modifier.width(9.dp));Text(label,fontSize=12.sp)}
                 }
             }
