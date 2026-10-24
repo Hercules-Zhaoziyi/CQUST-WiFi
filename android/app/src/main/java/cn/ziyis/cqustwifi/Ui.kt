@@ -20,6 +20,20 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.Surface
+import top.yukonga.miuix.kmp.basic.Switch
+import top.yukonga.miuix.kmp.basic.Checkbox
+import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.NavigationBar
+import top.yukonga.miuix.kmp.basic.NavigationBarItem
+import top.yukonga.miuix.kmp.basic.Card as MiuixCard
+import top.yukonga.miuix.kmp.basic.CardDefaults
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.theme.ThemeController
+import top.yukonga.miuix.kmp.theme.ColorSchemeMode
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -73,9 +87,15 @@ private val CardShape=RoundedCornerShape(26.dp)
     val background by animateColorAsState(scheme.background,tween(if(state.prefs.animations)450 else 0),label="theme")
     val snackbar=remember{SnackbarHostState()}
     LaunchedEffect(state.message){if(state.message.isNotEmpty()){snackbar.showSnackbar(state.message);Repository.dismissMessage()}}
-    MaterialTheme(colorScheme=scheme) {
-        Scaffold(containerColor=background,snackbarHost={SnackbarHost(snackbar)},topBar={
-            if(page!="课程表")Column(Modifier.statusBarsPadding().background(background)){
+    val mode=when(state.prefs.theme){"dark"->ColorSchemeMode.Dark;"light"->ColorSchemeMode.Light;else->ColorSchemeMode.System}
+    val controller=remember(mode){ThemeController(mode)}
+    MiuixTheme(controller=controller){
+    val palette=MiuixTheme.colorScheme
+    val aligned=scheme.copy(background=palette.background,surface=palette.surfaceContainer,onSurface=palette.onSurface,
+        primary=palette.primary,onSurfaceVariant=palette.onSurfaceVariantSummary,surfaceVariant=palette.surfaceVariant)
+    MaterialTheme(colorScheme=aligned) {
+        Scaffold(containerColor=palette.background,snackbarHost={SnackbarHost(snackbar)},topBar={
+            if(page!="课程表")Column(Modifier.statusBarsPadding().background(palette.background)){
                 Row(Modifier.fillMaxWidth().padding(horizontal=20.dp,vertical=12.dp),verticalAlignment=Alignment.CenterVertically){
                     Image(painterResource(R.drawable.app_logo),null,Modifier.size(42.dp).clip(RoundedCornerShape(12.dp)))
                     Column(Modifier.weight(1f).padding(start=12.dp)){
@@ -89,10 +109,10 @@ private val CardShape=RoundedCornerShape(26.dp)
                 }
             }
         },bottomBar={
-            NavigationBar(containerColor=MaterialTheme.colorScheme.surface){
+            NavigationBar(color=palette.surfaceContainer){
                 listOf("连接" to Icons.Outlined.Wifi,"课程表" to Icons.Outlined.CalendarMonth,"常用网站" to Icons.Outlined.Language,
                     "代理" to Icons.Outlined.Shield).forEach{(name,icon)->
-                    NavigationBarItem(selected=page==name,onClick={page=name},icon={Icon(icon,null)},label={Text(name,fontSize=12.sp)})
+                    NavigationBarItem(selected=page==name,onClick={page=name},icon=icon,label=name)
                 }
             }
         }){padding->
@@ -114,6 +134,7 @@ private val CardShape=RoundedCornerShape(26.dp)
         if(portal)PortalDialog(onClose={portal=false},onResult={url->portal=false;Repository.retryAuth(url,"","")})
         UpdateDialog()
     }
+    }
 }
 
 @Composable private fun PageColumn(content:@Composable ColumnScope.()->Unit){
@@ -128,8 +149,9 @@ private val CardShape=RoundedCornerShape(26.dp)
     }
 }
 @Composable private fun Panel(content:@Composable ColumnScope.()->Unit){
-    Surface(shape=CardShape,color=MaterialTheme.colorScheme.surface,modifier=Modifier.fillMaxWidth()){
-        Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp),content=content)
+    MiuixCard(modifier=Modifier.fillMaxWidth(),cornerRadius=26.dp,insideMargin=PaddingValues(20.dp),
+        colors=CardDefaults.defaultColors(color=MiuixTheme.colorScheme.surfaceContainer)){
+        Column(verticalArrangement=Arrangement.spacedBy(16.dp),content=content)
     }
 }
 @Composable private fun Setting(title:String,description:String,value:Boolean,onChange:(Boolean)->Unit){
@@ -141,7 +163,7 @@ private val CardShape=RoundedCornerShape(26.dp)
 }
 @Composable private fun SecretField(value:String,onChange:(String)->Unit,label:String="密码",visibleByDefault:Boolean=false,placeholder:String=""){
     var visible by remember{mutableStateOf(visibleByDefault)}
-    OutlinedTextField(value,onValueChange=onChange,label={Text(label)},placeholder={Text(placeholder)},
+    MiuixInput(value,onValueChange=onChange,label={Text(label)},placeholder={Text(placeholder)},
         modifier=Modifier.fillMaxWidth(),singleLine=true,shape=RoundedCornerShape(16.dp),
         visualTransformation=if(visible)VisualTransformation.None else PasswordVisualTransformation(),
         keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Password),
@@ -209,9 +231,9 @@ private val CardShape=RoundedCornerShape(26.dp)
                     Metric("局域网 IP",s.ip,Modifier.weight(1f))
                 }
             }
-            if(connected&&s.status!=LinkState.OPEN)TextButton(onClick={logoutConfirm=true},modifier=Modifier.align(Alignment.CenterHorizontally)){
+            if(connected&&s.status!=LinkState.OPEN)QuietButton(onClick={logoutConfirm=true},modifier=Modifier.align(Alignment.CenterHorizontally)){
                 Icon(Icons.Outlined.Logout,null,Modifier.size(17.dp));Spacer(Modifier.width(8.dp));Text("退出登录")}
-            if(s.status==LinkState.OPEN)TextButton(onClick=onPortal,modifier=Modifier.align(Alignment.CenterHorizontally)){Text("在官方页面管理账号与下线")}
+            if(s.status==LinkState.OPEN)QuietButton(onClick=onPortal,modifier=Modifier.align(Alignment.CenterHorizontally)){Text("在官方页面管理账号与下线")}
         }
         run{
             Panel{
@@ -219,11 +241,11 @@ private val CardShape=RoundedCornerShape(26.dp)
                     Column(Modifier.weight(1f)){Text("统一登录",fontSize=23.sp,fontWeight=FontWeight.Bold);Text("校园网与课表，按需使用",fontSize=12.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)}
                     Image(painterResource(R.drawable.school_logo),"重庆科技大学",Modifier.width(120.dp).height(32.dp),contentScale=ContentScale.Fit)
                 }
-                OutlinedTextField(user,{user=it},label={Text("校园网账号")},modifier=Modifier.fillMaxWidth().testTag("username"),
+                MiuixInput(user,{user=it},label={Text("校园网账号")},modifier=Modifier.fillMaxWidth().testTag("username"),
                     singleLine=true,shape=RoundedCornerShape(16.dp),trailingIcon={IconButton(onClick={accounts=true}){Icon(Icons.Outlined.ExpandMore,"选择账号")}})
                 SecretField(password,{password=it},"统一认证密码",placeholder=if(Repository.hasPassword(user))"密码已安全保存，可留空"else"请输入密码")
                 Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
-                    listOf("校园网","课表","两者").forEachIndexed{i,title->FilterChip(loginMode==i,{loginMode=i;onMode(i)},label={Text(title)})}
+                    listOf("校园网","课表","两者").forEachIndexed{i,title->ChoiceChip(loginMode==i,{loginMode=i;onMode(i)},label={Text(title)})}
                 }
                 if(loginMode!=0){
                     Text("课表独立使用统一身份认证，无需开通校园网。",fontSize=12.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
@@ -231,9 +253,9 @@ private val CardShape=RoundedCornerShape(26.dp)
                 }
                 Row(verticalAlignment=Alignment.CenterVertically){
                     Checkbox(rememberPassword,{rememberPassword=it});Text("记住账号密码",fontSize=13.sp,modifier=Modifier.weight(1f))
-                    TextButton(onClick=onPortal){Text("认证帮助")}
+                    QuietButton(onClick=onPortal){Text("认证帮助")}
                 }
-                Button(onClick=submitLogin,enabled=!s.busy,modifier=Modifier.fillMaxWidth().height(52.dp),shape=RoundedCornerShape(17.dp)){Text("登录");Spacer(Modifier.width(10.dp));Icon(Icons.Outlined.ArrowForward,null)}
+                ActionButton(onClick=submitLogin,enabled=!s.busy,modifier=Modifier.fillMaxWidth().height(52.dp),shape=RoundedCornerShape(17.dp)){Text("登录");Spacer(Modifier.width(10.dp));Icon(Icons.Outlined.ArrowForward,null)}
                 Text("密码使用 Android Keystore 加密保存在本机。",fontSize=11.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
@@ -241,7 +263,7 @@ private val CardShape=RoundedCornerShape(26.dp)
         Text("每 ${if(s.prefs.interval==120)"2 分钟"else"${s.prefs.interval} 秒"}检查 · 可在设置中调整",fontSize=12.sp,
             color=MaterialTheme.colorScheme.onSurfaceVariant,modifier=Modifier.align(Alignment.CenterHorizontally))
     }
-    if(accounts)AlertDialog(onDismissRequest={accounts=false},containerColor=MaterialTheme.colorScheme.surface,title={Text("校园网账号")},text={
+    if(accounts)MiuixPrompt(onDismissRequest={accounts=false},containerColor=MaterialTheme.colorScheme.surface,title={Text("校园网账号")},text={
         Column(Modifier.heightIn(max=360.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)){
             Text("选择已保存账号，或添加新的校园网账号。",fontSize=13.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
             s.accounts.forEach{account->Row(verticalAlignment=Alignment.CenterVertically){
@@ -250,12 +272,12 @@ private val CardShape=RoundedCornerShape(26.dp)
                 }
                 IconButton(onClick={Repository.forgetAccount(account)}){Icon(Icons.Outlined.DeleteOutline,"忘记账号")}
             }}
-            OutlinedButton(onClick={user="";password="";accounts=false},modifier=Modifier.fillMaxWidth()){Icon(Icons.Outlined.Add,null);Spacer(Modifier.width(8.dp));Text("添加其他账号")}
+            SecondaryButton(onClick={user="";password="";accounts=false},modifier=Modifier.fillMaxWidth()){Icon(Icons.Outlined.Add,null);Spacer(Modifier.width(8.dp));Text("添加其他账号")}
         }
-    },confirmButton={TextButton(onClick={accounts=false}){Text("关闭")}})
-    if(logoutConfirm)AlertDialog(onDismissRequest={logoutConfirm=false},title={Text("退出登录？")},text={Text("将向校园网关提交下线请求，已保存的账号密码仍保留。")},
-        confirmButton={TextButton(onClick={Repository.disconnect(true);logoutConfirm=false}){Text("退出登录")}},
-        dismissButton={TextButton(onClick={logoutConfirm=false}){Text("取消")}})
+    },confirmButton={QuietButton(onClick={accounts=false}){Text("关闭")}})
+    if(logoutConfirm)MiuixPrompt(onDismissRequest={logoutConfirm=false},title={Text("退出登录？")},text={Text("将向校园网关提交下线请求，已保存的账号密码仍保留。")},
+        confirmButton={QuietButton(onClick={Repository.disconnect(true);logoutConfirm=false}){Text("退出登录")}},
+        dismissButton={QuietButton(onClick={logoutConfirm=false}){Text("取消")}})
 }
 
 @Composable private fun Sites(){
@@ -303,7 +325,7 @@ private val CardShape=RoundedCornerShape(26.dp)
     }
     PageColumn{
         Heading("YOUR DEVICES, CONNECTED","代理","连接电脑共享的网络，或在自己的设备之间转发。")
-        if(tab==0&&!s.vpn)OutlinedButton(onClick={scanner.launch(com.journeyapps.barcodescanner.ScanOptions().setDesiredBarcodeFormats(com.journeyapps.barcodescanner.ScanOptions.QR_CODE).setPrompt("扫描桌面端代理配置二维码").setOrientationLocked(false))},modifier=Modifier.fillMaxWidth()){
+        if(tab==0&&!s.vpn)SecondaryButton(onClick={scanner.launch(com.journeyapps.barcodescanner.ScanOptions().setDesiredBarcodeFormats(com.journeyapps.barcodescanner.ScanOptions.QR_CODE).setPrompt("扫描桌面端代理配置二维码").setOrientationLocked(false))},modifier=Modifier.fillMaxWidth()){
             Icon(Icons.Outlined.QrCodeScanner,null);Spacer(Modifier.width(8.dp));Text("扫码导入并连接")
         }
         Surface(shape=RoundedCornerShape(20.dp),color=MaterialTheme.colorScheme.surfaceVariant){
@@ -326,10 +348,10 @@ private val CardShape=RoundedCornerShape(26.dp)
                         Text(s.vpnMessage,fontSize=12.sp,lineHeight=19.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)}
                 }
                 if(!s.vpn){
-                    OutlinedTextField(host,{host=it.trim()},label={Text("电脑服务器 IP")},placeholder={Text("例如 172.21.x.x")},
+                    MiuixInput(host,{host=it.trim()},label={Text("电脑服务器 IP")},placeholder={Text("例如 172.21.x.x")},
                         modifier=Modifier.fillMaxWidth(),singleLine=true,shape=RoundedCornerShape(16.dp),keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal))
-                    OutlinedTextField(port,{port=it.filter(Char::isDigit)},label={Text("端口")},modifier=Modifier.fillMaxWidth(),singleLine=true,shape=RoundedCornerShape(16.dp),keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number))
-                    OutlinedTextField(user,{user=it},label={Text("代理用户名")},modifier=Modifier.fillMaxWidth(),singleLine=true,shape=RoundedCornerShape(16.dp))
+                    MiuixInput(port,{port=it.filter(Char::isDigit)},label={Text("端口")},modifier=Modifier.fillMaxWidth(),singleLine=true,shape=RoundedCornerShape(16.dp),keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number))
+                    MiuixInput(user,{user=it},label={Text("代理用户名")},modifier=Modifier.fillMaxWidth(),singleLine=true,shape=RoundedCornerShape(16.dp))
                     Setting("使用校园网密码","仅当电脑端也选择校园网密码时使用；不会显示密码。",campus){campus=it;password=""}
                     if(!campus)SecretField(password,{password=it},"电脑代理密码",visibleByDefault=true)
                 }else{
@@ -337,7 +359,7 @@ private val CardShape=RoundedCornerShape(26.dp)
                     Text("代理用户名：$user",fontSize=13.sp)
                     Text(s.transfer,fontSize=12.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Button(onClick={
+                ActionButton(onClick={
                     if(s.vpn)onVpn()
                     else runCatching{Repository.saveVpn(host,port.toIntOrNull()?:0,user,password,campus)}.onSuccess{onVpn()}.onFailure{Repository.message(it.message?:"代理信息无效。")}
                 },modifier=Modifier.fillMaxWidth().height(52.dp),shape=RoundedCornerShape(17.dp)){Icon(if(s.vpn)Icons.Outlined.StopCircle else Icons.Outlined.VpnKey,null);Spacer(Modifier.width(9.dp));Text(if(s.vpn)"断开电脑代理"else"连接并授权 VPN")}
@@ -355,22 +377,22 @@ private val CardShape=RoundedCornerShape(26.dp)
                 }
                 if(!s.sharing){
                     Row(horizontalArrangement=Arrangement.spacedBy(5.dp)){
-                        listOf("mixed" to "混合","http" to "HTTP","socks5" to "SOCKS5").forEach{(id,label)->FilterChip(mode==id,{mode=id},label={Text(label)})}
+                        listOf("mixed" to "混合","http" to "HTTP","socks5" to "SOCKS5").forEach{(id,label)->ChoiceChip(mode==id,{mode=id},label={Text(label)})}
                     }
-                    OutlinedTextField(sharePort,{sharePort=it.filter(Char::isDigit)},label={Text("监听端口")},modifier=Modifier.fillMaxWidth(),singleLine=true,shape=RoundedCornerShape(16.dp))
-                    OutlinedTextField(shareUser,{shareUser=it},label={Text("代理用户名")},modifier=Modifier.fillMaxWidth(),singleLine=true,shape=RoundedCornerShape(16.dp))
+                    MiuixInput(sharePort,{sharePort=it.filter(Char::isDigit)},label={Text("监听端口")},modifier=Modifier.fillMaxWidth(),singleLine=true,shape=RoundedCornerShape(16.dp))
+                    MiuixInput(shareUser,{shareUser=it},label={Text("代理用户名")},modifier=Modifier.fillMaxWidth(),singleLine=true,shape=RoundedCornerShape(16.dp))
                     Setting("使用校园网密码","由后台复用，不显示或复制。更推荐独立的代理密码。",shareCampus){shareCampus=it;sharePass=""}
                     if(!shareCampus){
                         SecretField(sharePass,{sharePass=it},"代理密码",visibleByDefault=true)
-                        TextButton(onClick={sharePass=Protocol.recommendedPassword()}){Text("推荐密码")}
+                        QuietButton(onClick={sharePass=Protocol.recommendedPassword()}){Text("推荐密码")}
                     }
                     Setting("允许局域网设备连接","只监听当前 Wi-Fi IP，不需要填写允许的设备 IP。",lan){lan=it}
                 }else{
                     Text(s.sharingAddress,fontSize=21.sp,fontWeight=FontWeight.SemiBold)
                     Text("服务器：${s.sharingAddress.substringBeforeLast(':')}\n端口：${s.sharingAddress.substringAfterLast(':')}\n代理用户名：${s.sharingUser}",fontSize=14.sp,lineHeight=27.sp)
                     val uri=(if(mode=="http")"http"else"socks5")+"://"+s.sharingAddress
-                    OutlinedButton(onClick={copy(context,uri)}){Icon(Icons.Outlined.ContentCopy,null,Modifier.size(17.dp));Spacer(Modifier.width(8.dp));Text("复制协议链接")}
-                    OutlinedButton(onClick={runCatching{Repository.sharingQr()}.onSuccess{shareQr=it}.onFailure{Repository.message(it.message?:"当前配置不能生成连接二维码")}}){Icon(Icons.Outlined.QrCode,null);Spacer(Modifier.width(8.dp));Text("生成通用连接二维码")}
+                    SecondaryButton(onClick={copy(context,uri)}){Icon(Icons.Outlined.ContentCopy,null,Modifier.size(17.dp));Spacer(Modifier.width(8.dp));Text("复制协议链接")}
+                    SecondaryButton(onClick={runCatching{Repository.sharingQr()}.onSuccess{shareQr=it}.onFailure{Repository.message(it.message?:"当前配置不能生成连接二维码")}}){Icon(Icons.Outlined.QrCode,null);Spacer(Modifier.width(8.dp));Text("生成通用连接二维码")}
                     if(s.sharingSecret)Text("正在使用校园网密码，不提供显示或复制。",fontSize=12.sp)
                     else Repository.displayedSharePassword()?.let{secret->SecretField(secret,{},"本次代理密码",visibleByDefault=true)}
                 }
@@ -378,9 +400,9 @@ private val CardShape=RoundedCornerShape(26.dp)
             Text("HTTP 支持 HTTPS CONNECT，不解密网页内容；SOCKS5 支持 TCP/UDP。认证本身不加密，请仅在可信网络与自己的设备之间使用。网络隔离可能阻止互访，应用不会改变校园网设备配额。",fontSize=12.sp,lineHeight=22.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
-    scanned?.let{p->AlertDialog(onDismissRequest={scanned=null},title={Text("确认连接电脑代理")},text={Text("服务器：${p.host}\n端口：${p.port}\n用户名：${p.username}\n\n二维码包含代理凭据，请只扫描自己电脑生成的配置。")},confirmButton={TextButton(onClick={
+    scanned?.let{p->MiuixPrompt(onDismissRequest={scanned=null},title={Text("确认连接电脑代理")},text={Text("服务器：${p.host}\n端口：${p.port}\n用户名：${p.username}\n\n二维码包含代理凭据，请只扫描自己电脑生成的配置。")},confirmButton={QuietButton(onClick={
         runCatching{Repository.saveVpn(p.host,p.port,p.username,p.password,false)}.onSuccess{host=p.host;port=p.port.toString();user=p.username;password=p.password;campus=false;scanned=null;onVpn()}.onFailure{Repository.message("代理配置保存失败")}
-    }){Text("确认并连接")}},dismissButton={TextButton(onClick={scanned=null}){Text("取消")}})}
+    }){Text("确认并连接")}},dismissButton={QuietButton(onClick={scanned=null}){Text("取消")}})}
     shareQr?.let{payload->ProxyQrDialog(payload,onClose={shareQr=null})}
 }
 @Composable private fun ProxyQrDialog(payload:String,onClose:()->Unit){
@@ -388,10 +410,10 @@ private val CardShape=RoundedCornerShape(26.dp)
         android.graphics.Bitmap.createBitmap(720,720,android.graphics.Bitmap.Config.ARGB_8888).apply{
             val pixels=IntArray(720*720){i->if(matrix[i%720,i/720])android.graphics.Color.BLACK else android.graphics.Color.WHITE};setPixels(pixels,0,720,0,0,720,720)
         }}
-    AlertDialog(onDismissRequest=onClose,properties=androidx.compose.ui.window.DialogProperties(securePolicy=androidx.compose.ui.window.SecureFlagPolicy.SecureOn),containerColor=MaterialTheme.colorScheme.surface,title={Text("扫码连接本机代理")},text={Column(verticalArrangement=Arrangement.spacedBy(12.dp)){
+    MiuixPrompt(onDismissRequest=onClose,properties=androidx.compose.ui.window.DialogProperties(securePolicy=androidx.compose.ui.window.SecureFlagPolicy.SecureOn),containerColor=MaterialTheme.colorScheme.surface,title={Text("扫码连接本机代理")},text={Column(verticalArrangement=Arrangement.spacedBy(12.dp)){
         Image(bitmap.asImageBitmap(),"代理连接二维码",Modifier.fillMaxWidth().aspectRatio(1f))
         Text("二维码含代理密码，请勿公开分享。仅允许自己的可信设备扫描。",fontSize=12.sp)
-    }},confirmButton={TextButton(onClick=onClose){Text("关闭")}})
+    }},confirmButton={QuietButton(onClick=onClose){Text("关闭")}})
 }
 private fun copy(context:Context,text:String){context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("代理地址",text));Repository.message("已复制")}
 
@@ -418,7 +440,7 @@ private fun copy(context:Context,text:String){context.getSystemService(Clipboard
             Text("状态检查间隔",fontWeight=FontWeight.SemiBold)
             Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
                 listOf(5 to "5 秒",10 to "10 秒",120 to "2 分钟").forEach{(n,label)->
-                    FilterChip(s.prefs.interval==n,{Repository.preferences(s.prefs.copy(interval=n))},label={Text(label)})
+                    ChoiceChip(s.prefs.interval==n,{Repository.preferences(s.prefs.copy(interval=n))},label={Text(label)})
                 }
             }
             HorizontalDivider()
@@ -427,28 +449,28 @@ private fun copy(context:Context,text:String){context.getSystemService(Clipboard
             Text("界面主题",fontWeight=FontWeight.SemiBold)
             Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
                 listOf("system" to "跟随系统","light" to "白天","dark" to "夜间").forEach{(id,label)->
-                    FilterChip(s.prefs.theme==id,{Repository.preferences(s.prefs.copy(theme=id))},label={Text(label)})
+                    ChoiceChip(s.prefs.theme==id,{Repository.preferences(s.prefs.copy(theme=id))},label={Text(label)})
                 }
             }
         }
         Panel{
             Text("后台运行",fontSize=18.sp,fontWeight=FontWeight.SemiBold)
             Text(if(notificationsReady&&batteryReady)"通知与后台权限已就绪。"else"允许通知与后台运行有助于保持连接。权限生效后，对应按钮会隐藏。强行停止后仍需手动打开应用。",fontSize=13.sp,lineHeight=23.sp)
-            if(!notificationsReady)OutlinedButton(onClick=onNotifications,modifier=Modifier.fillMaxWidth()){Text("允许通知栏连接入口")}
-            if(!batteryReady)OutlinedButton(onClick={batterySettings(context)},modifier=Modifier.fillMaxWidth()){Text("打开电池与后台设置")}
-            TextButton(onClick=onLogs){Icon(Icons.Outlined.ReceiptLong,null);Spacer(Modifier.width(9.dp));Text("查看运行日志")}
+            if(!notificationsReady)SecondaryButton(onClick=onNotifications,modifier=Modifier.fillMaxWidth()){Text("允许通知栏连接入口")}
+            if(!batteryReady)SecondaryButton(onClick={batterySettings(context)},modifier=Modifier.fillMaxWidth()){Text("打开电池与后台设置")}
+            QuietButton(onClick=onLogs){Icon(Icons.Outlined.ReceiptLong,null);Spacer(Modifier.width(9.dp));Text("查看运行日志")}
         }
         Panel{
             Text("软件更新",fontSize=18.sp,fontWeight=FontWeight.SemiBold)
             Text("当前版本 ${BuildConfig.VERSION_NAME} · Android",fontSize=13.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
-            Button(onClick={checking=true;scope.launch{
+            ActionButton(onClick={checking=true;scope.launch{
                 runCatching{Repository.checkUpdate()}.onSuccess{update=it}.onFailure{Repository.message("更新检测失败，请稍后重试。")}
                 checking=false
             }},enabled=!checking){Text(if(checking)"正在检查…"else"检查 GitHub 新版本")}
             update?.let{u->
                 Text(if(u.newer)"发现新版本 ${u.version}"else"暂未发现更新版本",fontWeight=FontWeight.SemiBold)
                 Markdown(u.notes)
-                if(u.newer&&u.download!=null)OutlinedButton(onClick={AppUpdates.offer(u)}){Text("应用内下载并更新")}
+                if(u.newer&&u.download!=null)SecondaryButton(onClick={AppUpdates.offer(u)}){Text("应用内下载并更新")}
             }
         }
     }
@@ -457,16 +479,16 @@ private fun copy(context:Context,text:String){context.getSystemService(Clipboard
     val update by AppUpdates.state.collectAsStateWithLifecycle()
     val context=LocalContext.current
     val info=update.info
-    if(update.visible&&info!=null)AlertDialog(onDismissRequest=AppUpdates::dismiss,title={Text(if(update.ready)"更新已下载"else"发现新版本 ${info.version}")},text={
+    if(update.visible&&info!=null)MiuixPrompt(onDismissRequest=AppUpdates::dismiss,title={Text(if(update.ready)"更新已下载"else"发现新版本 ${info.version}")},text={
         Column(Modifier.heightIn(max=400.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)){
             Markdown(info.notes)
             Text("安装包将校验应用标识、版本、SHA-256 和签名。安装需要系统确认，不会静默安装或自动卸载旧版。",fontSize=12.sp,lineHeight=20.sp)
             if(update.downloading){LinearProgressIndicator(progress={update.percent/100f},modifier=Modifier.fillMaxWidth());Text("下载中 ${update.percent}%",fontSize=13.sp)}
             if(update.error.isNotEmpty())Text(update.error,fontSize=13.sp,color=MaterialTheme.colorScheme.error)
-            TextButton(onClick={openLink(context,"https://qm.qq.com/q/Rn7B5NBbiK")}){Icon(Icons.Outlined.Groups,null);Spacer(Modifier.width(7.dp));Text("加入 QQ 内测群")}
-            TextButton(onClick={openLink(context,info.url)}){Text("查看 GitHub 发布页")}
+            QuietButton(onClick={openLink(context,"https://qm.qq.com/q/Rn7B5NBbiK")}){Icon(Icons.Outlined.Groups,null);Spacer(Modifier.width(7.dp));Text("加入 QQ 内测群")}
+            QuietButton(onClick={openLink(context,info.url)}){Text("查看 GitHub 发布页")}
         }
-    },confirmButton={TextButton(onClick={if(update.ready)AppUpdates.install()else AppUpdates.download()},enabled=!update.downloading){Text(if(update.ready)"安装更新"else"下载并更新")}},dismissButton={TextButton(onClick=AppUpdates::dismiss){Text("稍后")}})
+    },confirmButton={QuietButton(onClick={if(update.ready)AppUpdates.install()else AppUpdates.download()},enabled=!update.downloading){Text(if(update.ready)"安装更新"else"下载并更新")}},dismissButton={QuietButton(onClick=AppUpdates::dismiss){Text("稍后")}})
 }
 @Composable private fun Markdown(text:String){
     val color=MaterialTheme.colorScheme.onSurface.toArgb()
@@ -478,7 +500,7 @@ private fun copy(context:Context,text:String){context.getSystemService(Clipboard
 @Composable private fun Logs(s:ViewState){
     PageColumn{
         Heading("CONNECTION JOURNAL","日志","只记录脱敏的连接阶段，不记录密码或完整认证网址。")
-        OutlinedButton(onClick=Repository::clearLogs){Text("清空本次日志")}
+        SecondaryButton(onClick=Repository::clearLogs){Text("清空本次日志")}
         Panel{if(s.logs.isEmpty())Text("暂无日志",fontSize=13.sp)else s.logs.reversed().forEach{Text(it,fontSize=12.sp,lineHeight=21.sp)}}
     }
 }
@@ -492,14 +514,14 @@ private fun copy(context:Context,text:String){context.getSystemService(Clipboard
             Text("${BuildConfig.VERSION_NAME} · Android",Modifier.align(Alignment.CenterHorizontally),fontSize=13.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
             Text("让校园网络连接，简单一点。",Modifier.align(Alignment.CenterHorizontally),fontSize=14.sp)
             Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceEvenly){
-                TextButton(onClick={openLink(context,"https://www.xiaohongshu.com/user/profile/60d40af7000000000101f612")}){
+                QuietButton(onClick={openLink(context,"https://www.xiaohongshu.com/user/profile/60d40af7000000000101f612")}){
                     AsyncImage("file:///android_asset/xiaohongshu-logo.svg",null,imageLoader=remember{ImageLoader.Builder(context).components{add(SvgDecoder.Factory())}.build()},modifier=Modifier.width(26.dp).height(16.dp));Spacer(Modifier.width(4.dp));Text("十七号旅客",fontSize=11.sp)}
-                TextButton(onClick={openLink(context,"https://github.com/yuexps")}){GithubIcon();Spacer(Modifier.width(4.dp));Text("GitHub",fontSize=11.sp)}
-                TextButton(onClick={openLink(context,"https://github.com/Hercules-Zhaoziyi/CQUST-WiFi")}){Icon(Icons.Outlined.Code,null,Modifier.size(15.dp));Text("开源项目",fontSize=11.sp)}
+                QuietButton(onClick={openLink(context,"https://github.com/yuexps")}){GithubIcon();Spacer(Modifier.width(4.dp));Text("GitHub",fontSize=11.sp)}
+                QuietButton(onClick={openLink(context,"https://github.com/Hercules-Zhaoziyi/CQUST-WiFi")}){Icon(Icons.Outlined.Code,null,Modifier.size(15.dp));Text("开源项目",fontSize=11.sp)}
             }
             Row(horizontalArrangement=Arrangement.spacedBy(10.dp)){
-                OutlinedButton(onClick={openLink(context,"https://qm.qq.com/q/Rn7B5NBbiK")},modifier=Modifier.weight(1f)){Icon(Icons.Outlined.Groups,null,Modifier.size(17.dp));Spacer(Modifier.width(5.dp));Text("加入内测群",fontSize=12.sp)}
-                OutlinedButton(onClick={openLink(context,"https://cqust-wifi.ziyis.cn/")},modifier=Modifier.weight(1f)){Icon(Icons.Outlined.Language,null,Modifier.size(17.dp));Spacer(Modifier.width(5.dp));Text("软件介绍",fontSize=12.sp)}
+                SecondaryButton(onClick={openLink(context,"https://qm.qq.com/q/Rn7B5NBbiK")},modifier=Modifier.weight(1f)){Icon(Icons.Outlined.Groups,null,Modifier.size(17.dp));Spacer(Modifier.width(5.dp));Text("加入内测群",fontSize=12.sp)}
+                SecondaryButton(onClick={openLink(context,"https://cqust-wifi.ziyis.cn/")},modifier=Modifier.weight(1f)){Icon(Icons.Outlined.Language,null,Modifier.size(17.dp));Spacer(Modifier.width(5.dp));Text("软件介绍",fontSize=12.sp)}
             }
         }
         Panel{
@@ -511,19 +533,19 @@ private fun copy(context:Context,text:String){context.getSystemService(Clipboard
             Text("特别鸣谢",fontSize=18.sp,fontWeight=FontWeight.SemiBold)
             Column{
                 listOf("Gloridust/RuijieWIFI-AutoLogin" to "AutoLogin · 锐捷认证", "Zelm05/campus-autologin" to "campus-autologin · 网络探测", "heiher/hev-socks5-tunnel" to "HevSocks5Tunnel · 转发核心", "yuexps/cqust-schedule-miuix" to "cqust-schedule-miuix · 课程表").forEach{(repo,label)->
-                    TextButton(onClick={openLink(context,"https://github.com/$repo")},contentPadding=PaddingValues(horizontal=0.dp,vertical=2.dp)){GithubIcon();Spacer(Modifier.width(9.dp));Text(label,fontSize=12.sp)}
+                    QuietButton(onClick={openLink(context,"https://github.com/$repo")},contentPadding=PaddingValues(horizontal=0.dp,vertical=2.dp)){GithubIcon();Spacer(Modifier.width(9.dp));Text(label,fontSize=12.sp)}
                 }
             }
             Text("开源许可与依赖说明随源码及应用一并提供。",fontSize=12.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
-            TextButton(onClick={licenses=true}){Text("查看开源许可")}
+            QuietButton(onClick={licenses=true}){Text("查看开源许可")}
         }
         Image(painterResource(R.drawable.school_logo),"重庆科技大学",Modifier.width(215.dp).height(38.dp).align(Alignment.CenterHorizontally),contentScale=ContentScale.Fit)
     }
-    if(licenses)AlertDialog(onDismissRequest={licenses=false},title={Text("开源许可")},text={
+    if(licenses)MiuixPrompt(onDismissRequest={licenses=false},title={Text("开源许可")},text={
         val notices=remember{context.assets.list("licenses").orEmpty().sorted().joinToString("\n\n"){name->
             name+"\n"+context.assets.open("licenses/$name").bufferedReader().use{it.readText()}}}
         Text(notices,Modifier.verticalScroll(rememberScrollState()),fontSize=11.sp,lineHeight=18.sp)
-    },confirmButton={TextButton(onClick={licenses=false}){Text("关闭")}})
+    },confirmButton={QuietButton(onClick={licenses=false}){Text("关闭")}})
 }
 
 @Composable private fun AuthDialog(issue:AuthIssue,onPortal:()->Unit){
@@ -531,25 +553,25 @@ private fun copy(context:Context,text:String){context.getSystemService(Clipboard
     var url by remember(issue){mutableStateOf("")}
     var captcha by remember(issue){mutableStateOf("")}
     var service by remember(issue){mutableStateOf(issue.services.firstOrNull().orEmpty())}
-    AlertDialog(onDismissRequest=Repository::dismissIssue,title={Text("认证帮助")},text={
+    MiuixPrompt(onDismissRequest=Repository::dismissIssue,title={Text("认证帮助")},text={
         Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)){
             Text(issue.message.orEmpty(),fontSize=14.sp,lineHeight=22.sp)
             if(issue.kind=="captcha"){
                 issue.image?.let{bytes->remember(bytes){BitmapFactory.decodeByteArray(bytes,0,bytes.size)}?.let{bitmap->
                     Image(bitmap.asImageBitmap(),"认证验证码",Modifier.fillMaxWidth().height(70.dp).clickable{Repository.refreshCaptcha()},contentScale=ContentScale.Fit)
                 }}
-                TextButton(onClick=Repository::refreshCaptcha){Text("刷新验证码图片")}
-                OutlinedTextField(captcha,{captcha=it},label={Text("验证码")},singleLine=true)
+                QuietButton(onClick=Repository::refreshCaptcha){Text("刷新验证码图片")}
+                MiuixInput(captcha,{captcha=it},label={Text("验证码")},singleLine=true)
             }else{
-                OutlinedButton(onClick=onPortal,modifier=Modifier.fillMaxWidth()){Text("自动读取校园网动态跳转")}
-                TextButton(onClick={openLink(context,"http://aaa.cqust.edu.cn/")}){Text("在浏览器打开官方认证页")}
+                SecondaryButton(onClick=onPortal,modifier=Modifier.fillMaxWidth()){Text("自动读取校园网动态跳转")}
+                QuietButton(onClick={openLink(context,"http://aaa.cqust.edu.cn/")}){Text("在浏览器打开官方认证页")}
                 Text("连接校园 Wi-Fi → 等待浏览器跳转 → 复制完整网址（包含 ? 后内容）→ 粘贴在下方。请勿公开分享认证网址。",fontSize=12.sp,lineHeight=21.sp)
-                OutlinedTextField(url,{url=it},label={Text("完整认证网址")},modifier=Modifier.fillMaxWidth(),maxLines=3)
+                MiuixInput(url,{url=it},label={Text("完整认证网址")},modifier=Modifier.fillMaxWidth(),maxLines=3)
             }
             issue.services.forEach{name->Row(verticalAlignment=Alignment.CenterVertically){RadioButton(service==name,{service=name});Text(name,fontSize=13.sp)}}
         }
-    },confirmButton={TextButton(onClick={Repository.retryAuth(url,service,captcha)},enabled=issue.kind!="captcha"||captcha.isNotBlank()){Text("继续登录")}},
-        dismissButton={TextButton(onClick=Repository::dismissIssue){Text("取消")}})
+    },confirmButton={QuietButton(onClick={Repository.retryAuth(url,service,captcha)},enabled=issue.kind!="captcha"||captcha.isNotBlank()){Text("继续登录")}},
+        dismissButton={QuietButton(onClick=Repository::dismissIssue){Text("取消")}})
 }
 @Composable private fun PortalDialog(onClose:()->Unit,onResult:(String)->Unit){
     var finished by remember{mutableStateOf(false)}
@@ -561,7 +583,7 @@ private fun copy(context:Context,text:String){context.getSystemService(Clipboard
         if(!bound)Repository.message("未找到校园 Wi-Fi，请连接后重新打开认证页。")
         onDispose{if(bound&&cm.boundNetworkForProcess==wifi)cm.bindProcessToNetwork(previous)}
     }
-    AlertDialog(onDismissRequest=onClose,title={Text("读取官方认证跳转")},text={
+    MiuixPrompt(onDismissRequest=onClose,title={Text("读取官方认证跳转")},text={
         Column{
             Text("仅打开学校认证页面，不向页面注入账号密码。捕获完整网址后会自动返回。",fontSize=12.sp,lineHeight=20.sp)
             AndroidView(factory={context->WebView(context).apply{
@@ -586,5 +608,5 @@ private fun copy(context:Context,text:String){context.getSystemService(Clipboard
             }},modifier=Modifier.fillMaxWidth().height(250.dp),
                 onRelease={it.stopLoading();it.clearHistory();it.destroy()})
         }
-    },confirmButton={TextButton(onClick=onClose){Text("关闭")}})
+    },confirmButton={QuietButton(onClick=onClose){Text("关闭")}})
 }
