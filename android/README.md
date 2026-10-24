@@ -1,45 +1,54 @@
 # CQUST Wi-Fi Android
 
-原生 Kotlin / Jetpack Compose 安卓客户端，当前为 **1.0.0-beta02 开发测试版**。不修改桌面端版本号。
+当前版本：**1.1.0-beta01**（versionCode 3）。原生 Kotlin / Compose / Miuix 客户端，保留校园网与代理功能，并完整整合获授权的课表模块。
 
-## 功能
+## 校园网与设备互联
 
-- 校园网自动探测、动态认证参数/RSA、验证码、手动网址补充。
-- 登录/下线、状态检测、可选自动登录和掉线重连、多账号切换。
-- Android Keystore AES-GCM 加密保存凭据，关闭系统备份。
-- 20 个校园常用网站、本地图标、深浅色主题、动效、日志。
-- GitHub Android 更新检测与 Markdown 更新说明、软件介绍和内测群入口。
-- 用户授权的 SOCKS5 VPN 客户端：连接电脑端局域网代理，转发公网 TCP/UDP；校内/私有网络直连。
-- 默认关闭的 HTTP / HTTPS CONNECT / SOCKS5 局域网代理服务，要求账号密码认证。
-- 前台通知服务，不注册开机自启。主题默认跟随系统。
-- 共用一个账号密码入口，校园网／课表认证独立调度；课表不依赖校园网付费开通状态。
-- 课表支持理论与实践课程同步、离线缓存、周视图、课程详情和校历日期设置。认证及解析经所有者授权整合自 yuexps/cqust-schedule-miuix，未移植该项目的桌面小组件、日历导出和勿扰自动化。
-- 代理配置支持扫描通用二维码、确认后连接；安卓本机共享和 Windows 端都可生成相同格式的二维码。
+- 共用一个学校账号密码入口；校园网与课表独立认证，仅看课表不要求开通校园网上网服务。
+- Wi-Fi 定向认证、动态认证参数、验证码、自动登录与静默重连、多账号管理及安全凭据。
+- HTTP / HTTPS CONNECT / SOCKS5 本机共享，局域网密码认证，动态 IP 变化后安全停止旧监听。
+- 用户授权的 SOCKS5 VPN/TUN：公网 TCP/UDP 与 DNS 转发、校内私网直连；可手动配置或扫描通用二维码。
+- 扫码入口固定在两个代理分栏上方；自定义全屏扫码页支持相机、相册与手动填写，不保存或上传相机画面。
+- 设置、权限状态检测、GitHub 更新弹窗、Markdown 简介、应用内下载校验与系统确认安装、QQ 内测群入口。
 
-## 开发与测试
+## 完整课表模块
 
-需要 JDK 17、Android SDK 35、Gradle 8.9；Android 10（API 29）及以上。
+授权来源：[yuexps/cqust-schedule-miuix](https://github.com/yuexps/cqust-schedule-miuix)，固定参考提交 `b9e4cf6379615882e2d29638662b49b926982fd0`。保留原包名与来源，不为上游另行指定通用许可证。
+
+- 理论课、实践课、未排课、学期选择、课程总览及搜索。
+- 周视图、课程详情、校历与周次、课程配色和自定义壁纸。
+- 本地调课、停课、课程交换与记录撤销；不会修改学校教务系统的正式排课。
+- 课前通知、精确闹钟、课中静音／勿扰与下课恢复。
+- 系统日历同步、桌面课表小组件、校内建筑地图导航。
+- 完整课表设置、权限管理和高级测试选项。
+- 课程页隐藏宿主品牌栏；课表与宿主共用主题、登录入口、更新与关于入口。
+
+提醒、自动化与日历同步默认关闭，权限由用户在系统界面授权。校园网不会因课表后台任务而自动开机登录。后台保活和闹钟准时性仍受设备省电与系统策略影响。
+
+## 安全与迁移
+
+- 兼容已核实学校官方主机的 HTTP / HTTPS 与 CAS 跳转，拒绝未知主机、非预期端口与带嵌入凭据的地址；HTTPS 证书校验保持开启。
+- 学校部分教务地址使用 HTTP，并非加密传输；请仅在可信网络中使用。不会通过全局“信任所有证书”来消除错误。
+- Cookie 按域名、路径、Secure 和有效期隔离；保留密码原始输入，不删除首尾空格。
+- 账号密码由 Android Keystore / AES-GCM 加密保存；用户取消记住或移除账号时同步处理课表与校园网的保存凭据。
+- 课表转为应用私有 Room 数据库，禁止系统云备份。旧 `schedule.enc` 自动迁移并保留原文件；解析失败不以空课表覆盖已有数据。
+- VPN 与本机共享互斥。代理二维码包含凭据，仅供本人可信设备使用，不公开传播。
+- 固定发布签名仅本机保管；CI 只生成无签名 release APK。beta02 可同签名覆盖升级；beta01 旧 debug 签名需自行卸载重装，旧数据会清除。详见 SIGNING.md。
+
+## 构建与检查
+
+需要 JDK 21、Android SDK 37.0、Build Tools 37.0.0、Gradle 9.7.1。最低 Android 10（API 29），targetSdk 35；对 Android 12 及以上专属权限保留版本判断。
 
 ```sh
-./gradlew :app:testDebugUnitTest :app:assembleDebug :app:assembleAndroidTest
+./gradlew :schedule:testDebugUnitTest :app:testDebugUnitTest :app:assembleDebug :app:assembleRelease
 ```
 
-仓库 `.github/workflows/android-build.yml` 可手动构建。CI 生成无签名 release APK，再由维护者在本机使用固定密钥签名；CI 不持有签名私钥或密码。测试 APK 使用 debug key，仅用于模拟器测试，不作为发布安装包。仍需真实校园网与不同品牌手机测试，不能承诺后台永久驻留。启用 VPN 必须由用户在系统授权页同意；启动时不会自动申请权限。
+- `app/`：CQUST 宿主、Miuix 控件、校园网、代理、扫码、更新及旧缓存迁移。
+- `schedule/`：完整课表界面、Room / DataStore、解析、日历、微件与自动化。
+- `vpnprobe/`：仅 CI 使用的独立 UID 网络探测应用，不作为用户安装包发布。
+- `.github/workflows/android-build.yml`：候选编译、单元测试、可选设备回归及截图。
+- `app/src/main/assets/licenses/`：完整许可与来源声明。
 
-Windows 使用 `gradlew.bat`；Android Studio 可直接打开本目录。Gradle 发行包与官方 wrapper JAR 均校验 SHA-256；wrapper JAR 为 `498495120a03b9a6ab5d155f5de3c8f0d986a449153702fb80fc80e134484f17`。
+Miuix 依赖锁定为 0.9.4-rc01；API 以该版本源码及官方文档为准，不自动追随快照版本。Hev Socks5 Tunnel 2.19.1 AAR SHA-256：`107958f7a07051386248ba8dba778b63d8dcefdfb2c3665b0ee9a8c93de5f6ca`。
 
-从 beta02 起采用本机保管的固定发布签名。beta01 为旧 debug 签名，无法覆盖升级到 beta02，需要用户确认后自行卸载重装（会清除旧账号缓存）；本应用不会自动卸载或清除数据。beta02 以后的同签名版本支持应用内下载安装更新。不要将密钥或密码提交到 GitHub；保管好签名备份。
-
-## 安全与使用边界
-
-- 认证凭据只发送给经过校验的学校认证主机；探测不使用系统代理，绑定 Wi-Fi 的 DNS 和 socket。
-- 持久凭据加密；VPN 运行期间原生库需要 app 私有、禁止备份目录内的临时明文配置，停用后删除。不得导出该目录或日志中的敏感数据。
-- SOCKS5/HTTP 代理不是加密隧道，只用于可信局域网；请优先使用独立代理密码，不要复用校园网密码。遵守校园网络使用规则。
-- VPN 与本机代理共享互斥，避免流量回环；VPN 排除本应用以维持认证与上游连接。系统 Wi-Fi HTTP 代理应关闭。
-- 原生 VPN 依赖 Hev Socks5 Tunnel 2.19.1，锁定 AAR SHA-256：`107958f7a07051386248ba8dba778b63d8dcefdfb2c3665b0ee9a8c93de5f6ca`。完整许可见 `app/src/main/assets/licenses/`。
-
-## 借鉴与依赖
-
-参考 [Zelm05/campus-autologin](https://github.com/Zelm05/campus-autologin) 的 Wi-Fi 定向探测、网络事件驱动和移动端信息分层思路，保留本项目品牌和动态认证实现，不照搬其固定认证参数。
-
-原生转发库：[heiher/hev-socks5-tunnel](https://github.com/heiher/hev-socks5-tunnel/tree/2.19.1)（MIT），包含 hev-task-system、hev-socks5-core、yaml（MIT）、lwIP（BSD）。Compose/AndroidX、OkHttp、Jsoup、Coil、Markwon 的许可证由各上游项目提供。
+本项目为非学校官方工具，使用本人有权限的账号并遵守校园网络规则。模拟器测试不能替代实际校园环境和真机验证。
