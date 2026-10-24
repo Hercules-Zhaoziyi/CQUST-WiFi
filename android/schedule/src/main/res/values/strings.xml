@@ -1,0 +1,369 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 应用基础信息 -->
+    <string name="app_name">重科课表</string>
+    <string name="school_name">重庆科技大学</string>
+
+    <!-- 通用操作与词汇 -->
+    <string name="common_back">返回</string>
+    <string name="common_confirm">确定</string>
+    <string name="common_cancel">取消</string>
+    <string name="common_year_suffix">年</string>
+    <string name="common_month_suffix">月</string>
+    <string name="common_day_suffix">日</string>
+    <string name="common_monday_format">(第 1 周周一)</string>
+
+    <!-- 星期名称 -->
+    <string name="day_monday">周一</string>
+    <string name="day_tuesday">周二</string>
+    <string name="day_wednesday">周三</string>
+    <string name="day_thursday">周四</string>
+    <string name="day_friday">周五</string>
+    <string name="day_saturday">周六</string>
+    <string name="day_sunday">周日</string>
+    <string name="day_number_format">周%1$d</string>
+    <string name="day_mon_short">一</string>
+    <string name="day_tue_short">二</string>
+    <string name="day_wed_short">三</string>
+    <string name="day_thu_short">四</string>
+    <string name="day_fri_short">五</string>
+    <string name="day_sat_short">六</string>
+    <string name="day_sun_short">日</string>
+
+    <!-- 课表主界面 -->
+    <string name="schedule_title_week_format">第 %1$d 周</string>
+    <string name="schedule_header_date_format">%1$d/%2$d/%3$d</string>
+    <string name="schedule_date_short_format">%1$d/%2$d</string>
+    <string name="schedule_subtitle_current_week">%1$s  %2$s</string>
+    <string name="schedule_subtitle_browsing_week">%1$s  当前为%2$s</string>
+    <string name="schedule_subtitle_vacation">%1$s  假期中</string>
+    <string name="schedule_action_sync">同步课表</string>
+    <string name="sync_success_format">课表同步成功 课程：%1$d 门，实践：%2$d 门</string>
+    <string name="sync_failed_default">同步失败</string>
+    <string name="course_overview_practice_items_format">共 %1$d 个实验项目</string>
+    <string name="schedule_action_import">导入课表</string>
+    <string name="schedule_action_settings">设置</string>
+    <string name="schedule_grid_unarranged_title">待安排课程</string>
+    <string name="schedule_grid_unarranged_desc">未安排固定时段或教室的课程</string>
+
+    <!-- 周次选择抽屉 -->
+    <string name="week_selector_title">选择教学周次</string>
+    <string name="week_selector_current_with_count">本周 · %1$d节</string>
+    <string name="week_selector_current_only">本周</string>
+    <string name="week_selector_count_format">%1$d 节课</string>
+    <string name="week_selector_no_course">无课程</string>
+    <string name="week_selector_week_format">第 %1$d 周</string>
+
+    <!-- 课程详情弹窗抽屉 -->
+    <string name="course_sheet_title_format">课程详情 (%1$d/%2$d)</string>
+    <string name="course_sheet_title_single">课程详情</string>
+    <string name="course_sheet_label_location">上课地点</string>
+    <string name="course_sheet_label_weeks">行课周次</string>
+    <string name="course_sheet_label_teacher">任课教师</string>
+    <string name="course_sheet_label_time">上课时间</string>
+    <string name="course_sheet_label_category">课程性质</string>
+    <string name="course_sheet_label_credit">课程学分</string>
+    <string name="course_sheet_label_code">课程序号</string>
+    <string name="course_sheet_label_student_count">班级人数</string>
+    <string name="course_sheet_label_course_type">课程类型</string>
+    <string name="course_sheet_label_selected_count">已选人数</string>
+    <string name="course_sheet_label_project">实践项目</string>
+    <string name="course_type_practical">实践教学</string>
+    <string name="course_sheet_unspecified">未注明</string>
+    <string name="course_sheet_not_assigned">未指定</string>
+    <string name="course_sheet_count_format">%1$d 人</string>
+    <string name="course_sheet_practice_unarranged">待定课程</string>
+
+    <!-- 地图导航与路径规划 -->
+    <string name="map_navigate_title">步行导航</string>
+    <string name="map_navigate_destination_label">目的地</string>
+    <string name="map_app_amap">高德地图</string>
+    <string name="map_app_baidu">百度地图</string>
+    <string name="map_app_tencent">腾讯地图</string>
+    <string name="map_no_location_toast">暂无可导航的上课地点</string>
+    <string name="map_no_supported_app_toast">未检测到高德地图、百度地图或腾讯地图</string>
+    <string name="map_open_error">调起地图应用失败</string>
+
+    <!-- 教务登录页面 -->
+    <string name="login_title">教务登录</string>
+    <string name="login_header_school_name">重庆科技大学</string>
+    <string name="login_header_sync_desc">教务系统课表同步与查看</string>
+    <string name="login_student_id_label">学号</string>
+    <string name="login_password_label">密码</string>
+    <string name="login_show_password">显示密码</string>
+    <string name="login_hide_password">隐藏密码</string>
+    <string name="login_button_text">登录并同步</string>
+    <string name="login_progress_default">正在登录并同步...</string>
+    <string name="login_error_empty_student_id">请输入学号</string>
+    <string name="login_error_empty_password">请输入教务密码</string>
+    <string name="login_connecting_hint">正在连接教务系统...</string>
+    <string name="login_failed_general">登录失败，请检查网络或账号密码</string>
+    <string name="login_disclaimer">当前周次依据行课起始日期推算，请自行对照校历校准。\n本课表仅供参考，不保证实时准确，请以教务处通知为准！\n本工具由个人独立开发，非学校官方发布。\n本程序仅用于技术交流学习，禁止滥用！\n数据仅保存在当前设备本地，保障隐私安全。</string>
+
+    <!-- 设置主页面 -->
+    <string name="settings_title">设置</string>
+    <string name="settings_login_prompt">点击登录教务账号</string>
+    <string name="settings_login_sub_prompt">重庆科技大学 · 同步完整学期课表</string>
+    <string name="settings_avatar_default">登</string>
+    <string name="settings_overview_entry">课程总览 ›</string>
+    <string name="settings_current_semester_entry">当前学期 ›</string>
+    <string name="settings_section_general">课表常规</string>
+    <string name="settings_item_start_date">行课起始日期</string>
+    <string name="settings_item_personalization">个性化设置</string>
+    <string name="settings_desc_personalization">壁纸、课程配色自定义</string>
+    <string name="settings_section_notifications">通知与自动化</string>
+    <string name="settings_item_pre_class_reminder">课前通知提醒</string>
+    <string name="settings_desc_pre_class_reminder">上课前发送横幅通知课程与地点</string>
+    <string name="settings_item_calendar_sync">同步日历日程</string>
+    <string name="settings_desc_calendar_sync">将课表导入手机系统日历</string>
+    <string name="settings_item_class_automation">自动化功能</string>
+    <string name="settings_desc_class_automation">上课期间自动切换为勿扰或静音</string>
+    <string name="settings_item_permission_management">权限管理</string>
+    <string name="settings_desc_permission_management">通知、日历、闹钟、勿扰与后台保活权限</string>
+    <string name="settings_dialog_logout_title">退出登录</string>
+    <string name="settings_dialog_logout_message">注销后将清除本地保存的账号信息与当前课表缓存，确定退出吗？</string>
+    <string name="settings_sheet_switch_semester">切换学期</string>
+    <string name="settings_semester_display_format">%1$s学年 第%2$s学期</string>
+    <string name="settings_semester_code_format">学期代码: %1$s</string>
+    <string name="settings_dialog_set_start_date">设置行课起始日期</string>
+    <string name="settings_auto_calibrate_monday_hint">系统将自动校准为当周周一 (%1$s)</string>
+
+    <!-- 日历同步子页面 -->
+    <string name="calendar_sync_title">同步日历日程</string>
+    <string name="calendar_sync_item_now">立即同步至系统日历</string>
+    <string name="calendar_sync_desc_now">将本学期全部课程写入手机系统日历</string>
+    <string name="calendar_sync_item_auto">课表更新时自动同步</string>
+    <string name="calendar_sync_desc_auto">从教务拉取新课表后自动刷新日历事件</string>
+    <string name="calendar_sync_item_remind">日历提前提醒</string>
+    <string name="calendar_sync_remind_format">提前 %1$d 分钟</string>
+    <string name="calendar_sync_permission_needed_toast">需要系统日历权限才能同步日程</string>
+    <string name="calendar_sync_success_toast">已成功同步至系统日历</string>
+    <string name="calendar_sync_fail_toast">同步失败，请检查行课起始日期是否正确</string>
+    <string name="calendar_sync_account_hint">课程将写入独立的“重科课表”日历账户，支持在系统日历中随时开启或隐藏，不影响个人日程。</string>
+    <string name="calendar_delete_item_title">删除系统日历日程</string>
+    <string name="calendar_delete_desc">从手机系统日历中移除已同步的全部课程</string>
+    <string name="calendar_delete_dialog_title">删除系统日历日程</string>
+    <string name="calendar_delete_dialog_message">确定要从系统日历中删除所有已同步的课程日程和“重科课表”日历账户吗？此操作不会影响应用内课表。</string>
+    <string name="calendar_delete_dialog_confirm">删除</string>
+    <string name="calendar_delete_success_toast">已从系统日历中删除课程日程与账户</string>
+    <string name="calendar_delete_fail_toast">删除失败，请检查日历权限</string>
+    <string name="calendar_event_desc_adjusted">【临时调课安排】</string>
+    <string name="calendar_event_desc_teacher_format">教师: %1$s</string>
+
+    <!-- 课前提醒设置子页面 -->
+    <string name="reminder_title">课前通知提醒</string>
+    <string name="reminder_switch_title">课前通知提醒</string>
+    <string name="reminder_switch_desc">在上课前发送横幅通知，提醒课程与地点</string>
+    <string name="reminder_time_title">提前提醒时间</string>
+    <string name="reminder_permission_notice_toast">未开启通知权限，可能无法收到提醒</string>
+    <string name="reminder_test_immediate_title">立即发送测试通知</string>
+    <string name="reminder_test_immediate_desc">模拟发送一条课前提醒通知以测试横幅效果</string>
+    <string name="reminder_test_delayed_title">后台测试通知</string>
+    <string name="reminder_test_delayed_desc">设定60秒后闹钟唤醒，可杀掉后台测试自启动通知</string>
+    <string name="reminder_test_delayed_scheduled_toast">已设定60秒后闹钟唤醒，现在可以杀掉后台测试</string>
+    <string name="reminder_test_sent_toast">已发送测试通知，请查看通知栏</string>
+    <string name="reminder_test_alarm_permission_toast">请先开启精确闹钟权限</string>
+    <string name="reminder_hint_text">为确保手机息屏休眠时能准时弹出通知，请前往“权限管理”开启精确闹钟与自启动权限。</string>
+
+    <!-- 课中自动化子页面 -->
+    <string name="automation_title">自动化功能</string>
+    <string name="automation_switch_title">课中自动化</string>
+    <string name="automation_switch_desc">上课自动调整系统状态，下课后恢复</string>
+    <string name="automation_mode_title">控制模式</string>
+    <string name="automation_mode_silent">自动静音 / 振动</string>
+    <string name="automation_mode_dnd">勿扰模式 (DND)</string>
+    <string name="automation_test_immediate_title">立即测试切换模式</string>
+    <string name="automation_test_immediate_desc">立即切换为静音/勿扰，10秒后自动恢复正常</string>
+    <string name="automation_test_delayed_title">后台切换模式测试</string>
+    <string name="automation_test_delayed_desc">设定30秒后闹钟唤醒切换模式，30秒后恢复，可杀掉后台测试</string>
+    <string name="automation_test_immediate_toast">已切换为测试模式，10秒后将自动恢复</string>
+    <string name="automation_test_delayed_scheduled_toast">已设定30秒后闹钟唤醒，现在可以杀掉后台测试</string>
+    <string name="automation_test_dnd_permission_toast">请先开启勿扰策略权限</string>
+    <string name="automation_test_alarm_permission_toast">请先开启精确闹钟权限</string>
+    <string name="automation_hint_text">需在“权限管理”中开启精确闹钟与后台运行权限，以确保准时生效。\n• 自动静音：上课期间切换为静音或振动，下课后恢复正常响铃；\n• 勿扰模式：上课期间屏蔽通知与来电打扰，下课后自动关闭勿扰。</string>
+    <string name="channel_audio_control_service">课中自动化</string>
+    <string name="notification_audio_control_running">正在切换静音模式…</string>
+
+    <!-- 权限管理子页面 -->
+    <string name="perm_title">权限管理</string>
+    <string name="perm_notification_title">通知权限</string>
+    <string name="perm_notification_granted">已开启 · 允许发送课前提醒通知</string>
+    <string name="perm_notification_denied">未开启 · 点击前往系统设置开启</string>
+    <string name="perm_exact_alarm_title">精确闹钟权限</string>
+    <string name="perm_exact_alarm_granted">已开启 · 息屏休眠时准时唤醒执行自动化</string>
+    <string name="perm_exact_alarm_denied">未开启 · 点击前往允许设置精确闹钟</string>
+    <string name="perm_calendar_title">系统日历权限</string>
+    <string name="perm_calendar_granted">已开启 · 允许读写系统日历日程</string>
+    <string name="perm_calendar_denied">未开启 · 点击请求授权日历读写权限</string>
+    <string name="perm_dnd_title">勿扰策略访问权限</string>
+    <string name="perm_dnd_granted">已开启 · 允许课中自动切换静音或勿扰模式</string>
+    <string name="perm_dnd_denied">未开启 · 课中自动静音与勿扰需要此权限</string>
+    <string name="perm_autostart_title">自启动权限</string>
+    <string name="perm_autostart_desc">允许应用开机及后台准时刷新数据</string>
+    <string name="perm_battery_title">后台运行权限</string>
+    <string name="perm_battery_granted">已开启 · 避免被系统省电策略休眠</string>
+    <string name="perm_battery_denied">未开启 · 点击前往允许后台无限制运行</string>
+    <string name="perm_hint_text">说明：小米、荣耀、OPPO、vivo 等系统具有较严格的后台省电策略，建议开启自启动并将省电策略设为“无限制”，以确保每天课前提醒与课中自动化准时生效。</string>
+    <string name="perm_show_test_features_title">测试功能</string>
+    <string name="perm_show_test_features_desc">用于联调的模拟测试项</string>
+
+    <!-- 课程总览与详情页面 -->
+    <string name="course_overview_title">课程总览</string>
+    <string name="course_overview_credit_format">%1$s 学分</string>
+    <string name="course_summary_prefix">本学期共 </string>
+    <string name="course_summary_unit_courses"> 门课程，</string>
+    <string name="course_summary_unit_slots"> 个时段</string>
+    <string name="course_summary_prefix_credits"> · 累计 </string>
+    <string name="course_summary_unit_credits"> 学分</string>
+    <string name="course_empty_data">暂无已同步的课程数据</string>
+    <string name="course_label_classroom">教室</string>
+    <string name="course_pending_location">待定</string>
+    <string name="course_pending_practice">待定</string>
+    <string name="course_practice_training">待定</string>
+    <string name="course_section_format">第 %1$d-%2$d 节</string>
+    <string name="course_time_format">%1$s 第 %2$d-%3$d 节</string>
+    <string name="course_overview_badge_combined">理论 + 实践</string>
+    <string name="course_overview_section_theory">理论教学</string>
+    <string name="course_overview_section_practical">实践教学</string>
+
+    <!-- 小组件 -->
+    <string name="widget_schedule_name">课程表</string>
+    <string name="widget_brand_name">重科</string>
+    <string name="widget_kaomoji_happy">( // \' ▽ \' // )</string>
+    <string name="widget_no_courses_today">今天没有课啦</string>
+    <string name="widget_date_format">%1$d.%2$d</string>
+    <string name="widget_preview_date">10.15</string>
+    <string name="widget_preview_weekday">周三</string>
+    <string name="widget_preview_course1_name">高等数学</string>
+    <string name="widget_preview_course1_room">笃行楼 201 张老师</string>
+    <string name="widget_preview_course1_time">08:00 - 09:40</string>
+    <string name="widget_preview_course2_name">大学物理</string>
+    <string name="widget_preview_course2_time_room">10:00 慎思楼 305</string>
+
+    <!-- 通知 -->
+    <string name="item_course_reminder">上课前提醒</string>
+    <string name="notification_unknown_course">未知课程</string>
+    <string name="notification_unknown_position">未知地点</string>
+    <string name="notification_live_status_preparing">准备上课</string>
+    <string name="notification_location_format">地点: %1$s</string>
+    <string name="notification_teacher_format">教师: %1$s</string>
+    <string name="notification_class_starting">即将开始上课</string>
+
+    <!-- 个性化设置子页面 -->
+    <string name="personalization_title">个性化设置</string>
+    <string name="personalization_section_wallpaper">课表壁纸</string>
+    <string name="personalization_wallpaper_select">选择壁纸</string>
+    <string name="personalization_wallpaper_change">更换壁纸</string>
+    <string name="personalization_wallpaper_clear">清除壁纸</string>
+    <string name="personalization_wallpaper_custom_status">已设置自定义壁纸</string>
+    <string name="personalization_wallpaper_default_status">未设置壁纸</string>
+    <string name="personalization_wallpaper_mask_dim_title">壁纸暗度: %1$d%%</string>
+    <string name="personalization_card_alpha_title">课程卡片不透明度: %1$d%%</string>
+    <string name="personalization_section_palette">课程配色</string>
+    <string name="personalization_color_dialog_title">编辑色块 #%1$d</string>
+    <string name="personalization_color_reset_slot">恢复此色</string>
+    <string name="personalization_wallpaper_set_success">课表壁纸已更新</string>
+    <string name="personalization_wallpaper_set_fail">壁纸设置失败，请重试</string>
+    <string name="personalization_wallpaper_clear_success">已清除课表壁纸</string>
+
+    <!-- 壁纸框选器 -->
+    <string name="crop_wallpaper_title">选取显示区域</string>
+    <string name="crop_wallpaper_loading">正在载入图像…</string>
+
+    <!-- 课程编辑二级页面与三级页面 -->
+    <!-- 二级页面：功能菜单 -->
+    <string name="course_edit_menu_title">课程选项</string>
+    <string name="course_edit_menu_color">课程配色</string>
+    <string name="course_edit_menu_color_desc">更改课程外观与主题色彩</string>
+    <string name="course_edit_menu_adjust">课程调整</string>
+    <string name="course_edit_menu_adjust_desc">调整上课周次、星期、节次或标记删除</string>
+    <string name="course_edit_menu_records">调课记录</string>
+    <string name="course_edit_menu_records_desc">查看或恢复本学期已调整的课程</string>
+
+    <!-- 三级页面 1：课程配色 -->
+    <string name="course_pick_color_title">课程配色</string>
+    <string name="course_pick_color_summary">为「%1$s」选择配色编号</string>
+
+    <!-- 三级页面 2：课程调整 -->
+    <string name="course_edit_adjust_title">课程调整</string>
+    <string name="course_edit_current_course_title">当前课程</string>
+    <string name="course_edit_current_course_desc">第%1$d周 · %2$s · 第%3$d-%4$d节</string>
+    <string name="course_edit_mode_title">处理方式</string>
+    <string name="course_edit_mode_move">移动</string>
+    <string name="course_edit_mode_swap">调换</string>
+    <string name="course_edit_mode_delete">删除</string>
+    <string name="course_edit_target_week">目标周次</string>
+    <string name="course_edit_target_day">目标星期</string>
+    <string name="course_edit_target_sections">目标节次</string>
+    <string name="course_edit_target_location">目标地点</string>
+    <string name="course_edit_target_location_hint">输入教室或地点</string>
+    <string name="course_edit_hint_move_valid">目标时段为空闲，可安全移动</string>
+    <string name="course_edit_hint_move_invalid">目标时段已有课程《%1$s》，不能移动！请切换为「调换」或更改目标时段</string>
+    <string name="course_edit_hint_swap_valid">将与《%1$s》（%2$s 第%3$d-%4$d节 @%5$s）互换时段</string>
+    <string name="course_edit_hint_swap_invalid">目标时段暂无课程，无法调换！若想排入空闲时段请选择「移动」</string>
+    <string name="course_edit_hint_swap_span_mismatch">两门课程节次长度不一致（%1$d节 vs %2$d节），无法直接调换</string>
+    <string name="course_edit_hint_delete">标记删除（%1$s 第%2$d-%3$d节）,不影响其他课</string>
+    <string name="course_edit_btn_restore">恢复默认排课</string>
+    <string name="course_tag_adjusted">调</string>
+
+    <string name="course_section_range_1_2">1-2节</string>
+    <string name="course_section_range_3_4">3-4节</string>
+    <string name="course_section_range_5_6">5-6节</string>
+    <string name="course_section_range_7_8">7-8节</string>
+    <string name="course_section_range_9_10">9-10节</string>
+    <string name="course_section_range_1_4">1-4节</string>
+    <string name="course_section_range_5_8">5-8节</string>
+
+    <!-- 三级页面 3：调课记录列表抽屉 -->
+    <string name="adjustments_screen_title">调课记录</string>
+    <string name="adjustments_action_clear_all">一键清除</string>
+    <string name="adjustments_empty_title">暂无调课记录</string>
+    <string name="adjustments_original_label">原：第%1$d周 %2$s 第%3$d-%4$d节 @%5$s</string>
+    <string name="adjustments_target_label">现：第%1$d周 %2$s 第%3$d-%4$d节 @%5$s</string>
+    <string name="adjustments_suspended_desc">已停课（第%1$d周 %2$s 第%3$d-%4$d节）</string>
+    <string name="adjustments_restore_single">恢复原课</string>
+    <string name="adjustments_clear_dialog_title">清除全部调课记录</string>
+    <string name="adjustments_clear_dialog_message">确定要一键清除所有调课记录吗？所有课程将恢复为默认排课。</string>
+
+    <!-- 调试与测试文案 -->
+    <string name="test_notification_title">[测试] %1$s</string>
+    <string name="test_notification_wakeup_title">[60s唤醒测试] %1$s</string>
+    <string name="test_course_default_name">高等数学</string>
+    <string name="test_course_default_location">教学主楼</string>
+    <string name="test_course_default_teacher">任课教师</string>
+
+    <!-- 关于页面与检查更新 -->
+    <string name="settings_section_about">关于</string>
+    <string name="settings_item_about">关于应用</string>
+    <string name="settings_desc_about">版本信息、GitHub仓库与交流反馈</string>
+    <string name="about_title">关于</string>
+    <string name="about_version_format">版本 %1$s</string>
+    <string name="about_item_repo">GitHub仓库</string>
+    <string name="about_desc_repo">yuexps/cqust-schedule-miuix</string>
+    <string name="about_item_check_update">检查更新</string>
+    <string name="about_desc_check_update_idle">点击检查最新版本</string>
+    <string name="about_desc_check_update_checking">正在检查更新…</string>
+    <string name="about_desc_check_update_latest">当前已是最新版本</string>
+    <string name="about_update_has_new">发现新版本 %1$s</string>
+    <string name="about_item_qq_group">QQ交流群</string>
+    <string name="about_desc_qq_group">重科课表 (767082393)</string>
+    <string name="about_item_disclaimer">说明</string>
+    <string name="about_update_dialog_btn_download">立即下载</string>
+    <string name="about_update_dialog_btn_later">稍后再说</string>
+    <string name="about_update_check_failed">检查更新失败: %1$s</string>
+    <string name="about_update_already_latest">当前已是最新版本 (%1$s)</string>
+    <string name="about_qq_group_copied_toast">未检测到手机QQ，已复制群号 (767082393) 到剪贴板</string>
+    <string name="about_qq_group_copy_label">重科课表QQ交流群</string>
+    <string name="about_browser_open_failed">无法打开浏览器，请检查系统设置</string>
+    <string name="about_download_started_toast">已启动系统下载，请在通知栏查看进度</string>
+    <string name="about_download_notification_title">重科课表 %1$s</string>
+    <string name="about_download_notification_desc">正在下载安装包…</string>
+    <string name="about_install_started_toast">安装包下载完成，正在调起安装…</string>
+    <string name="about_apk_already_downloaded_toast">检测到安装包已就绪，正在调起安装…</string>
+    <string name="about_install_failed_toast">无法打开安装包，请在文件管理器中手动安装</string>
+    <string name="about_install_permission_tip">请允许安装未知应用以完成版本更新</string>
+    <string name="about_error_network_timeout">连接超时，请检查网络后重试</string>
+    <string name="about_error_rate_limited">接口访问频繁，请稍后再试</string>
+    <string name="about_error_network_failed">网络连接异常，请检查网络设置</string>
+    <string name="about_fallback_to_github_toast">Gitee 通道失败，降级 GitHub</string>
+</resources>

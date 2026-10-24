@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 小组件浅色模式色彩系统 -->
+    <color name="widget_card_bg">#FFFFFF</color>
+    <color name="widget_text_primary">#1D2129</color>
+    <color name="widget_text_secondary">#86909C</color>
+    <color name="widget_text_tertiary">#B4B9C2</color>
+    <color name="widget_preview_indicator_1">#0D84FF</color>
+    <color name="widget_preview_indicator_2">#34C759</color>
+</resources>

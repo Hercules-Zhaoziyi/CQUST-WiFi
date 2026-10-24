@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- 几何互锁结构：左下半部 -->
+    <path
+        android:fillColor="#FF212429"
+        android:pathData="M43.5,31 L51,26.7 L51,74.5 L54,83 L29,68.5 L29,39.5 L36.5,35.2 L36.5,64.2 L43.5,68.2 Z" />
+
+    <!-- 几何互锁结构：右上半部 (180° 中心对称) -->
+    <path
+        android:fillColor="#FF212429"
+        android:pathData="M64.5,77 L57,81.3 L57,33.5 L54,25 L79,39.5 L79,68.5 L71.5,72.8 L71.5,43.8 L64.5,39.8 Z" />
+
+</vector>

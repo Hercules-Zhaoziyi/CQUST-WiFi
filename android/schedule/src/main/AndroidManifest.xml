@@ -1,0 +1,31 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY"/>
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SHORT_SERVICE"/>
+    <uses-permission android:name="android.permission.READ_CALENDAR"/>
+    <uses-permission android:name="android.permission.WRITE_CALENDAR"/>
+    <queries>
+        <package android:name="com.autonavi.minimap"/>
+        <package android:name="com.baidu.BaiduMap"/>
+        <package android:name="com.tencent.map"/>
+        <intent><action android:name="android.intent.action.VIEW"/><data android:scheme="geo"/></intent>
+    </queries>
+    <application>
+        <service android:name="top.msfxp.schedule.service.AudioModeControlService" android:exported="false" android:foregroundServiceType="shortService"/>
+        <receiver android:name="top.msfxp.schedule.service.CourseAlarmReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+                <action android:name="top.msfxp.schedule.ACTION_DISMISS_NOTIFICATION"/>
+            </intent-filter>
+        </receiver>
+        <receiver android:name="top.msfxp.schedule.widget.ScheduleWidgetProvider" android:exported="true" android:label="@string/widget_schedule_name">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_schedule_info"/>
+        </receiver>
+    </application>
+</manifest>

@@ -6,3 +6,4 @@ dependencyResolutionManagement {
 rootProject.name = "CQUST-WiFi-Android"
 include(":app")
 include(":vpnprobe")
+include(":schedule")

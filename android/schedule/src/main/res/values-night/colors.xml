@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 小组件深色模式色彩系统 (遵循 HyperOS 暗色规范) -->
+    <color name="widget_card_bg">#202328</color>
+    <color name="widget_text_primary">#F3F4F6</color>
+    <color name="widget_text_secondary">#9CA3AF</color>
+    <color name="widget_text_tertiary">#6B7280</color>
+    <color name="widget_preview_indicator_1">#0D84FF</color>
+    <color name="widget_preview_indicator_2">#34C759</color>
+</resources>
