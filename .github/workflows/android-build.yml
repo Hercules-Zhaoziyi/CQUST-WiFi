@@ -83,6 +83,7 @@ jobs:
           profile: pixel_6
           ram-size: 3072M
           disk-size: 8192M
+          emulator-options: -no-window -gpu ${{ inputs.emulator_api == '37' && 'software' || 'swiftshader_indirect' }} -no-snapshot -noaudio -no-boot-anim
           working-directory: android
           script: bash ci/device-regression.sh '${{ inputs.emulator_api || '35' }}'
       - uses: actions/upload-artifact@v4
