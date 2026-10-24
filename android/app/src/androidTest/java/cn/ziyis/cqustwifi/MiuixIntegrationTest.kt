@@ -67,6 +67,18 @@ class MiuixIntegrationTest {
         rule.onNodeWithText("手动填写").assertExists()
         screenshot("11-miuix-scanner-layout")
     }
+    @Test fun forgettingAnAccountClearsBothCredentialStores(){
+        val user="fixture-account"
+        runBlocking(Dispatchers.IO){
+            Repository.rememberIdentity(user,"fixture-password",true)
+            GlobalContext.get().get<SettingsRepository>().saveFullProfileAndCredentials(user,"测试账号","","","","fixture-encrypted-placeholder")
+        }
+        Repository.forgetAccount(user)
+        rule.waitUntil(10000){!Repository.state.value.accounts.contains(user)}
+        val settings=runBlocking{GlobalContext.get().get<SettingsRepository>().getAppSettingsOnce()}
+        assertEquals(user,settings.studentId);assertTrue(settings.passwordEncrypted.isEmpty())
+        assertFalse(Repository.hasPassword(user))
+    }
     private fun seedSchedule()=runBlocking(Dispatchers.IO){
         val repository=GlobalContext.get().get<ScheduleRepository>()
         val table=repository.getOrCreateDefaultTableId()

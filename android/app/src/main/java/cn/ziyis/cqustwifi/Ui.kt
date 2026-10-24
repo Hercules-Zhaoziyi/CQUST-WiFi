@@ -571,7 +571,10 @@ private fun copy(context:Context,text:String){context.getSystemService(Clipboard
                 }
             }
             Text("开源许可与依赖说明随源码及应用一并提供。",fontSize=12.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
-            QuietButton(onClick={licenses=true}){Text("查看开源许可")}
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){
+                QuietButton(onClick={licenses=true}){Text("查看开源许可")}
+                QuietButton(onClick={advanced=true}){Text(stringResource(R.string.course_advanced_options))}
+            }
         }
         Image(painterResource(R.drawable.school_logo),"重庆科技大学",Modifier.width(215.dp).height(38.dp).align(Alignment.CenterHorizontally),contentScale=ContentScale.Fit)
     }
