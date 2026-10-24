@@ -65,7 +65,7 @@ class CqustSyncManager(
         if (!eamsResult.success) {
             return@withContext Result.failure(Exception(eamsResult.errorMessage ?: "教务课表解析失败"))
         }
-        if (!allowEmpty && eamsResult.courses.isEmpty()) {
+        if (ScheduleSyncPolicy.rejectEmpty(allowEmpty,eamsResult.courses.size,practicalItems.size)) {
             return@withContext Result.failure(Exception("返回课程数为 0，不覆盖本地课表"))
         }
 
@@ -125,6 +125,7 @@ class CqustSyncManager(
         }
 
         var practicalItems = emptyList<RawPracticalItem>()
+        var practicalFailed=practicalResult?.success==false
         if (practicalResult != null && practicalResult.success) {
             practicalItems = practicalResult.items
         } else if (targetSemesterId != null) {
@@ -134,6 +135,7 @@ class CqustSyncManager(
 
             onProgress?.invoke("正在获取学期实践课表")
             val termResult = CqustPracticalParser.fetchAndParse(session, studentId, practicalTerm)
+            practicalFailed=!termResult.success
             if (termResult.success && termResult.items.isNotEmpty()) {
                 practicalItems = termResult.items
             }
@@ -146,7 +148,7 @@ class CqustSyncManager(
         if(sameSemester&&eamsResult.courses.isEmpty()&&practicalItems.isEmpty()&&existing.isNotEmpty()){
             throw IllegalStateException("未解析到有效课程，已保留完整原课表。")
         }
-        if(sameSemester&&practicalResult?.success==false&&existing.any{it.course.isPractical}){
+        if(ScheduleSyncPolicy.keepPractical(sameSemester,practicalFailed,existing.any{it.course.isPractical})){
             throw IllegalStateException("实践课同步未完成，已保留完整原课表。")
         }
         return Pair(eamsResult, practicalItems)
