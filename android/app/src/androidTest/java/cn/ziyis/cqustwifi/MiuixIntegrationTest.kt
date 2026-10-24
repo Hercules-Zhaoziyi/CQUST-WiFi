@@ -50,7 +50,7 @@ class MiuixIntegrationTest {
             Thread.sleep(350)
             val width=rule.activity.resources.displayMetrics.widthPixels.toFloat()
             val shown=SemanticsMatcher("visible route back button"){node->
-                val box=node.boundsInRoot;box.left>=0f&&box.right<=width&&box.top>=0f
+                val box=node.boundsInRoot;box.width>0f&&box.height>0f&&box.left>=0f&&box.right<=width&&box.top>=0f
             }
             rule.onNode(hasContentDescription("返回") and shown).assertExists().performTouchInput{click()}
             Thread.sleep(350)
@@ -86,6 +86,9 @@ class MiuixIntegrationTest {
 }
 
 private fun MainActivity.setContentForScannerTest(){
+    androidx.core.view.WindowInsetsControllerCompat(window,window.decorView).apply{
+        isAppearanceLightStatusBars=false;isAppearanceLightNavigationBars=false
+    }
     setContent {
         MiuixTheme(controller=androidx.compose.runtime.remember{ThemeController(ColorSchemeMode.Dark)}){
             ScannerScreen(ScannerUiState(camera=true),null,{})

@@ -4,6 +4,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import top.msfxp.schedule.data.model.COURSE_TYPE_PRACTICAL
 import top.msfxp.schedule.data.model.COURSE_TYPE_THEORY
 import top.msfxp.schedule.data.model.Semester
@@ -25,6 +27,12 @@ class CqustSyncManager(
     private val settingsRepository: SettingsRepository,
     private val scheduleRepository: ScheduleRepository
 ) {
+    private val syncGate=Mutex()
+
+    suspend fun forgetSavedPassword(studentId:String)=syncGate.withLock {
+        val settings=settingsRepository.getAppSettingsOnce()
+        if(settings.studentId==studentId)settingsRepository.updateSettings{it.copy(passwordEncrypted="")}
+    }
 
     // 登录教务并同步课表到本地数据库
     suspend fun syncCourses(
@@ -35,6 +43,7 @@ class CqustSyncManager(
         rememberPassword:Boolean=true,
         onProgress: ((String) -> Unit)? = null
     ): Result<SyncResultSummary> = withContext(Dispatchers.IO) {
+        syncGate.withLock {
         val sid = studentId.trim()
         val pwd = passwordRaw
 
@@ -83,6 +92,7 @@ class CqustSyncManager(
         }catch(e:kotlinx.coroutines.CancellationException){throw e}
         catch(e:Exception){Result.failure(e)}
         finally{session.close()}
+        }
     }
 
     // 并发协同抓取教务常规课表与实践教学课表

@@ -89,14 +89,14 @@ object Repository {
         app.getSharedPreferences("settings",Context.MODE_PRIVATE).edit().putInt("loginPurpose",safe).apply()
         ensureMonitor()
     }
-    fun rememberIdentity(user:String,password:String,remember:Boolean=true){scope.launch{gate.withLock{
+    suspend fun rememberIdentity(user:String,password:String,remember:Boolean=true)=gate.withLock{
         val accounts=credentials.optJSONObject("accounts")?:JSONObject().also{credentials.put("accounts",it)}
         if(remember)accounts.put(user,password)else accounts.remove(user)
         runCatching{vault.write(credentials)}.onFailure{message("身份认证已通过，但安全凭据保存失败。")}
         runtimeAccounts[user]=Account(user,password,remember)
         mutable.update{it.copy(accounts=(it.accounts+user).distinct())}
         if(session==null)select(user)
-    }}}
+    }
     private fun select(user:String) {
         app.getSharedPreferences("settings",Context.MODE_PRIVATE).edit().putString("username",user).apply()
         mutable.update{it.copy(username=user,name="")}
@@ -106,8 +106,12 @@ object Repository {
         select(user);manualPause=true
     }}}
     fun forgetAccount(user:String){scope.launch{gate.withLock{
+        if(ScheduleStore.busy.value){message("课表正在同步，请完成后再移除账号。");return@withLock}
         if(session!=null&&state.value.username==user){message("请先退出当前账号。");return@withLock}
-        runtimeAccounts.remove(user);credentials.optJSONObject("accounts")?.remove(user);vault.write(credentials)
+        try{
+            ScheduleStore.forgetSavedPassword(user)
+            credentials.optJSONObject("accounts")?.remove(user);vault.write(credentials);runtimeAccounts.remove(user)
+        }catch(_:Exception){message("账号未能完整移除，请稍后重试。");return@withLock}
         mutable.update{it.copy(accounts=it.accounts-user)}
         if(state.value.username==user)select("")
     }}}

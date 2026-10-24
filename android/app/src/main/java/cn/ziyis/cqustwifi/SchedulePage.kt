@@ -27,6 +27,7 @@ object ScheduleStore {
     private val scope=CoroutineScope(SupervisorJob()+Dispatchers.IO)
     private val migrationLock=Mutex()
     private fun <T:Any> service(type:kotlin.reflect.KClass<T>):T=GlobalContext.get().get(type)
+    suspend fun forgetSavedPassword(user:String){service(CqustSyncManager::class).forgetSavedPassword(user)}
     fun sync(user:String,password:String,remember:Boolean=false){
         if(!busy.compareAndSet(false,true))return
         scope.launch{

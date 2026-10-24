@@ -22,4 +22,6 @@
     <string name="proxy_scan_share_stop">连接前将停止当前本机共享。</string>
     <string name="proxy_scan_vpn_stop">请先断开当前 VPN，再连接另一个设备。</string>
     <string name="proxy_scan_confirm_detail">服务器：%1$s\n端口：%2$d\n用户名：%3$s\n\n只连接自己的可信设备。二维码中包含代理凭据。</string>
+    <string name="course_advanced_options">课表高级选项</string>
+    <string name="course_advanced_done">完成</string>
 </resources>

@@ -99,11 +99,11 @@ private val CardShape=RoundedCornerShape(26.dp)
     val controller=remember(mode){ThemeController(mode)}
     MiuixTheme(controller=controller){
     val palette=MiuixTheme.colorScheme
-    val aligned=scheme.copy(background=palette.background,surface=palette.surfaceContainer,onSurface=palette.onSurface,
+    val aligned=scheme.copy(background=palette.surface,surface=palette.surfaceContainer,onSurface=palette.onSurface,
         primary=palette.primary,onSurfaceVariant=palette.onSurfaceVariantSummary,surfaceVariant=palette.surfaceVariant)
     MaterialTheme(colorScheme=aligned) {
-        Scaffold(containerColor=palette.background,snackbarHost={SnackbarHost(snackbar)},topBar={
-            if(page!="课程表")Column(Modifier.statusBarsPadding().background(palette.background)){
+        Scaffold(containerColor=palette.surface,snackbarHost={SnackbarHost(snackbar)},topBar={
+            if(page!="课程表")Column(Modifier.statusBarsPadding().background(palette.surface)){
                 Row(Modifier.fillMaxWidth().padding(horizontal=20.dp,vertical=12.dp),verticalAlignment=Alignment.CenterVertically){
                     Image(painterResource(R.drawable.app_logo),null,Modifier.size(42.dp).clip(RoundedCornerShape(12.dp)))
                     Column(Modifier.weight(1f).padding(start=12.dp)){
@@ -124,7 +124,7 @@ private val CardShape=RoundedCornerShape(26.dp)
                 }
             }
         }){padding->
-            AnimatedContent(page,Modifier.padding(padding).fillMaxSize(),transitionSpec={
+            AnimatedContent(page,Modifier.padding(padding).consumeWindowInsets(padding).fillMaxSize(),transitionSpec={
                 fadeIn(tween(if(state.prefs.animations)220 else 0)) togetherWith fadeOut(tween(if(state.prefs.animations)100 else 0))
             },label="page"){current->
                 pageState.SaveableStateProvider(current){
@@ -537,6 +537,10 @@ private fun copy(context:Context,text:String){context.getSystemService(Clipboard
 @Composable private fun About(){
     val context=LocalContext.current
     var licenses by remember{mutableStateOf(false)}
+    var advanced by remember{mutableStateOf(false)}
+    val scope=rememberCoroutineScope()
+    val courseSettings=remember{org.koin.core.context.GlobalContext.get().get<top.msfxp.schedule.data.repository.SettingsRepository>()}
+    val coursePreferences by courseSettings.appSettingsFlow.collectAsStateWithLifecycle()
     PageColumn{
         Panel{
             Image(painterResource(R.drawable.app_logo),null,Modifier.size(74.dp).align(Alignment.CenterHorizontally).clip(RoundedCornerShape(22.dp)))
@@ -571,6 +575,10 @@ private fun copy(context:Context,text:String){context.getSystemService(Clipboard
         }
         Image(painterResource(R.drawable.school_logo),"重庆科技大学",Modifier.width(215.dp).height(38.dp).align(Alignment.CenterHorizontally),contentScale=ContentScale.Fit)
     }
+    if(advanced)MiuixPrompt(onDismissRequest={advanced=false},title={Text(stringResource(R.string.course_advanced_options))},text={
+        Setting(stringResource(top.msfxp.schedule.R.string.perm_show_test_features_title),
+            stringResource(top.msfxp.schedule.R.string.perm_show_test_features_desc),coursePreferences.showTestFeatures){enabled->scope.launch{courseSettings.updateShowTestFeatures(enabled)}}
+    },confirmButton={QuietButton(onClick={advanced=false}){Text(stringResource(R.string.course_advanced_done))}})
     if(licenses)MiuixPrompt(onDismissRequest={licenses=false},title={Text("开源许可")},text={
         val notices=remember{context.assets.list("licenses").orEmpty().sorted().joinToString("\n\n"){name->
             name+"\n"+context.assets.open("licenses/$name").bufferedReader().use{it.readText()}}}
