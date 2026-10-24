@@ -69,12 +69,12 @@ object ScheduleStore {
     }
 }
 
-@Composable fun SchedulePage(onLogin:()->Unit,onAbout:()->Unit,controller:ThemeController){
+@Composable fun SchedulePage(onLogin:()->Unit,onAbout:()->Unit,onSettings:()->Unit,controller:ThemeController){
     var ready by remember{mutableStateOf(false)}
     LaunchedEffect(Unit){
         withContext(Dispatchers.IO){runCatching{ScheduleStore.migrateLegacy()}.onFailure{Repository.message(Repository.app.getString(R.string.schedule_migration_failed))}}
         ready=true
     }
-    if(ready)top.msfxp.schedule.App(onSharedLogin=onLogin,onHostAbout=onAbout,controller=controller)
+    if(ready)top.msfxp.schedule.App(onSharedLogin=onLogin,onHostAbout=onAbout,onSharedSettings=onSettings,controller=controller)
     else Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center){InfiniteProgressIndicator()}
 }

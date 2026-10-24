@@ -24,9 +24,15 @@ import top.yukonga.miuix.kmp.theme.ThemeController
 
 // 应用根导航组件
 @Composable
-fun App(onSharedLogin:(()->Unit)?=null,onHostAbout:(()->Unit)?=null,controller:ThemeController?=null) {
+fun App(onSharedLogin:(()->Unit)?=null,onHostAbout:(()->Unit)?=null,controller:ThemeController?=null,
+    onSharedSettings:(()->Unit)?=null,settingsOnly:Boolean=false,onExit:(()->Unit)?=null,
+    accountContent:(@Composable (()->Unit)->Unit)?=null,
+    preferencesContent:(@Composable ()->Unit)?=null,
+    permissionsContent:(@Composable ()->Unit)?=null,
+    updatesContent:(@Composable ()->Unit)?=null) {
     val defaultController = remember { ThemeController(ColorSchemeMode.System) }
-    val backStack = rememberNavBackStack<Route>(Route.Schedule)
+    val backStack = rememberNavBackStack<Route>(if(settingsOnly)Route.Settings else Route.Schedule)
+    fun back(){if(backStack.size>1)backStack.removeLastOrNull()else onExit?.invoke()}
 
     MiuixTheme(controller = controller?:defaultController) {
         Surface(
@@ -35,13 +41,13 @@ fun App(onSharedLogin:(()->Unit)?=null,onHostAbout:(()->Unit)?=null,controller:T
         ) {
             NavDisplay(
                 backStack = backStack,
-                onBack = { backStack.removeLastOrNull() }
+                onBack = { back() }
             ) {
                 // 主课表页面
                 entry<Route.Schedule> {
                     WeeklyScheduleScreen(
                         onNavigateToSettings = {
-                            backStack.add(Route.Settings)
+                            if(onSharedSettings!=null)onSharedSettings()else backStack.add(Route.Settings)
                         },
                         onNavigateToLogin = {
                             if(onSharedLogin!=null)onSharedLogin()else backStack.add(Route.Login)
@@ -52,6 +58,10 @@ fun App(onSharedLogin:(()->Unit)?=null,onHostAbout:(()->Unit)?=null,controller:T
                 // 设置主页面
                 entry<Route.Settings> {
                     SettingsScreen(
+                        accountContent=accountContent,
+                        preferencesContent=preferencesContent,
+                        permissionsContent=permissionsContent,
+                        updatesContent=updatesContent,
                         onNavigateToLogin = {
                             if(onSharedLogin!=null)onSharedLogin()else backStack.add(Route.Login)
                         },
@@ -77,7 +87,7 @@ fun App(onSharedLogin:(()->Unit)?=null,onHostAbout:(()->Unit)?=null,controller:T
                             if(onHostAbout!=null)onHostAbout()else backStack.add(Route.About)
                         },
                         onBack = {
-                            backStack.removeLastOrNull()
+                            back()
                         }
                     )
                 }

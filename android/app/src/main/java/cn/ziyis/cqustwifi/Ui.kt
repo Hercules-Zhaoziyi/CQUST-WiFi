@@ -4,10 +4,6 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.BitmapFactory
-import android.view.ViewGroup
-import android.webkit.WebResourceRequest
-import android.webkit.WebView
-import android.webkit.WebViewClient
 import android.widget.TextView
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
@@ -35,6 +31,9 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.ThemeController
 import top.yukonga.miuix.kmp.theme.ColorSchemeMode
 import androidx.compose.runtime.*
+import androidx.activity.compose.BackHandler
+import top.yukonga.miuix.kmp.basic.SmallTopAppBar
+import top.yukonga.miuix.kmp.preference.ArrowPreference
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -69,6 +68,13 @@ private val CardShape=RoundedCornerShape(26.dp)
     val state by Repository.state.collectAsStateWithLifecycle()
     val issue by Repository.issues.collectAsStateWithLifecycle()
     var page by remember{mutableStateOf("连接")}
+    var mainReturn by remember{mutableStateOf("连接")}
+    var aboutReturn by remember{mutableStateOf("连接")}
+    val mainPages=listOf("连接","课程表","常用网站","代理")
+    fun settings(){if(page in mainPages)mainReturn=page;page="设置"}
+    fun about(){aboutReturn=page;page="关于"}
+    fun back(){page=when(page){"关于"->aboutReturn;"日志"->"设置";else->mainReturn}}
+    BackHandler(enabled=page !in mainPages){back()}
     var loginTarget by remember{mutableIntStateOf(Repository.loginPurpose())}
     var portal by remember{mutableStateOf(false)}
     val pageState=rememberSaveableStateHolder()
@@ -103,7 +109,8 @@ private val CardShape=RoundedCornerShape(26.dp)
         primary=palette.primary,onSurfaceVariant=palette.onSurfaceVariantSummary,surfaceVariant=palette.surfaceVariant)
     MaterialTheme(colorScheme=aligned) {
         Scaffold(containerColor=palette.surface,snackbarHost={SnackbarHost(snackbar)},topBar={
-            if(page!="课程表")Column(Modifier.statusBarsPadding().background(palette.surface)){
+            if(page in listOf("关于","日志"))SmallTopAppBar(title=page,navigationIcon={IconButton(onClick={back()}){Icon(Icons.Outlined.ArrowBack,stringResource(R.string.unified_back))}})
+            else if(page in mainPages&&page!="课程表")Column(Modifier.statusBarsPadding().background(palette.surface)){
                 Row(Modifier.fillMaxWidth().padding(horizontal=20.dp,vertical=12.dp),verticalAlignment=Alignment.CenterVertically){
                     Image(painterResource(R.drawable.app_logo),null,Modifier.size(42.dp).clip(RoundedCornerShape(12.dp)))
                     Column(Modifier.weight(1f).padding(start=12.dp)){
@@ -112,17 +119,17 @@ private val CardShape=RoundedCornerShape(26.dp)
                     }
                     IconButton(onClick={Repository.preferences(state.prefs.copy(theme=if(dark)"light"else"dark"))}){
                         Icon(if(dark)Icons.Outlined.LightMode else Icons.Outlined.DarkMode,"切换主题")}
-                    IconButton(onClick={page=if(page=="设置")"连接"else"设置"}){Icon(Icons.Outlined.Tune,"设置")}
-                    IconButton(onClick={page=if(page=="关于")"连接"else"关于"}){Icon(Icons.Outlined.Info,"关于")}
+                    IconButton(onClick={settings()}){Icon(Icons.Outlined.Tune,"设置")}
+                    IconButton(onClick={about()}){Icon(Icons.Outlined.Info,"关于")}
                 }
             }
         },bottomBar={
-            NavigationBar(color=palette.surfaceContainer){
+            if(page in mainPages)Box(Modifier.testTag("main-navigation")){NavigationBar(color=palette.surfaceContainer){
                 listOf("连接" to Icons.Outlined.Wifi,"课程表" to Icons.Outlined.CalendarMonth,"常用网站" to Icons.Outlined.Language,
                     "代理" to Icons.Outlined.Shield).forEach{(name,icon)->
                     NavigationBarItem(selected=page==name,onClick={page=name},icon=icon,label=name)
                 }
-            }
+            }}
         }){padding->
             AnimatedContent(page,Modifier.padding(padding).consumeWindowInsets(padding).fillMaxSize(),transitionSpec={
                 fadeIn(tween(if(state.prefs.animations)220 else 0)) togetherWith fadeOut(tween(if(state.prefs.animations)100 else 0))
@@ -131,9 +138,14 @@ private val CardShape=RoundedCornerShape(26.dp)
                 when(current){
                     "连接"->Home(state,onPortal={if(issue!=null)manualAuth=true else portal=true},initialMode=loginTarget,onMode={loginTarget=it})
                     "常用网站"->Sites()
-                    "课程表"->SchedulePage(onLogin={loginTarget=1;page="连接"},onAbout={page="关于"},controller=controller)
+                    "课程表"->SchedulePage(onLogin={loginTarget=1;page="连接"},onAbout={about()},onSettings={settings()},controller=controller)
                     "代理"->ProxyPage(state,onVpn)
-                    "设置"->SettingsPage(state,onLogs={page="日志"},onNotifications)
+                    "设置"->top.msfxp.schedule.App(settingsOnly=true,controller=controller,onExit={page=mainReturn},
+                        onSharedLogin={loginTarget=1;page="连接"},onHostAbout={about()},
+                        accountContent={logout->UnifiedAccounts(state,logout){mode->loginTarget=mode;page="连接"}},
+                        preferencesContent={ConnectionPreferences(state)},
+                        permissionsContent={BackgroundPreferences(onLogs={page="日志"},onNotifications)},
+                        updatesContent={UpdatePreferences()})
                     "日志"->Logs(state)
                     else->About()
                 }
@@ -141,7 +153,7 @@ private val CardShape=RoundedCornerShape(26.dp)
             }
         }
         if(issue!=null&&(loginTarget==0||manualAuth))AuthDialog(issue!!,onPortal={Repository.dismissIssue();portal=true})
-        if(portal)PortalDialog(onClose={portal=false},onResult={url->portal=false;Repository.retryAuth(url,"","")})
+        if(portal)AuthenticationGuide(onClose={portal=false},onResult={url->portal=false;Repository.retryAuth(url,"","")})
         UpdateDialog()
     }
     }
@@ -447,8 +459,8 @@ private val CardShape=RoundedCornerShape(26.dp)
 }
 private fun copy(context:Context,text:String){context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("代理地址",text));Repository.message("已复制")}
 
-@Composable private fun SettingsPage(s:ViewState,onLogs:()->Unit,onNotifications:()->Unit){
-    val context=LocalContext.current;val scope=rememberCoroutineScope()
+@Composable private fun BackgroundPreferences(onLogs:()->Unit,onNotifications:()->Unit){
+    val context=LocalContext.current
     var notificationsReady by remember{mutableStateOf(false)}
     var batteryReady by remember{mutableStateOf(false)}
     val lifecycle=androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
@@ -458,31 +470,6 @@ private fun copy(context:Context,text:String){context.getSystemService(Clipboard
         batteryReady=context.getSystemService(android.os.PowerManager::class.java).isIgnoringBatteryOptimizations(context.packageName)
     }
     DisposableEffect(lifecycle){refreshPermissions();val observer=androidx.lifecycle.LifecycleEventObserver{_,event->if(event==androidx.lifecycle.Lifecycle.Event.ON_RESUME)refreshPermissions()};lifecycle.addObserver(observer);onDispose{lifecycle.removeObserver(observer)}}
-    var update by remember{mutableStateOf<UpdateInfo?>(null)}
-    var checking by remember{mutableStateOf(false)}
-    PageColumn{
-        Heading("连接与偏好","让连接与显示方式，按你的习惯运行。")
-        Panel{
-            Setting("自动登录","检测到认证入口时使用选定账号；不会绕过验证码。",s.prefs.autoLogin){Repository.preferences(s.prefs.copy(autoLogin=it))}
-            HorizontalDivider()
-            Setting("始终保持连接","会话失效后静默尝试重连；手动断开时暂停。",s.prefs.keepConnected){Repository.preferences(s.prefs.copy(keepConnected=it))}
-            HorizontalDivider()
-            Text("状态检查间隔",fontWeight=FontWeight.SemiBold)
-            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                listOf(5 to "5 秒",10 to "10 秒",120 to "2 分钟").forEach{(n,label)->
-                    ChoiceChip(s.prefs.interval==n,{Repository.preferences(s.prefs.copy(interval=n))},label={Text(label)})
-                }
-            }
-            HorizontalDivider()
-            Setting("界面动效","页面淡入、主题渐变与连接按钮呼吸。",s.prefs.animations){Repository.preferences(s.prefs.copy(animations=it))}
-            HorizontalDivider()
-            Text("界面主题",fontWeight=FontWeight.SemiBold)
-            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                listOf("system" to "跟随系统","light" to "白天","dark" to "夜间").forEach{(id,label)->
-                    ChoiceChip(s.prefs.theme==id,{Repository.preferences(s.prefs.copy(theme=id))},label={Text(label)})
-                }
-            }
-        }
         Panel{
             Text("后台运行",fontSize=18.sp,fontWeight=FontWeight.SemiBold)
             Text(if(notificationsReady&&batteryReady)"通知与后台权限已就绪。"else"允许通知与后台运行有助于保持连接。权限生效后，对应按钮会隐藏。强行停止后仍需手动打开应用。",fontSize=13.sp,lineHeight=23.sp)
@@ -490,6 +477,11 @@ private fun copy(context:Context,text:String){context.getSystemService(Clipboard
             if(!batteryReady)SecondaryButton(onClick={batterySettings(context)},modifier=Modifier.fillMaxWidth()){Text("打开电池与后台设置")}
             QuietButton(onClick=onLogs){Icon(Icons.Outlined.ReceiptLong,null);Spacer(Modifier.width(9.dp));Text("查看运行日志")}
         }
+}
+@Composable private fun UpdatePreferences(){
+    val scope=rememberCoroutineScope()
+    var update by remember{mutableStateOf<UpdateInfo?>(null)}
+    var checking by remember{mutableStateOf(false)}
         Panel{
             Text("软件更新",fontSize=18.sp,fontWeight=FontWeight.SemiBold)
             Text("当前版本 ${BuildConfig.VERSION_NAME} · Android",fontSize=13.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
@@ -503,6 +495,53 @@ private fun copy(context:Context,text:String){context.getSystemService(Clipboard
                 if(u.newer&&u.download!=null)SecondaryButton(onClick={AppUpdates.offer(u)}){Text("应用内下载并更新")}
             }
         }
+}
+
+@Composable private fun ConnectionPreferences(s:ViewState){
+    Panel{
+        Text(stringResource(R.string.unified_connection),fontSize=18.sp,fontWeight=FontWeight.SemiBold)
+        Setting(stringResource(R.string.unified_auto_login),stringResource(R.string.unified_auto_login_desc),s.prefs.autoLogin){Repository.preferences(s.prefs.copy(autoLogin=it))}
+        HorizontalDivider()
+        Setting(stringResource(R.string.unified_keep),stringResource(R.string.unified_keep_desc),s.prefs.keepConnected){Repository.preferences(s.prefs.copy(keepConnected=it))}
+        HorizontalDivider()
+        Text(stringResource(R.string.unified_interval),fontWeight=FontWeight.SemiBold)
+        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+            listOf(5 to R.string.unified_five,10 to R.string.unified_ten,120 to R.string.unified_two_minutes).forEach{(n,label)->ChoiceChip(s.prefs.interval==n,{Repository.preferences(s.prefs.copy(interval=n))},label={Text(stringResource(label))})}
+        }
+        HorizontalDivider()
+        Setting(stringResource(R.string.unified_animations),stringResource(R.string.unified_animations_desc),s.prefs.animations){Repository.preferences(s.prefs.copy(animations=it))}
+        HorizontalDivider()
+        Text(stringResource(R.string.unified_theme),fontWeight=FontWeight.SemiBold)
+        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+            listOf("system" to R.string.unified_system,"light" to R.string.unified_light,"dark" to R.string.unified_dark).forEach{(id,label)->ChoiceChip(s.prefs.theme==id,{Repository.preferences(s.prefs.copy(theme=id))},label={Text(stringResource(label))})}
+        }
+    }
+}
+
+@Composable private fun UnifiedAccounts(s:ViewState,onCourseLogout:()->Unit,onLogin:(Int)->Unit){
+    val repository=remember{org.koin.core.context.GlobalContext.get().get<top.msfxp.schedule.data.repository.SettingsRepository>()}
+    val course by repository.appSettingsFlow.collectAsStateWithLifecycle()
+    val rows=identityRows(s.username,course.studentId)
+    Panel{
+        Text(stringResource(R.string.unified_accounts),fontSize=18.sp,fontWeight=FontWeight.SemiBold)
+        if(rows.isEmpty())ArrowPreference(title=stringResource(R.string.unified_login),summary=stringResource(R.string.unified_login_desc),onClick={onLogin(2)})
+        rows.forEachIndexed{i,row->
+            if(i>0)HorizontalDivider()
+            val label=when(row.kind){IdentityKind.CAMPUS->R.string.unified_campus_account;IdentityKind.COURSE->R.string.unified_course_account;IdentityKind.SHARED->R.string.unified_shared_account}
+            Row(Modifier.fillMaxWidth().clickable{onLogin(row.kind.loginMode)},verticalAlignment=Alignment.CenterVertically){
+                Icon(if(row.kind==IdentityKind.CAMPUS)Icons.Outlined.Wifi else Icons.Outlined.AccountCircle,null,Modifier.size(32.dp),tint=MiuixTheme.colorScheme.primary)
+                Column(Modifier.weight(1f).padding(start=12.dp)){
+                    Text(row.username,fontSize=18.sp,fontWeight=FontWeight.SemiBold)
+                    Text(stringResource(label),fontSize=12.sp,color=MiuixTheme.colorScheme.onSurfaceVariantSummary)
+                    if(row.kind!=IdentityKind.CAMPUS&&course.studentName.isNotBlank())Text(listOf(course.studentName,course.className).filter{it.isNotBlank()}.joinToString(" · "),fontSize=12.sp,color=MiuixTheme.colorScheme.onSurfaceVariantSummary)
+                }
+                Icon(Icons.Outlined.ChevronRight,stringResource(R.string.unified_change_account))
+            }
+        }
+        Row(horizontalArrangement=Arrangement.spacedBy(10.dp)){
+            if(s.status==LinkState.CONNECTED)QuietButton(onClick={Repository.disconnect(logout=true)}){Text(stringResource(R.string.unified_disconnect_campus))}
+            if(course.isLoggedIn)QuietButton(onClick=onCourseLogout){Text(stringResource(R.string.unified_logout_course))}
+        }
     }
 }
 @Composable private fun UpdateDialog(){
@@ -515,7 +554,7 @@ private fun copy(context:Context,text:String){context.getSystemService(Clipboard
             Text("安装包将校验应用标识、版本、SHA-256 和签名。安装需要系统确认，不会静默安装或自动卸载旧版。",fontSize=12.sp,lineHeight=20.sp)
             if(update.downloading){LinearProgressIndicator(progress={update.percent/100f},modifier=Modifier.fillMaxWidth());Text("下载中 ${update.percent}%",fontSize=13.sp)}
             if(update.error.isNotEmpty())Text(update.error,fontSize=13.sp,color=MaterialTheme.colorScheme.error)
-            QuietButton(onClick={openLink(context,"https://qm.qq.com/q/Rn7B5NBbiK")}){Icon(Icons.Outlined.Groups,null);Spacer(Modifier.width(7.dp));Text("加入 QQ 内测群")}
+            CommunityLinks()
             QuietButton(onClick={openLink(context,info.url)}){Text("查看 GitHub 发布页")}
         }
     },confirmButton={QuietButton(onClick={if(update.ready)AppUpdates.install()else AppUpdates.download()},enabled=!update.downloading){Text(if(update.ready)"安装更新"else"下载并更新")}},dismissButton={QuietButton(onClick=AppUpdates::dismiss){Text("稍后")}})
@@ -543,25 +582,30 @@ private fun copy(context:Context,text:String){context.getSystemService(Clipboard
     val coursePreferences by courseSettings.appSettingsFlow.collectAsStateWithLifecycle()
     PageColumn{
         Panel{
-            Image(painterResource(R.drawable.app_logo),null,Modifier.size(74.dp).align(Alignment.CenterHorizontally).clip(RoundedCornerShape(22.dp)))
-            Text("CQUST Wi-Fi",Modifier.align(Alignment.CenterHorizontally),fontSize=29.sp,fontWeight=FontWeight.Bold)
+            Row(Modifier.fillMaxWidth().padding(top=4.dp),horizontalArrangement=Arrangement.spacedBy(22.dp,Alignment.CenterHorizontally),verticalAlignment=Alignment.CenterVertically){
+                Image(painterResource(R.drawable.app_logo),null,Modifier.size(66.dp).clip(RoundedCornerShape(18.dp)))
+                Text(stringResource(R.string.unified_brand_cross),fontSize=28.sp,color=MiuixTheme.colorScheme.onSurfaceVariantSummary)
+                Image(painterResource(top.msfxp.schedule.R.drawable.ic_launcher_foreground),null,Modifier.size(66.dp).clip(RoundedCornerShape(18.dp)).background(Color.White))
+            }
+            Text(stringResource(R.string.unified_brand),Modifier.align(Alignment.CenterHorizontally),fontSize=23.sp,fontWeight=FontWeight.Bold)
             Text("${BuildConfig.VERSION_NAME} · Android",Modifier.align(Alignment.CenterHorizontally),fontSize=13.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("让校园网络连接，简单一点。",Modifier.align(Alignment.CenterHorizontally),fontSize=14.sp)
+            Text(stringResource(R.string.unified_tagline),Modifier.align(Alignment.CenterHorizontally),fontSize=14.sp)
             Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceEvenly){
                 QuietButton(onClick={openLink(context,"https://www.xiaohongshu.com/user/profile/60d40af7000000000101f612")}){
                     AsyncImage("file:///android_asset/xiaohongshu-logo.svg",null,imageLoader=remember{ImageLoader.Builder(context).components{add(SvgDecoder.Factory())}.build()},modifier=Modifier.width(26.dp).height(16.dp));Spacer(Modifier.width(4.dp));Text("十七号旅客",fontSize=11.sp)}
                 QuietButton(onClick={openLink(context,"https://github.com/yuexps")}){GithubIcon();Spacer(Modifier.width(4.dp));Text("GitHub",fontSize=11.sp)}
-                QuietButton(onClick={openLink(context,"https://github.com/Hercules-Zhaoziyi/CQUST-WiFi")}){Icon(Icons.Outlined.Code,null,Modifier.size(15.dp));Text("开源项目",fontSize=11.sp)}
-            }
-            Row(horizontalArrangement=Arrangement.spacedBy(10.dp)){
-                SecondaryButton(onClick={openLink(context,"https://qm.qq.com/q/Rn7B5NBbiK")},modifier=Modifier.weight(1f)){Icon(Icons.Outlined.Groups,null,Modifier.size(17.dp));Spacer(Modifier.width(5.dp));Text("加入内测群",fontSize=12.sp)}
-                SecondaryButton(onClick={openLink(context,"https://cqust-wifi.ziyis.cn/")},modifier=Modifier.weight(1f)){Icon(Icons.Outlined.Language,null,Modifier.size(17.dp));Spacer(Modifier.width(5.dp));Text("软件介绍",fontSize=12.sp)}
             }
         }
         Panel{
-            Text("Android 版，轻松连接",fontSize=19.sp,fontWeight=FontWeight.SemiBold)
-            Text("Miuix 界面、完整课表与调课、课前提醒、日历及桌面微件；保留校园网认证、多账号、常用网站、代理共享与 VPN 转发。",fontSize=14.sp,lineHeight=24.sp)
+            Text(stringResource(R.string.unified_intro_title),fontSize=19.sp,fontWeight=FontWeight.SemiBold)
+            Text(stringResource(R.string.unified_intro),fontSize=14.sp,lineHeight=24.sp)
             Text("本软件为非学校官方工具，请使用本人有权限的账号，并遵守学校网络管理规则。",fontSize=12.sp,lineHeight=22.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Panel{
+            ArrowPreference(title=stringResource(R.string.unified_wifi_repo),summary=stringResource(R.string.unified_wifi_repo_path),startAction={GithubIcon()},onClick={openLink(context,"https://github.com/Hercules-Zhaoziyi/CQUST-WiFi")})
+            ArrowPreference(title=stringResource(R.string.unified_course_repo),summary=stringResource(R.string.unified_course_repo_path),startAction={GithubIcon()},onClick={openLink(context,"https://github.com/yuexps/cqust-schedule-miuix")})
+            CommunityLinks()
+            ArrowPreference(title=stringResource(R.string.unified_website),summary=stringResource(R.string.unified_website_desc),onClick={openLink(context,"https://cqust-wifi.ziyis.cn/")})
         }
         Panel{
             Text("特别鸣谢",fontSize=18.sp,fontWeight=FontWeight.SemiBold)
@@ -604,7 +648,7 @@ private fun copy(context:Context,text:String){context.getSystemService(Clipboard
                 QuietButton(onClick=Repository::refreshCaptcha){Text("刷新验证码图片")}
                 MiuixInput(captcha,{captcha=it},label={Text("验证码")},singleLine=true)
             }else{
-                SecondaryButton(onClick=onPortal,modifier=Modifier.fillMaxWidth()){Text("自动读取校园网动态跳转")}
+                SecondaryButton(onClick=onPortal,modifier=Modifier.fillMaxWidth()){Text(stringResource(R.string.auth_probe_start))}
                 QuietButton(onClick={openLink(context,"http://aaa.cqust.edu.cn/")}){Text("在浏览器打开官方认证页")}
                 Text("连接校园 Wi-Fi → 等待浏览器跳转 → 复制完整网址（包含 ? 后内容）→ 粘贴在下方。请勿公开分享认证网址。",fontSize=12.sp,lineHeight=21.sp)
                 MiuixInput(url,{url=it},label={Text("完整认证网址")},modifier=Modifier.fillMaxWidth(),maxLines=3)
@@ -613,41 +657,4 @@ private fun copy(context:Context,text:String){context.getSystemService(Clipboard
         }
     },confirmButton={QuietButton(onClick={Repository.retryAuth(url,service,captcha)},enabled=issue.kind!="captcha"||captcha.isNotBlank()){Text("继续登录")}},
         dismissButton={QuietButton(onClick=Repository::dismissIssue){Text("取消")}})
-}
-@Composable private fun PortalDialog(onClose:()->Unit,onResult:(String)->Unit){
-    var finished by remember{mutableStateOf(false)}
-    val wifi=remember{Repository.engine.wifi()}
-    DisposableEffect(wifi){
-        val cm=Repository.engine.connectivity
-        val previous=cm.boundNetworkForProcess
-        val bound=wifi!=null&&cm.bindProcessToNetwork(wifi)
-        if(!bound)Repository.message("未找到校园 Wi-Fi，请连接后重新打开认证页。")
-        onDispose{if(bound&&cm.boundNetworkForProcess==wifi)cm.bindProcessToNetwork(previous)}
-    }
-    MiuixPrompt(onDismissRequest=onClose,title={Text("读取官方认证跳转")},text={
-        Column{
-            Text("仅打开学校认证页面，不向页面注入账号密码。捕获完整网址后会自动返回。",fontSize=12.sp,lineHeight=20.sp)
-            AndroidView(factory={context->WebView(context).apply{
-                layoutParams=ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,500)
-                settings.javaScriptEnabled=true;settings.allowFileAccess=false;settings.allowContentAccess=false
-                settings.domStorageEnabled=false
-                webViewClient=object:WebViewClient(){
-                    override fun shouldInterceptRequest(view:WebView,request:WebResourceRequest):android.webkit.WebResourceResponse? {
-                        return if(Protocol.trusted(request.url.toString()))null else android.webkit.WebResourceResponse(
-                            "text/plain","UTF-8",java.io.ByteArrayInputStream(ByteArray(0)))
-                    }
-                    override fun shouldOverrideUrlLoading(view:WebView,request:WebResourceRequest):Boolean {
-                        val url=request.url.toString()
-                        if(Protocol.candidate(url)){if(!finished){finished=true;view.stopLoading();onResult(url)};return true}
-                        return !Protocol.trusted(url)
-                    }
-                    override fun onPageStarted(view:WebView,url:String,favicon:android.graphics.Bitmap?){
-                        if(Protocol.candidate(url)&&!finished){finished=true;view.stopLoading();onResult(url)}
-                    }
-                }
-                if(wifi!=null)loadUrl("http://aaa.cqust.edu.cn/")
-            }},modifier=Modifier.fillMaxWidth().height(250.dp),
-                onRelease={it.stopLoading();it.clearHistory();it.destroy()})
-        }
-    },confirmButton={QuietButton(onClick=onClose){Text("关闭")}})
 }

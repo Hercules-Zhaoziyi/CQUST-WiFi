@@ -139,11 +139,11 @@ class CampusEngine(private val context:Context,private val diagnostic:(String)->
             }.getOrElse{throw AuthIssue("server","认证服务器返回格式异常。")}
         }
     }
-    private fun prepare(net:Network,manual:String,selected:String):Challenge {
+    private fun discover(net:Network,manual:String):Pair<String,String> {
         if(manual.isNotBlank()&&!Protocol.trusted(manual))throw AuthIssue("url","仅接受学校认证域名或认证 IP 的网址。")
         val key=networkKey(net)+"/"+ip(net)
         if(key!=hintNetwork){hint=null;hintNetwork=key}
-        val entries=if(manual.isNotBlank())listOf(manual)else(Protocol.entries.take(2)+listOfNotNull(hint)+Protocol.entries.drop(2)).distinct()
+        val entries=if(manual.isNotBlank())listOf(manual)else(listOfNotNull(hint)+Protocol.entries).distinct()
         val http=client(net);val deadline=System.currentTimeMillis()+16000
         var found:Pair<String,String>?=null
         for(entry in entries) {
@@ -152,7 +152,15 @@ class CampusEngine(private val context:Context,private val diagnostic:(String)->
             catch(e:AuthIssue){if(e.kind=="online")throw e}
             catch(_:Exception){diagnostic("入口 "+runCatching{URI(entry).host}.getOrDefault("学校")+" · 未取得跳转")}
         }
-        val(page,html)=found?:throw AuthIssue("url","未取得完整认证网址。可用内嵌页面完成动态跳转，或粘贴官方页面跳转后的完整网址。")
+        val page=found?:throw AuthIssue("url",context.getString(R.string.auth_probe_failed))
+        hint=page.first
+        return page
+    }
+    fun probePortal(net:Network):Detection=try{
+        Detection.Portal(discover(net,"").first)
+    }catch(e:AuthIssue){if(e.kind=="online")Detection.Online else Detection.Unknown}
+    private fun prepare(net:Network,manual:String,selected:String):Challenge {
+        val(page,html)=discover(net,manual)
         val query=URI(page).rawQuery.orEmpty();val doc=Jsoup.parse(html)
         val values=doc.select("input").associate{it.id().ifBlank{it.attr("name")} to it.attr("value")}.toMutableMap()
         val init=Regex("""AuthInterFace\.init\(\s*["']([^"']*)["']""").find(html)?.groupValues?.get(1)?:"./"

@@ -30,6 +30,7 @@ object Repository {
     val state=mutable.asStateFlow()
     val issues=MutableStateFlow<AuthIssue?>(null)
     val navigation=MutableStateFlow<String?>(null)
+    val authProbe=MutableStateFlow(AuthProbe())
     private var session:CampusSession?=null
     private var manualPause=false
     @Volatile private var networkRequested=true
@@ -95,7 +96,7 @@ object Repository {
         runCatching{vault.write(credentials)}.onFailure{message("身份认证已通过，但安全凭据保存失败。")}
         runtimeAccounts[user]=Account(user,password,remember)
         mutable.update{it.copy(accounts=(it.accounts+user).distinct())}
-        if(session==null)select(user)
+        if(session==null&&state.value.username.isBlank())select(user)
     }
     private fun select(user:String) {
         app.getSharedPreferences("settings",Context.MODE_PRIVATE).edit().putString("username",user).apply()
@@ -202,6 +203,16 @@ object Repository {
         performLogin(a,url,service,code,issues.value?.kind=="captcha");selectedService=service
     }}}
     fun dismissIssue(){issues.value=null}
+    fun probeAuthentication(){scope.launch{gate.withLock{
+        val wifi=engine.wifi()
+        if(wifi==null){authProbe.value=AuthProbe(ProbeStatus.NO_WIFI);return@withLock}
+        authProbe.value=AuthProbe(ProbeStatus.CHECKING)
+        try{authProbe.value=when(val result=engine.probePortal(wifi)){
+            is Detection.Portal->AuthProbe(ProbeStatus.PORTAL,java.net.URI(result.url).host.orEmpty())
+            Detection.Online->AuthProbe(ProbeStatus.ONLINE)
+            Detection.Unknown->AuthProbe(ProbeStatus.UNAVAILABLE)
+        }}catch(_:Exception){authProbe.value=AuthProbe(ProbeStatus.UNAVAILABLE)}
+    }}}
     fun vpnProfile():VpnProfile {
         val p=credentials.optJSONObject("vpn")?:return VpnProfile(username=state.value.username)
         return VpnProfile(p.optString("host"),p.optInt("port",7890),p.optString("username"),

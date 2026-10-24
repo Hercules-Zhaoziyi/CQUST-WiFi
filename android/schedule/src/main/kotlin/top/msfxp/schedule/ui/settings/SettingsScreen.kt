@@ -49,6 +49,10 @@ fun SettingsScreen(
     onNavigateToPersonalization: () -> Unit,
     onNavigateToAbout: () -> Unit,
     onBack: (() -> Unit)? = null,
+    accountContent: (@Composable (()->Unit)->Unit)? = null,
+    preferencesContent: (@Composable ()->Unit)? = null,
+    permissionsContent: (@Composable ()->Unit)? = null,
+    updatesContent: (@Composable ()->Unit)? = null,
     viewModel: SettingsViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -93,7 +97,7 @@ fun SettingsScreen(
         ) {
             // 用户信息卡片
             item {
-                UserProfileCard(
+                if(accountContent!=null)accountContent{showLogoutDialog=true}else UserProfileCard(
                     settings = uiState.appSettings,
                     onNavigateToLogin = onNavigateToLogin,
                     onLogoutClick = { showLogoutDialog = true }
@@ -117,6 +121,7 @@ fun SettingsScreen(
             }
 
             // 课表常规设置
+            if(preferencesContent!=null)item{preferencesContent()}
             item {
                 GeneralSettingsSection(
                     startDate = uiState.currentSemester.effectiveStartDate.toString(),
@@ -136,9 +141,11 @@ fun SettingsScreen(
             }
 
             // 关于
+            if(permissionsContent!=null)item{permissionsContent()}
             item {
                 AboutSection(onAboutClick = onNavigateToAbout)
             }
+            if(updatesContent!=null)item{updatesContent()}
         }
 
         // 退出登录确认弹窗

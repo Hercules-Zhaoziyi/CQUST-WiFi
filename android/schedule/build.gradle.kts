@@ -9,7 +9,7 @@ android {
     compileSdk { version = release(37) { minorApiLevel = 0 } }
     defaultConfig {
         minSdk = 29
-        buildConfigField("String", "VERSION_NAME", "\"1.1.0-beta01\"")
+        buildConfigField("String", "VERSION_NAME", "\"1.1.0-beta02\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildFeatures { compose = true; buildConfig = true }

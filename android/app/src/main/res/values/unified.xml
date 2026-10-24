@@ -1,0 +1,59 @@
+<resources>
+    <string name="unified_back">返回</string>
+    <string name="unified_connection">连接与外观</string>
+    <string name="unified_auto_login">自动登录</string>
+    <string name="unified_auto_login_desc">识别校园网认证入口后连接选定账号。</string>
+    <string name="unified_keep">始终保持连接</string>
+    <string name="unified_keep_desc">掉线后静默重连，手动断开时暂停。</string>
+    <string name="unified_interval">状态检查间隔</string>
+    <string name="unified_five">5 秒</string>
+    <string name="unified_ten">10 秒</string>
+    <string name="unified_two_minutes">2 分钟</string>
+    <string name="unified_animations">界面动效</string>
+    <string name="unified_animations_desc">页面过渡与连接状态动效。</string>
+    <string name="unified_theme">界面主题</string>
+    <string name="unified_system">跟随系统</string>
+    <string name="unified_light">白天</string>
+    <string name="unified_dark">夜间</string>
+    <string name="unified_accounts">学校账号</string>
+    <string name="unified_login">登录学校账号</string>
+    <string name="unified_login_desc">校园网与课表独立认证，也可使用不同账号。</string>
+    <string name="unified_campus_account">校园网账号</string>
+    <string name="unified_course_account">课表账号</string>
+    <string name="unified_shared_account">校园网与课表 · 共用账号</string>
+    <string name="unified_change_account">更换账号</string>
+    <string name="unified_disconnect_campus">校园网下线</string>
+    <string name="unified_logout_course">退出课表</string>
+    <string name="unified_brand">CQUST Wi-Fi × 课程表</string>
+    <string name="unified_brand_cross">×</string>
+    <string name="unified_tagline">网络与课程，一起安排好。</string>
+    <string name="unified_intro_title">为校园日常，连在一起</string>
+    <string name="unified_intro">连接校园网、管理课程安排，也让自己的设备共享网络。校园网与课表共用登录入口、分别认证，账号相同自动合并展示，不同账号也能独立使用。提醒、日历、小组件、多账号和代理配置，在统一设置中集中管理。</string>
+    <string name="unified_wifi_repo">Wi-Fi 开源仓库</string>
+    <string name="unified_wifi_repo_path" translatable="false">Hercules-Zhaoziyi/CQUST-WiFi</string>
+    <string name="unified_course_repo">课程表开源仓库</string>
+    <string name="unified_course_repo_path" translatable="false">yuexps/cqust-schedule-miuix</string>
+    <string name="unified_wifi_group">CQUST Wi-Fi 内测群</string>
+    <string name="unified_wifi_group_number" translatable="false">399359897</string>
+    <string name="unified_course_group">课程表 QQ 交流群</string>
+    <string name="unified_course_group_number" translatable="false">767082393</string>
+    <string name="unified_group_desc">打开 QQ，申请加入交流群</string>
+    <string name="unified_group_fallback">未能打开 QQ，群号 %1$s 已复制。</string>
+    <string name="unified_website">软件介绍</string>
+    <string name="unified_website_desc">功能介绍、各平台下载与更新说明</string>
+    <string name="auth_guide_title">校园网认证帮助</string>
+    <string name="auth_guide_body">使用当前 Wi-Fi 原生探测认证入口，不打开内嵌网页，也不会提交账号密码。未开通校园网仍可使用可用网络单独登录课表。</string>
+    <string name="auth_probe_start">重新探测认证入口</string>
+    <string name="auth_probe_working">正在通过 Wi-Fi 探测…</string>
+    <string name="auth_probe_idle">先连接校园 Wi-Fi，再点击探测。</string>
+    <string name="auth_probe_found">已识别认证入口：%1$s。返回登录后将使用此入口。</string>
+    <string name="auth_probe_online">当前设备已有校园网会话，可返回刷新连接状态。</string>
+    <string name="auth_probe_no_wifi">未连接可用 Wi-Fi。请先连接校园无线网络。</string>
+    <string name="auth_probe_failed">未识别到认证入口。请确认连接的是校园 Wi-Fi；也可使用浏览器打开官方认证页，复制跳转后的完整网址。</string>
+    <string name="auth_probe_external">在浏览器打开官方认证页</string>
+    <string name="auth_probe_manual">完整认证网址（可选）</string>
+    <string name="auth_probe_manual_help">只接受学校认证页的完整跳转网址，包含 ? 后参数；不要公开分享。</string>
+    <string name="auth_probe_apply">使用此认证网址</string>
+    <string name="auth_probe_invalid">网址不完整或不是学校认证入口。</string>
+    <string name="auth_guide_done">返回登录</string>
+</resources>
