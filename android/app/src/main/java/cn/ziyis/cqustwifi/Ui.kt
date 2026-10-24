@@ -43,6 +43,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import top.yukonga.miuix.kmp.basic.TabRowWithContour
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.*
 import androidx.compose.ui.unit.dp
@@ -68,6 +70,7 @@ private val CardShape=RoundedCornerShape(26.dp)
     var page by remember{mutableStateOf("连接")}
     var loginTarget by remember{mutableIntStateOf(Repository.loginPurpose())}
     var portal by remember{mutableStateOf(false)}
+    var manualAuth by remember{mutableStateOf(false)}
     val systemDark=isSystemInDarkTheme()
     val dark=when(state.prefs.theme){"dark"->true;"light"->false;else->systemDark}
     val activity=LocalContext.current as? android.app.Activity
@@ -87,6 +90,8 @@ private val CardShape=RoundedCornerShape(26.dp)
     val background by animateColorAsState(scheme.background,tween(if(state.prefs.animations)450 else 0),label="theme")
     val snackbar=remember{SnackbarHostState()}
     LaunchedEffect(state.message){if(state.message.isNotEmpty()){snackbar.showSnackbar(state.message);Repository.dismissMessage()}}
+    LaunchedEffect(Unit){ScheduleStore.completed.collect{if(page=="连接"&&loginTarget!=0)page="课程表"}}
+    LaunchedEffect(issue){if(issue==null)manualAuth=false}
     val mode=when(state.prefs.theme){"dark"->ColorSchemeMode.Dark;"light"->ColorSchemeMode.Light;else->ColorSchemeMode.System}
     val controller=remember(mode){ThemeController(mode)}
     MiuixTheme(controller=controller){
@@ -120,9 +125,9 @@ private val CardShape=RoundedCornerShape(26.dp)
                 fadeIn(tween(if(state.prefs.animations)220 else 0)) togetherWith fadeOut(tween(if(state.prefs.animations)100 else 0))
             },label="page"){current->
                 when(current){
-                    "连接"->Home(state,onPortal={portal=true},initialMode=loginTarget,onMode={loginTarget=it})
+                    "连接"->Home(state,onPortal={if(issue!=null)manualAuth=true else portal=true},initialMode=loginTarget,onMode={loginTarget=it})
                     "常用网站"->Sites()
-                    "课程表"->SchedulePage(onLogin={loginTarget=1;page="连接"})
+                    "课程表"->SchedulePage(onLogin={loginTarget=1;page="连接"},onAbout={page="关于"},controller=controller)
                     "代理"->ProxyPage(state,onVpn)
                     "设置"->SettingsPage(state,onLogs={page="日志"},onNotifications)
                     "日志"->Logs(state)
@@ -130,7 +135,7 @@ private val CardShape=RoundedCornerShape(26.dp)
                 }
             }
         }
-        if(issue!=null)AuthDialog(issue!!,onPortal={Repository.dismissIssue();portal=true})
+        if(issue!=null&&(loginTarget==0||manualAuth))AuthDialog(issue!!,onPortal={Repository.dismissIssue();portal=true})
         if(portal)PortalDialog(onClose={portal=false},onResult={url->portal=false;Repository.retryAuth(url,"","")})
         UpdateDialog()
     }
@@ -141,9 +146,8 @@ private val CardShape=RoundedCornerShape(26.dp)
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal=20.dp).padding(bottom=24.dp),
         verticalArrangement=Arrangement.spacedBy(18.dp),content=content)
 }
-@Composable private fun Heading(kicker:String,title:String,subtitle:String){
+@Composable private fun Heading(title:String,subtitle:String){
     Column(Modifier.padding(top=14.dp,bottom=4.dp)){
-        Text(kicker,fontSize=11.sp,letterSpacing=2.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
         Text(title,fontSize=30.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(top=10.dp))
         Text(subtitle,fontSize=14.sp,color=MaterialTheme.colorScheme.onSurfaceVariant,modifier=Modifier.padding(top=8.dp),lineHeight=22.sp)
     }
@@ -285,7 +289,7 @@ private val CardShape=RoundedCornerShape(26.dp)
     val sites=remember{Repository.sites()}
     val loader=remember{ImageLoader.Builder(context).components{add(SvgDecoder.Factory())}.build()}
     LazyColumn(Modifier.fillMaxSize().padding(horizontal=20.dp),verticalArrangement=Arrangement.spacedBy(12.dp),contentPadding=PaddingValues(bottom=24.dp)){
-        item{Heading("CAMPUS SHORTCUTS","常用网站","校园服务，触手可及。")}
+        item{Heading("常用网站","校园服务，触手可及。")}
         items(sites.chunked(2)){row->
             Row(horizontalArrangement=Arrangement.spacedBy(12.dp)){
                 row.forEach{site->
@@ -320,35 +324,42 @@ private val CardShape=RoundedCornerShape(26.dp)
     val context=LocalContext.current
     var scanned by remember{mutableStateOf<VpnProfile?>(null)}
     var shareQr by remember{mutableStateOf<String?>(null)}
-    val scanner=androidx.activity.compose.rememberLauncherForActivityResult(com.journeyapps.barcodescanner.ScanContract()){result->
-        result.contents?.let{raw->runCatching{ProxyQr.parse(raw)}.onSuccess{scanned=it}.onFailure{Repository.message("不是有效的局域网代理二维码，请核对桌面端配置。")}}
+    val scanner=androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()){result->
+        if(result.data?.getBooleanExtra("manual",false)==true)tab=0
+        result.data?.getStringExtra("proxy_qr")?.let{raw->runCatching{ProxyQr.parse(raw)}.onSuccess{scanned=it}.onFailure{Repository.message(context.getString(R.string.proxy_scan_invalid))}}
     }
+    LaunchedEffect(s.sharing){if(!s.sharing)shareQr=null}
     PageColumn{
-        Heading("YOUR DEVICES, CONNECTED","代理","连接电脑共享的网络，或在自己的设备之间转发。")
-        if(tab==0&&!s.vpn)SecondaryButton(onClick={scanner.launch(com.journeyapps.barcodescanner.ScanOptions().setDesiredBarcodeFormats(com.journeyapps.barcodescanner.ScanOptions.QR_CODE).setPrompt("扫描桌面端代理配置二维码").setOrientationLocked(false))},modifier=Modifier.fillMaxWidth()){
-            Icon(Icons.Outlined.QrCodeScanner,null);Spacer(Modifier.width(8.dp));Text("扫码导入并连接")
-        }
-        Surface(shape=RoundedCornerShape(20.dp),color=MaterialTheme.colorScheme.surfaceVariant){
-            Row(Modifier.fillMaxWidth().padding(5.dp),horizontalArrangement=Arrangement.spacedBy(6.dp)){
-                listOf("连接电脑","本机共享").forEachIndexed{i,title->
-                    Surface(onClick={tab=i},shape=RoundedCornerShape(16.dp),
-                        color=if(tab==i)MaterialTheme.colorScheme.surface else Color.Transparent,modifier=Modifier.weight(1f)){
-                        Row(Modifier.padding(vertical=14.dp),horizontalArrangement=Arrangement.Center,verticalAlignment=Alignment.CenterVertically){
-                            Icon(if(i==0)Icons.Outlined.Computer else Icons.Outlined.Share,null,Modifier.size(18.dp));Spacer(Modifier.width(8.dp));Text(title,fontSize=14.sp,fontWeight=FontWeight.SemiBold)
-                        }
-                    }
+        Heading("代理","连接自己的设备，分享已连接的网络。")
+        MiuixCard(modifier=Modifier.fillMaxWidth().testTag("proxy-scan-entry"),cornerRadius=24.dp,
+            insideMargin=PaddingValues(18.dp),showIndication=true,
+            colors=CardDefaults.defaultColors(color=MiuixTheme.colorScheme.primary.copy(alpha=.10f)),
+            onClick={scanner.launch(android.content.Intent(context,ProxyScannerActivity::class.java))}){
+            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){
+                Surface(shape=RoundedCornerShape(15.dp),color=MiuixTheme.colorScheme.surfaceContainer){
+                    Icon(Icons.Outlined.QrCodeScanner,null,Modifier.padding(12.dp).size(26.dp),tint=MiuixTheme.colorScheme.primary)
                 }
+                Column(Modifier.weight(1f).padding(horizontal=13.dp)){
+                    Text(stringResource(R.string.proxy_scan_entry),fontSize=17.sp,fontWeight=FontWeight.SemiBold)
+                    Text(stringResource(R.string.proxy_scan_entry_detail),fontSize=12.sp,lineHeight=20.sp,color=MiuixTheme.colorScheme.onSurfaceVariantSummary,modifier=Modifier.padding(top=5.dp))
+                }
+                Icon(Icons.Outlined.ChevronRight,null,Modifier.size(20.dp),tint=MiuixTheme.colorScheme.primary)
             }
+        }
+        BoxWithConstraints(Modifier.fillMaxWidth()){
+            val width=(maxWidth-14.dp)/2
+            TabRowWithContour(tabs=listOf("连接电脑","本机共享"),selectedTabIndex=tab,onTabSelected={tab=it},
+                modifier=Modifier.fillMaxWidth(),minWidth=width,maxWidth=width,height=48.dp,cornerRadius=16.dp)
         }
         if(tab==0){
             Panel{
                 Row(verticalAlignment=Alignment.CenterVertically){
                     Icon(Icons.Outlined.Laptop,null,tint=MaterialTheme.colorScheme.primary)
-                    Column(Modifier.weight(1f).padding(start=12.dp)){Text("电脑 SOCKS5",fontSize=18.sp,fontWeight=FontWeight.SemiBold)
+                    Column(Modifier.weight(1f).padding(start=12.dp)){Text("设备 SOCKS5",fontSize=18.sp,fontWeight=FontWeight.SemiBold)
                         Text(s.vpnMessage,fontSize=12.sp,lineHeight=19.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)}
                 }
                 if(!s.vpn){
-                    MiuixInput(host,{host=it.trim()},label={Text("电脑服务器 IP")},placeholder={Text("例如 172.21.x.x")},
+                    MiuixInput(host,{host=it.trim()},label={Text("服务器 IP")},placeholder={Text("例如 172.21.x.x")},
                         modifier=Modifier.fillMaxWidth(),singleLine=true,shape=RoundedCornerShape(16.dp),keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal))
                     MiuixInput(port,{port=it.filter(Char::isDigit)},label={Text("端口")},modifier=Modifier.fillMaxWidth(),singleLine=true,shape=RoundedCornerShape(16.dp),keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number))
                     MiuixInput(user,{user=it},label={Text("代理用户名")},modifier=Modifier.fillMaxWidth(),singleLine=true,shape=RoundedCornerShape(16.dp))
@@ -400,8 +411,13 @@ private val CardShape=RoundedCornerShape(26.dp)
             Text("HTTP 支持 HTTPS CONNECT，不解密网页内容；SOCKS5 支持 TCP/UDP。认证本身不加密，请仅在可信网络与自己的设备之间使用。网络隔离可能阻止互访，应用不会改变校园网设备配额。",fontSize=12.sp,lineHeight=22.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
-    scanned?.let{p->MiuixPrompt(onDismissRequest={scanned=null},title={Text("确认连接电脑代理")},text={Text("服务器：${p.host}\n端口：${p.port}\n用户名：${p.username}\n\n二维码包含代理凭据，请只扫描自己电脑生成的配置。")},confirmButton={QuietButton(onClick={
-        runCatching{Repository.saveVpn(p.host,p.port,p.username,p.password,false)}.onSuccess{host=p.host;port=p.port.toString();user=p.username;password=p.password;campus=false;scanned=null;onVpn()}.onFailure{Repository.message("代理配置保存失败")}
+    scanned?.let{p->MiuixPrompt(onDismissRequest={scanned=null},title={Text(stringResource(R.string.proxy_scan_confirm))},text={Column(verticalArrangement=Arrangement.spacedBy(12.dp)){
+        Text(stringResource(R.string.proxy_scan_confirm_detail,p.host,p.port,p.username))
+        if(s.sharing)Text(stringResource(R.string.proxy_scan_share_stop),color=MiuixTheme.colorScheme.primary)
+        if(s.vpn)Text(stringResource(R.string.proxy_scan_vpn_stop),color=MiuixTheme.colorScheme.primary)
+    }},confirmButton={QuietButton(enabled=!s.vpn,onClick={
+        if(s.sharing)Repository.stopSharing()
+        runCatching{Repository.saveVpn(p.host,p.port,p.username,p.password,false)}.onSuccess{host=p.host;port=p.port.toString();user=p.username;password=p.password;campus=false;scanned=null;tab=0;onVpn()}.onFailure{Repository.message("代理配置保存失败")}
     }){Text("确认并连接")}},dismissButton={QuietButton(onClick={scanned=null}){Text("取消")}})}
     shareQr?.let{payload->ProxyQrDialog(payload,onClose={shareQr=null})}
 }
@@ -410,10 +426,19 @@ private val CardShape=RoundedCornerShape(26.dp)
         android.graphics.Bitmap.createBitmap(720,720,android.graphics.Bitmap.Config.ARGB_8888).apply{
             val pixels=IntArray(720*720){i->if(matrix[i%720,i/720])android.graphics.Color.BLACK else android.graphics.Color.WHITE};setPixels(pixels,0,720,0,0,720,720)
         }}
-    MiuixPrompt(onDismissRequest=onClose,properties=androidx.compose.ui.window.DialogProperties(securePolicy=androidx.compose.ui.window.SecureFlagPolicy.SecureOn),containerColor=MaterialTheme.colorScheme.surface,title={Text("扫码连接本机代理")},text={Column(verticalArrangement=Arrangement.spacedBy(12.dp)){
-        Image(bitmap.asImageBitmap(),"代理连接二维码",Modifier.fillMaxWidth().aspectRatio(1f))
-        Text("二维码含代理密码，请勿公开分享。仅允许自己的可信设备扫描。",fontSize=12.sp)
-    }},confirmButton={QuietButton(onClick=onClose){Text("关闭")}})
+    val profile=remember(payload){ProxyQr.parse(payload)}
+    MiuixPrompt(onDismissRequest=onClose,
+        properties=androidx.compose.ui.window.DialogProperties(securePolicy=androidx.compose.ui.window.SecureFlagPolicy.SecureOn),
+        title={Text("连接到这台设备",fontSize=22.sp,fontWeight=FontWeight.SemiBold)},text={
+        Column(Modifier.fillMaxWidth(),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(14.dp)){
+            Text("在另一台设备的代理页，点击“扫码连接”",fontSize=13.sp,color=MiuixTheme.colorScheme.onSurfaceVariantSummary)
+            Surface(color=Color.White,shape=RoundedCornerShape(24.dp)){
+                Image(bitmap.asImageBitmap(),"代理连接二维码",Modifier.padding(12.dp).fillMaxWidth().aspectRatio(1f))
+            }
+            Text("${profile.host}:${profile.port}",fontSize=15.sp,fontWeight=FontWeight.SemiBold)
+            Text("二维码包含代理凭据，仅供本人可信设备使用，请勿公开分享。",fontSize=12.sp,lineHeight=20.sp,color=MiuixTheme.colorScheme.onSurfaceVariantSummary)
+        }
+    },confirmButton={QuietButton(onClick=onClose){Text("完成")}})
 }
 private fun copy(context:Context,text:String){context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("代理地址",text));Repository.message("已复制")}
 
@@ -431,7 +456,7 @@ private fun copy(context:Context,text:String){context.getSystemService(Clipboard
     var update by remember{mutableStateOf<UpdateInfo?>(null)}
     var checking by remember{mutableStateOf(false)}
     PageColumn{
-        Heading("MAKE IT YOURS","连接与偏好","操作即时生效，让连接按你的习惯运行。")
+        Heading("连接与偏好","让连接与显示方式，按你的习惯运行。")
         Panel{
             Setting("自动登录","检测到认证入口时使用选定账号；不会绕过验证码。",s.prefs.autoLogin){Repository.preferences(s.prefs.copy(autoLogin=it))}
             HorizontalDivider()
@@ -499,7 +524,7 @@ private fun copy(context:Context,text:String){context.getSystemService(Clipboard
 }
 @Composable private fun Logs(s:ViewState){
     PageColumn{
-        Heading("CONNECTION JOURNAL","日志","只记录脱敏的连接阶段，不记录密码或完整认证网址。")
+        Heading("日志","只记录连接阶段，不记录密码或完整认证网址。")
         SecondaryButton(onClick=Repository::clearLogs){Text("清空本次日志")}
         Panel{if(s.logs.isEmpty())Text("暂无日志",fontSize=13.sp)else s.logs.reversed().forEach{Text(it,fontSize=12.sp,lineHeight=21.sp)}}
     }

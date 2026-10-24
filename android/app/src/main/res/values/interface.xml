@@ -1,0 +1,25 @@
+<resources>
+    <string name="schedule_credentials_required">请在共用登录入口填写学校账号与统一认证密码。</string>
+    <string name="schedule_sync_done">课表已同步</string>
+    <string name="schedule_sync_failed">课表同步未完成，原缓存已保留。请检查学校认证和教务系统是否可访问。</string>
+    <string name="schedule_migration_failed">旧课表暂无法恢复，原文件已保留；可重新同步或稍后重试。</string>
+    <string name="proxy_scan_title">扫码连接</string>
+    <string name="proxy_scan_subtitle">扫描电脑或手机的代理二维码</string>
+    <string name="proxy_scan_hint">将二维码放入框内，即可识别连接配置</string>
+    <string name="proxy_scan_gallery">从相册导入</string>
+    <string name="proxy_scan_manual">手动填写</string>
+    <string name="proxy_scan_back">返回</string>
+    <string name="proxy_scan_flash">手电筒</string>
+    <string name="proxy_scan_private">只扫描本人可信设备，不会上传相机画面</string>
+    <string name="proxy_scan_permission_title">允许相机，轻松连接</string>
+    <string name="proxy_scan_permission_body">相机仅用于识别代理配置，不保存或上传画面。也可以从相册导入。</string>
+    <string name="proxy_scan_permission_button">允许使用相机</string>
+    <string name="proxy_scan_invalid">没有识别到有效的局域网代理二维码</string>
+    <string name="proxy_scan_invalid_picture">这张图片中未找到代理二维码，请换一张清晰的图片。</string>
+    <string name="proxy_scan_confirm">确认连接设备</string>
+    <string name="proxy_scan_entry">扫码连接设备</string>
+    <string name="proxy_scan_entry_detail">免手动输入，自动填写代理配置</string>
+    <string name="proxy_scan_share_stop">连接前将停止当前本机共享。</string>
+    <string name="proxy_scan_vpn_stop">请先断开当前 VPN，再连接另一个设备。</string>
+    <string name="proxy_scan_confirm_detail">服务器：%1$s\n端口：%2$d\n用户名：%3$s\n\n只连接自己的可信设备。二维码中包含代理凭据。</string>
+</resources>

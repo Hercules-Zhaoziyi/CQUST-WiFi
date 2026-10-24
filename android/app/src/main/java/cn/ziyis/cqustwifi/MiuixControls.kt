@@ -33,8 +33,8 @@ import top.yukonga.miuix.kmp.window.WindowDialog
 }
 
 @Composable internal fun QuietButton(onClick:()->Unit,modifier:Modifier=Modifier,enabled:Boolean=true,
-    content:@Composable RowScope.()->Unit){
-    Button(onClick,modifier,enabled,minWidth=0.dp,minHeight=36.dp,insideMargin=PaddingValues(8.dp,6.dp),
+    contentPadding:PaddingValues=PaddingValues(8.dp,6.dp),content:@Composable RowScope.()->Unit){
+    Button(onClick,modifier,enabled,minWidth=0.dp,minHeight=36.dp,insideMargin=contentPadding,
         colors=ButtonDefaults.buttonColors(color=Color.Transparent,contentColor=MiuixTheme.colorScheme.primary),content=content)
 }
 
