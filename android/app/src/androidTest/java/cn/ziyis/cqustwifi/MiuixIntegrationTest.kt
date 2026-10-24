@@ -99,6 +99,7 @@ class MiuixIntegrationTest {
         rule.onNodeWithText("认证帮助").performScrollTo().performClick()
         rule.onNodeWithText("校园网认证帮助").assertExists()
         rule.onNodeWithText("重新探测认证入口").performClick()
+        rule.waitUntil(10000){rule.onAllNodesWithText("未连接可用 Wi-Fi。请先连接校园无线网络。").fetchSemanticsNodes().isNotEmpty()}
         rule.onNodeWithText("未连接可用 Wi-Fi。请先连接校园无线网络。").assertExists()
         screenshot("13-native-auth-help")
     }
