@@ -43,7 +43,7 @@ object Repository {
         app=context.applicationContext;vault=Vault(app);engine=CampusEngine(app,::log)
         val error=runCatching{credentials=vault.read()}.exceptionOrNull()
         val p=app.getSharedPreferences("settings",Context.MODE_PRIVATE)
-        networkRequested=Protocol.usesCampusLogin(p.getInt("loginPurpose",0))
+        networkRequested=Protocol.usesCampusLogin(loginPurpose())
         val prefs=Preferences(p.getBoolean("startup",false),p.getBoolean("autoLogin",false),
             p.getBoolean("keepConnected",false),p.getInt("interval",10).takeIf{it in listOf(5,10,120)}?:10,
             p.getBoolean("animations",true),p.getString("theme","system")?:"system",p.getBoolean("vpnAuto",false))
@@ -83,11 +83,15 @@ object Repository {
     }
     fun hasPassword(user:String=state.value.username)=account(user)!=null
     internal fun sharedAccount(user:String)=account(user)
-    fun loginPurpose()=app.getSharedPreferences("settings",Context.MODE_PRIVATE).getInt("loginPurpose",0).coerceIn(0,2)
+    fun loginPurpose():Int{
+        val p=app.getSharedPreferences("settings",Context.MODE_PRIVATE)
+        if(!p.contains("loginPurposeV2"))p.edit().putInt("loginPurposeV2",if(p.getInt("loginPurpose",0)==2)3 else p.getInt("loginPurpose",0)).apply()
+        return p.getInt("loginPurposeV2",0).coerceIn(0,3)
+    }
     fun loginPurpose(mode:Int){
-        val safe=mode.coerceIn(0,2)
+        val safe=mode.coerceIn(0,3)
         networkRequested=Protocol.usesCampusLogin(safe)
-        app.getSharedPreferences("settings",Context.MODE_PRIVATE).edit().putInt("loginPurpose",safe).apply()
+        app.getSharedPreferences("settings",Context.MODE_PRIVATE).edit().putInt("loginPurposeV2",safe).apply()
         ensureMonitor()
     }
     suspend fun rememberIdentity(user:String,password:String,remember:Boolean=true)=gate.withLock{
@@ -112,6 +116,7 @@ object Repository {
         try{
             ScheduleStore.forgetSavedPassword(user)
             credentials.optJSONObject("accounts")?.remove(user);vault.write(credentials);runtimeAccounts.remove(user)
+            PortalStore.forget(user)
         }catch(_:Exception){message("账号未能完整移除，请稍后重试。");return@withLock}
         mutable.update{it.copy(accounts=it.accounts-user)}
         if(state.value.username==user)select("")

@@ -1,0 +1,8 @@
+<resources>
+    <string name="portal_failed">信息门户认证未完成，请核对账号或在校方页面完成验证。</string>
+    <string name="portal_back">返回</string>
+    <string name="portal_external">使用浏览器打开</string>
+    <string name="login_portal">信息门户</string>
+    <string name="login_all">全部</string>
+    <string name="portal_hint">信息门户独立认证，无需开通校园网上网服务。</string>
+</resources>

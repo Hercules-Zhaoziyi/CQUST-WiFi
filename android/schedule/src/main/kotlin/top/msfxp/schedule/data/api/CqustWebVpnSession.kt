@@ -34,6 +34,10 @@ class CqustWebVpnSession(
 
     private val cookieMap = java.util.concurrent.ConcurrentHashMap<String, Cookie>()
     fun close(){cookieMap.clear();httpClient.close()}
+    // 仅向应用内门户窗口转交网关域的有效 Cookie。
+    fun portalCookies(): List<String> = cookieMap.values.filter {
+        it.domain == "web.cqust.edu.cn" && it.expiresAt > System.currentTimeMillis()
+    }.map { it.newBuilder().secure(true).build().toString() }
 
     // 教务与实践系统基地址
     var eamsBaseUrl: String? = null

@@ -25,6 +25,7 @@
             </intent-filter>
         </activity>
         <activity android:name=".ProxyScannerActivity" android:exported="false" android:windowSoftInputMode="adjustNothing"/>
+        <activity android:name=".PortalActivity" android:exported="false"/>
         <service android:name=".MonitorService" android:exported="false"
             android:foregroundServiceType="connectedDevice"/>
         <service android:name=".CampusVpnService" android:permission="android.permission.BIND_VPN_SERVICE"

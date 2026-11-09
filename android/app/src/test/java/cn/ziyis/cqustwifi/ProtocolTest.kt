@@ -7,8 +7,8 @@ import org.json.JSONArray
 
 class ProtocolTest {
     @Test fun timetableOnlyNeverRequestsCampusLogin(){
-        assertTrue(Protocol.usesCampusLogin(0));assertTrue(Protocol.usesCampusLogin(2))
-        assertFalse(Protocol.usesCampusLogin(1));assertFalse(Protocol.usesCampusLogin(-1));assertFalse(Protocol.usesCampusLogin(99))
+        assertTrue(Protocol.usesCampusLogin(0));assertTrue(Protocol.usesCampusLogin(3))
+        assertFalse(Protocol.usesCampusLogin(1));assertFalse(Protocol.usesCampusLogin(2));assertFalse(Protocol.usesCampusLogin(-1));assertFalse(Protocol.usesCampusLogin(99))
     }
     @Test fun trustedSchoolOnly(){
         assertTrue(Protocol.trusted("http://aaa.cqust.edu.cn/eportal/"))

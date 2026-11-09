@@ -94,7 +94,7 @@ private val CardShape=RoundedCornerShape(26.dp)
     val scheme=lightColorScheme()
     val snackbar=remember{SnackbarHostState()}
     LaunchedEffect(state.message){if(state.message.isNotEmpty()){snackbar.showSnackbar(state.message);Repository.dismissMessage()}}
-    LaunchedEffect(Unit){ScheduleStore.completed.collect{if(page=="连接"&&loginTarget!=0)page="课程表"}}
+    LaunchedEffect(Unit){ScheduleStore.completed.collect{if(page=="连接"&&(loginTarget==1||loginTarget==3))page="课程表"}}
     LaunchedEffect(Unit){Repository.navigation.collect{if(it=="schedule"){page="课程表";Repository.navigation.value=null}}}
     LaunchedEffect(issue){if(issue==null)manualAuth=false}
     MiuixTheme(controller=controller){
@@ -219,8 +219,9 @@ private val CardShape=RoundedCornerShape(26.dp)
     val submitLogin:()->Unit={
         Repository.loginPurpose(loginMode)
         val secret=password.ifEmpty{Repository.sharedAccount(user)?.password.orEmpty()}
-        if(loginMode!=1)Repository.login(user,password,rememberPassword)
-        if(loginMode!=0)ScheduleStore.sync(user,secret,rememberPassword)
+        if(Protocol.usesCampusLogin(loginMode))Repository.login(user,password,rememberPassword)
+        if(loginMode==1||loginMode==3)ScheduleStore.sync(user,secret,rememberPassword)
+        if(loginMode==2||loginMode==3)PortalStore.signIn(user,secret,rememberPassword)
     }
     val title=when(s.status){LinkState.CONNECTED,LinkState.OPEN->"已连接";LinkState.CONNECTING->"正在连接";LinkState.OFFLINE->"未连接 Wi-Fi";LinkState.NEED_AUTH->"等待连接";LinkState.UNKNOWN->"状态待确认"}
     val hour=Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
@@ -273,11 +274,11 @@ private val CardShape=RoundedCornerShape(26.dp)
                 MiuixInput(user,{user=it},label={Text("校园网账号")},modifier=Modifier.fillMaxWidth().testTag("username"),
                     singleLine=true,shape=RoundedCornerShape(16.dp),trailingIcon={IconButton(onClick={accounts=true}){Icon(Icons.Outlined.ExpandMore,"选择账号")}})
                 SecretField(password,{password=it},"统一认证密码",placeholder=if(Repository.hasPassword(user))"密码已安全保存，可留空"else"请输入密码")
-                Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
-                    listOf("校园网","课表","两者").forEachIndexed{i,title->ChoiceChip(loginMode==i,{loginMode=i;onMode(i)},label={Text(title)})}
+                FlowRow(horizontalArrangement=Arrangement.spacedBy(6.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){
+                    listOf("校园网","课表",stringResource(R.string.login_portal),stringResource(R.string.login_all)).forEachIndexed{i,title->ChoiceChip(loginMode==i,{loginMode=i;onMode(i)},label={Text(title)})}
                 }
                 if(loginMode!=0){
-                    Text("课表独立使用统一身份认证，无需开通校园网。",fontSize=12.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(if(loginMode==2)stringResource(R.string.portal_hint)else "课表独立使用统一身份认证，无需开通校园网。",fontSize=12.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
                     if(scheduleMessage.isNotEmpty())Text(scheduleMessage,fontSize=12.sp,color=MaterialTheme.colorScheme.primary)
                 }
                 Row(verticalAlignment=Alignment.CenterVertically){
@@ -318,7 +319,7 @@ private val CardShape=RoundedCornerShape(26.dp)
         items(sites.chunked(2)){row->
             Row(horizontalArrangement=Arrangement.spacedBy(12.dp)){
                 row.forEach{site->
-                    Surface(onClick={openLink(context,site.url)},shape=RoundedCornerShape(22.dp),color=MaterialTheme.colorScheme.surface,modifier=Modifier.weight(1f)){
+                    Surface(onClick={if(site.name=="信息门户")PortalStore.openAuthenticated(context)else openLink(context,site.url)},shape=RoundedCornerShape(22.dp),color=MaterialTheme.colorScheme.surface,modifier=Modifier.weight(1f)){
                         Column(Modifier.padding(17.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
                             AsyncImage("file:///android_asset/${site.icon}",site.name,imageLoader=loader,modifier=Modifier.size(42.dp))
                             Text(site.name,fontSize=15.sp,fontWeight=FontWeight.SemiBold,lineHeight=22.sp)
