@@ -44,7 +44,9 @@ class CqustWebVpnSession(
     var sjjxBaseUrl: String? = null
 
     // 检查是否已持有有效的 WebVPN 会话 Ticket
-    fun hasVpnTicket(): Boolean = getCookie(VPN_TICKET_COOKIE)!=null
+    fun hasVpnTicket(): Boolean = cookieMap.values.any {
+        it.name==VPN_TICKET_COOKIE&&it.expiresAt>System.currentTimeMillis()&&it.matches(VPN_GATEWAY.toHttpUrl())
+    }
 
     // 获取特定 Cookie
     fun getCookie(key: String): String? = cookieMap.values.firstOrNull{it.name==key&&it.expiresAt>System.currentTimeMillis()}?.value
