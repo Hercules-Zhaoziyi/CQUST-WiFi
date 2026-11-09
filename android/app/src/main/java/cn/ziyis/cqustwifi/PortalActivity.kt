@@ -32,7 +32,7 @@ object PortalStore {
         if(!busy.compareAndSet(false,true))return
         scope.launch {
             try {
-                require(user.isNotBlank()&&password.isNotEmpty())
+                require(user.trim().matches(Regex("[A-Za-z0-9_-]{1,32}"))&&password.isNotEmpty()&&password.length<=256)
                 val result=CqustCasAuthClient.login(user.trim(),password)
                 val session=result.session
                 if(!result.success||session==null){Repository.message(result.errorMessage?:Repository.app.getString(R.string.portal_failed));return@launch}

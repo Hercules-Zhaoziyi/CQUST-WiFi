@@ -1,6 +1,6 @@
 # CQUST Wi-Fi Android
 
-当前版本：**1.1.0-beta02**（versionCode 4）。原生 Kotlin / Compose / Miuix 客户端，保留校园网与代理功能，并完整整合获授权的课表模块。
+当前版本：**1.2.0-beta01**（versionCode 5）。原生 Kotlin / Compose / Miuix 客户端，保留校园网与代理功能，并完整整合获授权的课表模块。
 
 ## 本次更新
 
