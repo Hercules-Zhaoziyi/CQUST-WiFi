@@ -1,6 +1,8 @@
 package top.msfxp.schedule.data.db
 
 import androidx.room.*
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 import top.msfxp.schedule.data.model.*
 
@@ -12,55 +14,8 @@ interface ScheduleDao {
     @Query("SELECT * FROM course_tables LIMIT 1")
     fun getDefaultCourseTable(): Flow<CourseTable?>
 
-    @Query("SELECT * FROM course_tables WHERE id = :tableId LIMIT 1")
-    suspend fun getCourseTableById(tableId: String): CourseTable?
-
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertCourseTable(table: CourseTable)
-
-    // 查询指定周已排时段教学事件
-    @Transaction
-    @Query("""
-        SELECT 
-            e.id, e.courseId, e.tableId, e.week, e.day, e.startSection, e.endSection,
-            e.location, e.teacher, e.projectName, e.studentCount,
-            c.name as courseName, c.courseCode as courseCode, c.credit as credit,
-            c.category as category, c.courseType as courseType, c.colorIndex as colorIndex
-        FROM course_events e
-        INNER JOIN courses c ON e.courseId = c.id
-        WHERE e.tableId = :tableId AND e.week = :week AND e.day > 0 AND e.startSection > 0
-        ORDER BY e.day ASC, e.startSection ASC
-    """)
-    fun getWeekGridEvents(tableId: String, week: Int): Flow<List<CourseEventWithMeta>>
-
-    // 查询指定周未排时段教学事件
-    @Transaction
-    @Query("""
-        SELECT 
-            e.id, e.courseId, e.tableId, e.week, e.day, e.startSection, e.endSection,
-            e.location, e.teacher, e.projectName, e.studentCount,
-            c.name as courseName, c.courseCode as courseCode, c.credit as credit,
-            c.category as category, c.courseType as courseType, c.colorIndex as colorIndex
-        FROM course_events e
-        INNER JOIN courses c ON e.courseId = c.id
-        WHERE e.tableId = :tableId AND e.week = :week AND (e.day = 0 OR e.startSection = 0)
-    """)
-    fun getWeekUnarrangedEvents(tableId: String, week: Int): Flow<List<CourseEventWithMeta>>
-
-    // 查询指定周与星期的已排教学事件
-    @Transaction
-    @Query("""
-        SELECT 
-            e.id, e.courseId, e.tableId, e.week, e.day, e.startSection, e.endSection,
-            e.location, e.teacher, e.projectName, e.studentCount,
-            c.name as courseName, c.courseCode as courseCode, c.credit as credit,
-            c.category as category, c.courseType as courseType, c.colorIndex as colorIndex
-        FROM course_events e
-        INNER JOIN courses c ON e.courseId = c.id
-        WHERE e.tableId = :tableId AND e.week = :week AND e.day = :day AND e.startSection > 0
-        ORDER BY e.startSection ASC
-    """)
-    suspend fun getDayEvents(tableId: String, week: Int, day: Int): List<CourseEventWithMeta>
 
     // 提取全学期教学事件
     @Transaction
@@ -72,7 +27,7 @@ interface ScheduleDao {
             c.category as category, c.courseType as courseType, c.colorIndex as colorIndex
         FROM course_events e
         INNER JOIN courses c ON e.courseId = c.id
-        WHERE e.tableId = :tableId AND e.day > 0 AND e.startSection > 0
+        WHERE e.tableId = :tableId AND e.day > 0 AND e.startSection != 0
         ORDER BY e.week ASC, e.day ASC, e.startSection ASC
     """)
     suspend fun getAllEventsForTable(tableId: String): List<CourseEventWithMeta>
@@ -129,9 +84,6 @@ interface ScheduleDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSemesters(semesters: List<Semester>)
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertSemester(semester: Semester)
 
     @Query("UPDATE semesters SET isCurrent = CASE WHEN id = :activeSemesterId THEN 1 ELSE 0 END")
     suspend fun setActiveSemester(activeSemesterId: String)
@@ -197,11 +149,41 @@ interface ScheduleDao {
     @Query("DELETE FROM course_adjustments WHERE id = :id")
     suspend fun deleteAdjustmentById(id: Long)
 
-    @Query("DELETE FROM course_adjustments WHERE tableId = :tableId AND semesterId = :semesterId")
-    suspend fun clearAdjustmentsBySemester(tableId: String, semesterId: String)
-
     @Query("DELETE FROM course_adjustments WHERE tableId = :tableId")
     suspend fun clearAllAdjustments(tableId: String)
+}
+
+// 考试记录数据访问接口
+@Dao
+interface ExamDao {
+
+    // 观察指定学期的考试记录
+    @Query("""
+        SELECT * FROM exam_records
+        WHERE tableId = :tableId AND semesterId = :semesterId
+        ORDER BY (examDate IS NULL) ASC, examDate ASC, startTime ASC, sequence ASC
+    """)
+    fun observeBySemester(tableId: String, semesterId: String): Flow<List<ExamRecord>>
+
+    @Query("""
+        SELECT * FROM exam_records
+        WHERE tableId = :tableId AND semesterId = :semesterId
+        ORDER BY (examDate IS NULL) ASC, examDate ASC, startTime ASC, sequence ASC
+    """)
+    suspend fun getBySemester(tableId: String, semesterId: String): List<ExamRecord>
+
+    @Query("DELETE FROM exam_records WHERE tableId = :tableId AND semesterId = :semesterId")
+    suspend fun clearBySemester(tableId: String, semesterId: String)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(records: List<ExamRecord>)
+
+    // 按学期整批替换考试记录
+    @Transaction
+    suspend fun replaceSemesterExams(tableId: String, semesterId: String, records: List<ExamRecord>) {
+        clearBySemester(tableId, semesterId)
+        if (records.isNotEmpty()) insertAll(records)
+    }
 }
 
 // 课表 Room 本地数据库
@@ -211,11 +193,49 @@ interface ScheduleDao {
         CourseTable::class,
         Course::class,
         CourseEvent::class,
-        CourseAdjustment::class
+        CourseAdjustment::class,
+        ExamRecord::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class ScheduleDatabase : RoomDatabase() {
     abstract fun scheduleDao(): ScheduleDao
+    abstract fun examDao(): ExamDao
+}
+
+// 数据库 1 → 2：新增考试记录表与查询索引
+val MIGRATION_1_2 = object : Migration(1, 2) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `exam_records` (
+                `id` TEXT NOT NULL,
+                `tableId` TEXT NOT NULL,
+                `semesterId` TEXT NOT NULL,
+                `courseId` TEXT,
+                `examType` TEXT NOT NULL,
+                `sequence` INTEGER NOT NULL,
+                `courseCode` TEXT NOT NULL,
+                `courseName` TEXT NOT NULL,
+                `examDate` TEXT,
+                `week` INTEGER,
+                `weekday` INTEGER,
+                `startTime` TEXT,
+                `endTime` TEXT,
+                `position` TEXT,
+                `seatNo` TEXT,
+                `status` TEXT,
+                `remark` TEXT NOT NULL,
+                `arrangeText` TEXT NOT NULL,
+                `updatedAt` INTEGER NOT NULL,
+                PRIMARY KEY(`id`)
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_exam_records_semester` " +
+                "ON `exam_records` (`tableId`, `semesterId`, `examDate`)"
+        )
+    }
 }

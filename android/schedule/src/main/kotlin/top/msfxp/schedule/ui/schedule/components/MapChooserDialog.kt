@@ -47,7 +47,7 @@ fun MapChooserDialog(
     val context = LocalContext.current
     val destination = remember(rawPosition) {
         MapNavigationHelper.buildWalkingDestination(rawPosition)
-    }
+    } ?: return
     val availableApps = remember(context) {
         MapNavigationHelper.getAvailableMapApps(context)
     }

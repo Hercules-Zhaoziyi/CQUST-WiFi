@@ -19,6 +19,8 @@ import androidx.compose.ui.unit.dp
 import top.msfxp.schedule.R
 import top.msfxp.schedule.data.model.CourseAdjustment
 import top.msfxp.schedule.data.model.CourseEventWithMeta
+import top.msfxp.schedule.data.model.ExamRecord
+import top.msfxp.schedule.util.CourseLocationFormatter
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
@@ -41,6 +43,7 @@ fun CourseAdjustmentSubSheet(
     currentSemesterId: String = "",
     existingAdjustment: CourseAdjustment?,
     getCourseAtSlot: (week: Int, day: Int, startSection: Int, endSection: Int) -> CourseEventWithMeta?,
+    getExamAtSlot: (week: Int, day: Int, startSection: Int, endSection: Int) -> ExamRecord? = { _, _, _, _ -> null },
     onMoveCourse: (CourseAdjustment) -> Unit,
     onSwapCourses: (CourseAdjustment, CourseAdjustment) -> Unit,
     onMarkDeleted: (CourseAdjustment) -> Unit,
@@ -68,15 +71,20 @@ fun CourseAdjustmentSubSheet(
         mutableIntStateOf(existingAdjustment?.targetEndSection ?: if (event.endSection > 0) event.endSection else 2)
     }
     var targetLocation by remember(existingAdjustment, event.location) {
-        mutableStateOf(existingAdjustment?.targetLocation ?: event.location)
+        mutableStateOf(
+            existingAdjustment?.targetLocation?.let { CourseLocationFormatter.formatDisplay(it) }
+                ?: event.displayLocation
+        )
     }
 
     // 数据变更检测
+    val normalizedTargetLocation = CourseLocationFormatter.formatDisplay(targetLocation)
+    val normalizedEventLocation = event.displayLocation
     val isSlotChanged = targetWeek != currentWeek ||
             targetDay != event.day ||
             targetStartSection != event.startSection ||
             targetEndSection != event.endSection
-    val isLocationChanged = targetLocation.trim() != event.location.trim()
+    val isLocationChanged = normalizedTargetLocation.trim() != normalizedEventLocation.trim()
 
     val isSameAsOriginal = !isSlotChanged && !isLocationChanged
 
@@ -85,7 +93,8 @@ fun CourseAdjustmentSubSheet(
             targetDay == existingAdjustment.targetDay &&
             targetStartSection == existingAdjustment.targetStartSection &&
             targetEndSection == existingAdjustment.targetEndSection &&
-            targetLocation.trim() == existingAdjustment.targetLocation.trim()
+            normalizedTargetLocation.trim() ==
+            CourseLocationFormatter.formatDisplay(existingAdjustment.targetLocation).trim()
 
     val isDataChanged = !isSameAsOriginal && !isSameAsExisting
 
@@ -101,6 +110,18 @@ fun CourseAdjustmentSubSheet(
                 course
             }
         }
+    }
+
+    // 目标时段存在考试安排时禁止调课
+    val targetExamConflict = remember(targetWeek, targetDay, targetStartSection, targetEndSection, isSlotChanged) {
+        if (!isSlotChanged) null
+        else getExamAtSlot(targetWeek, targetDay, targetStartSection, targetEndSection)
+    }
+
+    // 调换时对方课程移入原时段，需校验原时段考试冲突
+    val sourceExamConflict = remember(targetWeek, mode, targetConflictCourse) {
+        if (mode != CourseAdjustmentMode.SWAP || targetConflictCourse == null) null
+        else getExamAtSlot(targetWeek, event.day, event.startSection, event.endSection)
     }
 
     val isSpanMatched = targetConflictCourse == null ||
@@ -148,12 +169,16 @@ fun CourseAdjustmentSubSheet(
     val targetDayStr = if (targetDay in 1..7) dayNames[targetDay - 1] else stringResource(R.string.course_pending_location)
 
     val isConfirmEnabled = when (mode) {
-        CourseAdjustmentMode.MOVE -> isDataChanged && (!isSlotChanged || targetConflictCourse == null)
-        CourseAdjustmentMode.SWAP -> isSlotChanged && targetConflictCourse != null && isSpanMatched
+        CourseAdjustmentMode.MOVE ->
+            isDataChanged && (!isSlotChanged || (targetConflictCourse == null && targetExamConflict == null))
+        CourseAdjustmentMode.SWAP ->
+            isSlotChanged && targetConflictCourse != null &&
+                targetExamConflict == null && sourceExamConflict == null && isSpanMatched
         CourseAdjustmentMode.DELETE -> true
     }
 
-    val origLoc = existingAdjustment?.originalLocation?.ifBlank { event.location } ?: event.location
+    val origLoc = existingAdjustment?.originalLocation?.let { CourseLocationFormatter.formatDisplay(it) }
+        ?.ifBlank { normalizedEventLocation } ?: normalizedEventLocation
 
     WindowBottomSheet(
         show = true,
@@ -187,7 +212,7 @@ fun CourseAdjustmentSubSheet(
                                 targetDay = targetDay,
                                 targetStartSection = targetStartSection,
                                 targetEndSection = targetEndSection,
-                                targetLocation = targetLocation.trim(),
+                                targetLocation = normalizedTargetLocation,
                                 isSuspended = false
                             )
                             onMoveCourse(adj)
@@ -208,7 +233,7 @@ fun CourseAdjustmentSubSheet(
                                 targetDay = conflict.day,
                                 targetStartSection = conflict.startSection,
                                 targetEndSection = conflict.endSection,
-                                targetLocation = if (targetLocation.isNotBlank()) targetLocation.trim() else conflict.location,
+                                targetLocation = normalizedTargetLocation.ifBlank { conflict.displayLocation },
                                 isSuspended = false
                             )
                             val adjB = CourseAdjustment(
@@ -220,12 +245,12 @@ fun CourseAdjustmentSubSheet(
                                 originalDay = conflict.day,
                                 originalStartSection = conflict.startSection,
                                 originalEndSection = conflict.endSection,
-                                originalLocation = conflict.location,
+                                originalLocation = conflict.displayLocation,
                                 targetWeek = currentWeek,
                                 targetDay = event.day,
                                 targetStartSection = event.startSection,
                                 targetEndSection = event.endSection,
-                                targetLocation = event.location,
+                                targetLocation = event.displayLocation,
                                 isSuspended = false
                             )
                             onSwapCourses(adjA, adjB)
@@ -245,7 +270,7 @@ fun CourseAdjustmentSubSheet(
                                 targetDay = event.day,
                                 targetStartSection = event.startSection,
                                 targetEndSection = event.endSection,
-                                targetLocation = event.location,
+                                targetLocation = event.displayLocation,
                                 isSuspended = true
                             )
                             onMarkDeleted(adj)
@@ -311,7 +336,7 @@ fun CourseAdjustmentSubSheet(
                             origDayStr,
                             event.startSection,
                             event.endSection
-                        ) + " · ${event.location.ifBlank { stringResource(R.string.course_pending_location) }}",
+                        ) + " · ${event.displayLocation.ifBlank { stringResource(R.string.course_pending_location) }}",
                         style = MiuixTheme.textStyles.footnote2,
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         maxLines = 1,
@@ -516,7 +541,14 @@ fun CourseAdjustmentSubSheet(
                     // 状态提示条
                     if (mode == CourseAdjustmentMode.MOVE) {
                         if (isSlotChanged) {
-                            if (targetConflictCourse != null) {
+                            if (targetExamConflict != null) {
+                                ExamConflictNotice(
+                                    stringResource(
+                                        R.string.course_edit_hint_exam_conflict,
+                                        targetExamConflict.courseName
+                                    )
+                                )
+                            } else if (targetConflictCourse != null) {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -550,7 +582,21 @@ fun CourseAdjustmentSubSheet(
                         }
                     } else if (mode == CourseAdjustmentMode.SWAP) {
                         if (isSlotChanged) {
-                            if (targetConflictCourse != null) {
+                            if (targetExamConflict != null) {
+                                ExamConflictNotice(
+                                    stringResource(
+                                        R.string.course_edit_hint_exam_conflict,
+                                        targetExamConflict.courseName
+                                    )
+                                )
+                            } else if (sourceExamConflict != null) {
+                                ExamConflictNotice(
+                                    stringResource(
+                                        R.string.course_edit_hint_exam_conflict_source,
+                                        sourceExamConflict.courseName
+                                    )
+                                )
+                            } else if (targetConflictCourse != null) {
                                 if (!isSpanMatched) {
                                     Box(
                                         modifier = Modifier
@@ -584,7 +630,7 @@ fun CourseAdjustmentSubSheet(
                                                 targetDayStr,
                                                 targetConflictCourse.startSection,
                                                 targetConflictCourse.endSection,
-                                                targetConflictCourse.location.ifBlank { stringResource(R.string.course_pending_location) }
+                                                targetConflictCourse.displayLocation.ifBlank { stringResource(R.string.course_pending_location) }
                                             ),
                                             style = MiuixTheme.textStyles.footnote2.copy(fontWeight = FontWeight.SemiBold),
                                             color = MiuixTheme.colorScheme.primary,
@@ -649,6 +695,26 @@ fun CourseAdjustmentSubSheet(
                 }
             }
         }
+    }
+}
+
+// 考试冲突提示条
+@Composable
+private fun ExamConflictNotice(text: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(MiuixTheme.colorScheme.error.copy(alpha = 0.12f))
+            .padding(12.dp)
+    ) {
+        Text(
+            text = text,
+            style = MiuixTheme.textStyles.footnote2.copy(fontWeight = FontWeight.SemiBold),
+            color = MiuixTheme.colorScheme.error,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 

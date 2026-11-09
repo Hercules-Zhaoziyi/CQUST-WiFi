@@ -33,6 +33,9 @@ fun App(onSharedLogin:(()->Unit)?=null,onHostAbout:(()->Unit)?=null,controller:T
     val defaultController = remember { ThemeController(ColorSchemeMode.System) }
     val backStack = rememberNavBackStack<Route>(if(settingsOnly)Route.Settings else Route.Schedule)
     fun back(){if(backStack.size>1)backStack.removeLastOrNull()else onExit?.invoke()}
+    val navigate: (Route) -> Unit = remember {
+        { route -> if (backStack.lastOrNull() != route) backStack.add(route) }
+    }
 
     MiuixTheme(controller = controller?:defaultController) {
         Surface(
@@ -47,10 +50,10 @@ fun App(onSharedLogin:(()->Unit)?=null,onHostAbout:(()->Unit)?=null,controller:T
                 entry<Route.Schedule> {
                     WeeklyScheduleScreen(
                         onNavigateToSettings = {
-                            if(onSharedSettings!=null)onSharedSettings()else backStack.add(Route.Settings)
+                            if(onSharedSettings!=null)onSharedSettings()else navigate(Route.Settings)
                         },
                         onNavigateToLogin = {
-                            if(onSharedLogin!=null)onSharedLogin()else backStack.add(Route.Login)
+                            if(onSharedLogin!=null)onSharedLogin()else navigate(Route.Login)
                         }
                     )
                 }
@@ -63,28 +66,28 @@ fun App(onSharedLogin:(()->Unit)?=null,onHostAbout:(()->Unit)?=null,controller:T
                         permissionsContent=permissionsContent,
                         updatesContent=updatesContent,
                         onNavigateToLogin = {
-                            if(onSharedLogin!=null)onSharedLogin()else backStack.add(Route.Login)
+                            if(onSharedLogin!=null)onSharedLogin()else navigate(Route.Login)
                         },
                         onNavigateToOverview = {
-                            backStack.add(Route.CourseOverview)
+                            navigate(Route.CourseOverview)
                         },
                         onNavigateToPreClassReminder = {
-                            backStack.add(Route.PreClassReminderSettings)
+                            navigate(Route.PreClassReminderSettings)
                         },
                         onNavigateToCalendarSync = {
-                            backStack.add(Route.CalendarSyncSettings)
+                            navigate(Route.CalendarSyncSettings)
                         },
                         onNavigateToClassAutomation = {
-                            backStack.add(Route.ClassAutomationSettings)
+                            navigate(Route.ClassAutomationSettings)
                         },
                         onNavigateToPermissions = {
-                            backStack.add(Route.PermissionManagement)
+                            navigate(Route.PermissionManagement)
                         },
                         onNavigateToPersonalization = {
-                            backStack.add(Route.PersonalizationSettings)
+                            navigate(Route.PersonalizationSettings)
                         },
                         onNavigateToAbout = {
-                            if(onHostAbout!=null)onHostAbout()else backStack.add(Route.About)
+                            if(onHostAbout!=null)onHostAbout()else navigate(Route.About)
                         },
                         onBack = {
                             back()
@@ -126,7 +129,7 @@ fun App(onSharedLogin:(()->Unit)?=null,onHostAbout:(()->Unit)?=null,controller:T
                             backStack.removeLastOrNull()
                         },
                         onNavigateToPermissions = {
-                            backStack.add(Route.PermissionManagement)
+                            navigate(Route.PermissionManagement)
                         }
                     )
                 }

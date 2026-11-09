@@ -20,29 +20,32 @@ enum class MapAppType(
 object MapNavigationHelper {
 
     private const val SCHOOL_NAME = "重庆科技大学"
-    private const val CAMPUS_HUXI = "虎溪校区"
-    private const val CAMPUS_JINFENG = "金凤校区"
+    private const val CAMPUS_HUXI = CourseLocationFormatter.CAMPUS_HUXI
 
-    // 智能提取楼栋并构造标准目的地搜索词
-    fun buildWalkingDestination(position: String): String {
+    // 判断地点是否可导航
+    private fun canNavigate(position: String): Boolean {
         val trimmed = position.trim()
-        if (trimmed.isBlank() || trimmed == "待定" || trimmed.contains("未安排")) {
-            return "$SCHOOL_NAME $CAMPUS_HUXI"
-        }
+        return trimmed.isNotBlank() && trimmed != "待定" && !trimmed.contains("未安排")
+    }
+
+    // 构造步行导航目的地：仅虎溪校区解析楼栋，其余保持原始文本
+    fun buildWalkingDestination(position: String): String? {
+        if (!canNavigate(position)) return null
+
+        val trimmed = position.trim()
         if (trimmed.contains(SCHOOL_NAME)) {
             return trimmed
         }
 
-        // 仅在明确标明“金凤”时定向金凤校区，其余默认虎溪校区
-        val campusName = if (trimmed.contains("金凤")) CAMPUS_JINFENG else CAMPUS_HUXI
+        val parsed = CourseLocationFormatter.parse(trimmed)
+        if (parsed.campus != CAMPUS_HUXI) {
+            return "$SCHOOL_NAME $trimmed"
+        }
 
-        // 剥离校区前缀与房间号，提取纯建筑名称
-        val withoutCampus = trimmed.replace(campusName, "").trim()
-        val buildingPart = withoutCampus.split(Regex("\\s+")).firstOrNull().orEmpty()
-        val cleanBuilding = buildingPart.replace(Regex("(?i)[a-z]?\\d{2,}.*$"), "").trim()
-        val targetBuilding = cleanBuilding.ifBlank { buildingPart.ifBlank { withoutCampus } }
-
-        return "$SCHOOL_NAME $campusName $targetBuilding".trim()
+        val target = parsed.building.ifBlank { parsed.room.ifBlank { parsed.detail } }
+        return listOf(SCHOOL_NAME, parsed.campus, target)
+            .filter { it.isNotBlank() }
+            .joinToString(" ")
     }
 
     // 检查是否安装指定包名的应用

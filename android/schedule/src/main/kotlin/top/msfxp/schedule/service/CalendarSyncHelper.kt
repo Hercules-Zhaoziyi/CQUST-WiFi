@@ -12,8 +12,10 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import top.msfxp.schedule.R
-import top.msfxp.schedule.data.model.DefaultTimeSlots
+import top.msfxp.schedule.data.model.ExamRecord
 import top.msfxp.schedule.data.model.effectiveStartDate
+import top.msfxp.schedule.data.model.findSectionTimeSlot
+import top.msfxp.schedule.data.repository.ExamRepository
 import top.msfxp.schedule.data.repository.ScheduleRepository
 import top.msfxp.schedule.data.repository.SettingsRepository
 import java.time.LocalDateTime
@@ -25,7 +27,8 @@ import java.util.TimeZone
 class CalendarSyncHelper(
     private val context: Context,
     private val settingsRepository: SettingsRepository,
-    private val scheduleRepository: ScheduleRepository
+    private val scheduleRepository: ScheduleRepository,
+    private val examRepository: ExamRepository
 ) {
     companion object {
         private const val LEGACY_CALENDAR_ACCOUNT_NAME = "cqust_schedule_account"
@@ -62,7 +65,6 @@ class CalendarSyncHelper(
 
                 val tableId = scheduleRepository.getOrCreateDefaultTableId()
                 val events = scheduleRepository.getAllEventsForTable(tableId)
-                val slots = DefaultTimeSlots
 
                 val calendarId = getOrCreateCalendarId()
                 if (calendarId == -1L) return@withLock false
@@ -74,12 +76,13 @@ class CalendarSyncHelper(
                 val usedKeys = mutableSetOf<String>()
 
                 for (w in 1..totalWeeks) {
-                    val weekRawEvents = events.filter { it.week == w && it.day in 1..7 && it.startSection > 0 }
+                    // 仅纳入有作息的课程事件，待安排项不写入日历
+                    val weekRawEvents = events.filter { it.week == w && it.day in 1..7 && it.startSection != 0 }
                     val weekAdjustedEvents = top.msfxp.schedule.data.repository.applyAdjustmentsToWeekEvents(weekRawEvents, adjustments, w, events)
 
                     weekAdjustedEvents.forEach { ev ->
-                        val startSlot = slots.find { it.sectionNumber == ev.startSection }
-                        val endSlot = slots.find { it.sectionNumber == ev.endSection } ?: startSlot
+                        val startSlot = findSectionTimeSlot(ev.startSection)
+                        val endSlot = findSectionTimeSlot(ev.endSection) ?: startSlot
 
                         val startTime = startSlot?.startTime ?: "08:30"
                         val endTime = endSlot?.endTime ?: "09:15"
@@ -98,8 +101,15 @@ class CalendarSyncHelper(
 
                         val descParts = mutableListOf<String>()
                         if (ev.isAdjusted) descParts.add(context.getString(R.string.calendar_event_desc_adjusted))
-                        if (ev.teacher.isNotBlank()) descParts.add(context.getString(R.string.calendar_event_desc_teacher_format, ev.teacher))
                         val desc = descParts.joinToString("\n")
+
+                        val teacher = ev.teacher.trim()
+                        val eventLocation = ev.displayLocation.trim()
+                        val location = when {
+                            teacher.isBlank() -> eventLocation
+                            eventLocation.isBlank() -> teacher
+                            else -> context.getString(R.string.calendar_event_location_teacher_format, eventLocation, teacher)
+                        }
 
                         val cleanProject = ev.projectName.trim().replace(Regex("[^a-zA-Z0-9_\\u4e00-\\u9fa5]"), "_")
                         val baseKey = "cqust_${tableId}_w${w}_d${ev.day}_s${ev.startSection}_c${ev.courseId}_p${cleanProject}"
@@ -114,7 +124,7 @@ class CalendarSyncHelper(
                             DesiredCalendarEvent(
                                 syncKey = finalKey,
                                 title = ev.calendarTitle,
-                                location = ev.location,
+                                location = location,
                                 description = desc,
                                 startMillis = startMillis,
                                 endMillis = endMillis,
@@ -124,6 +134,9 @@ class CalendarSyncHelper(
                     }
                 }
 
+                // 追加有时间地点的考试日程
+                appendExamEvents(desiredList, tableId, currentSemester.id, calendarRemindMinutes)
+
                 // 精细化增量同步，不全量删除已存在的事件
                 incrementalSyncCalendarEvents(calendarId, desiredList)
             } catch (e: Exception) {
@@ -131,6 +144,45 @@ class CalendarSyncHelper(
                 false
             }
         }
+    }
+
+    // 追加考试日程至待同步列表
+    private suspend fun appendExamEvents(
+        desiredList: MutableList<DesiredCalendarEvent>,
+        tableId: String,
+        semesterId: String,
+        remindMinutes: Int
+    ) {
+        examRepository.getExamsOnce(tableId, semesterId)
+            .mapNotNull { buildExamCalendarEvent(it, remindMinutes) }
+            .forEach { desiredList.add(it) }
+    }
+
+    // 构建考试日程条目
+    private fun buildExamCalendarEvent(exam: ExamRecord, remindMinutes: Int): DesiredCalendarEvent? {
+        val date = exam.examDateValue ?: return null
+        val start = exam.startTime?.let { runCatching { LocalTime.parse(it) }.getOrNull() } ?: return null
+        val end = exam.endTime?.let { runCatching { LocalTime.parse(it) }.getOrNull() } ?: return null
+        val zoneId = ZoneId.systemDefault()
+        val location = exam.seatNo?.takeIf { it.isNotBlank() }?.let { seat ->
+            context.getString(R.string.calendar_exam_location_format, exam.displayPosition, seat)
+        } ?: exam.displayPosition
+        val description = buildString {
+            append(context.getString(R.string.calendar_exam_desc_type_format, context.getString(R.string.exam_type_label)))
+            if (!exam.status.isNullOrBlank()) {
+                append("\n").append(context.getString(R.string.calendar_exam_desc_status_format, exam.status))
+            }
+            if (exam.remark.isNotBlank()) append("\n").append(exam.remark)
+        }
+        return DesiredCalendarEvent(
+            syncKey = "cqust_exam_${exam.id}",
+            title = context.getString(R.string.calendar_exam_title_format, exam.courseName),
+            location = location,
+            description = description,
+            startMillis = LocalDateTime.of(date, start).atZone(zoneId).toInstant().toEpochMilli(),
+            endMillis = LocalDateTime.of(date, end).atZone(zoneId).toInstant().toEpochMilli(),
+            remindMinutes = remindMinutes
+        )
     }
 
     // 精细化增量更新日历事件与关联提醒

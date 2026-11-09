@@ -13,10 +13,12 @@ import top.msfxp.schedule.data.api.CqustSyncManager
 import top.msfxp.schedule.data.api.LocalCrypto
 import top.msfxp.schedule.data.api.UpdateCheckService
 import top.msfxp.schedule.data.model.*
+import top.msfxp.schedule.data.repository.ExamRepository
 import top.msfxp.schedule.data.repository.ScheduleRepository
 import top.msfxp.schedule.data.repository.applyAdjustmentsToWeekEvents
 import top.msfxp.schedule.data.repository.SettingsRepository
 import top.msfxp.schedule.util.AppActionHelper
+import top.msfxp.schedule.util.ExamTimeMapper
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
@@ -33,7 +35,8 @@ data class WeeklyScheduleUiState(
     val isSemesterSet: Boolean = false,
     val isVacation: Boolean = false,
     val timeSlots: List<TimeSlot> = DefaultTimeSlots,
-    val weekBlocksMap: Map<Int, List<MergedCourseBlock>> = emptyMap(),
+    val weekCellsMap: Map<Int, List<ScheduleGridCell>> = emptyMap(),
+    val weekExamBlocksMap: Map<Int, List<ExamGridBlock>> = emptyMap(),
     val weekUnarrangedMap: Map<Int, List<CourseEventWithMeta>> = emptyMap(),
     val weekCourseCountMap: Map<Int, Int> = emptyMap(),
     val isSyncing: Boolean = false,
@@ -42,7 +45,8 @@ data class WeeklyScheduleUiState(
     val wallpaperMaskDim: Float = 0.15f,
     val courseCardAlpha: Float = 0.95f,
     val wallpaperFile: java.io.File? = null,
-    val courseColors: List<CourseColor> = DefaultCourseColors
+    val courseColors: List<CourseColor> = DefaultCourseColors,
+    val courseColorIndexMap: Map<String, Int> = emptyMap()
 )
 
 // 周课表业务视图模型
@@ -50,6 +54,7 @@ class WeeklyScheduleViewModel(
     private val context: Context,
     private val scheduleRepository: ScheduleRepository,
     private val settingsRepository: SettingsRepository,
+    private val examRepository: ExamRepository,
     private val cqustSyncManager: CqustSyncManager
 ) : ViewModel() {
 
@@ -95,13 +100,34 @@ class WeeklyScheduleViewModel(
         scheduleRepository.getAdjustmentsFlow(semesterId = semester?.id.orEmpty())
     }
 
-    val uiState: StateFlow<WeeklyScheduleUiState> = combine(
+    // 课表核心数据流（设置、学期、课程、调课、考试）
+    private data class CoreScheduleData(
+        val settings: AppSettings,
+        val semester: Semester?,
+        val allCourses: List<CourseWithEvents>,
+        val adjustments: List<CourseAdjustment>,
+        val exams: List<ExamRecord>
+    )
+
+    private val coreDataFlow = combine(
         settingsRepository.appSettingsFlow,
         scheduleRepository.currentSemesterFlow,
         scheduleRepository.allCoursesFlow,
         adjustmentsFlow,
+        examRepository.currentSemesterExamsFlow
+    ) { settings, semester, allCourses, adjustments, exams ->
+        CoreScheduleData(settings, semester, allCourses, adjustments, exams)
+    }
+
+    val uiState: StateFlow<WeeklyScheduleUiState> = combine(
+        coreDataFlow,
         syncStateFlow
-    ) { settings, currentSemester, allCourses, adjustments, (syncing, syncMsg) ->
+    ) { core, (syncing, syncMsg) ->
+        val settings = core.settings
+        val currentSemester = core.semester
+        val allCourses = core.allCourses
+        val adjustments = core.adjustments
+        val exams = core.exams
         val today = LocalDate.now()
         val totalWeeks = currentSemester?.totalWeeks ?: 20
         val parsedStart = currentSemester.effectiveStartDate
@@ -123,31 +149,69 @@ class WeeklyScheduleViewModel(
 
         val allMetaEvents = allCourses.flatMap { c ->
             val allCourseWeeks = c.events.map { it.week }.filter { it > 0 }.distinct().sorted()
-            c.events.filter { it.week in 1..totalWeeks && it.day in 1..7 && it.startSection > 0 }
+            c.events.filter { it.week in 1..totalWeeks && it.day in 1..7 }
                 .map { ev -> ev.toMeta(c.course, allCourseWeeks) }
         }
 
         for (w in 1..totalWeeks) {
-            val weekEvents = allCourses.flatMap { c ->
+            // 有星期的事件参与调课计算，含非标准作息节次
+            val scheduledEvents = allCourses.flatMap { c ->
                 val allCourseWeeks = c.events.map { it.week }.filter { it > 0 }.distinct().sorted()
-                c.events.filter { it.week == w && it.day in 1..7 && it.startSection > 0 }
+                c.events.filter { it.week == w && it.day in 1..7 }
                     .map { ev -> ev.toMeta(c.course, allCourseWeeks) }
             }
             val weekUnarranged = allCourses.flatMap { c ->
                 val allCourseWeeks = c.events.map { it.week }.filter { it > 0 }.distinct().sorted()
-                c.events.filter { it.week == w && (it.day == 0 || it.startSection == 0) }
+                c.events.filter { it.week == w && it.day == 0 }
                     .map { ev -> ev.toMeta(c.course, allCourseWeeks) }
             }
 
-            val adjustedWeekEvents = applyAdjustmentsToWeekEvents(weekEvents, adjustments, w, allMetaEvents)
+            val adjustedScheduled = applyAdjustmentsToWeekEvents(scheduledEvents, adjustments, w, allMetaEvents)
+            // 落到标准作息的进网格，非标准作息节次留在待安排区
+            val adjustedWeekEvents = adjustedScheduled.filter { it.startSection > 0 }
             val adjustedUnarranged = weekUnarranged.filter { unarr ->
                 val adj = adjustments.find { it.originalWeek == w && it.courseId == unarr.courseId && it.originalDay == 0 }
                 adj == null || (!adj.isSuspended && adj.targetDay == 0)
-            }
+            } + adjustedScheduled.filter { it.startSection <= 0 }
 
             countMap[w] = adjustedWeekEvents.size + adjustedUnarranged.size
             blocksMap[w] = adjustedWeekEvents.toMergedBlocks()
             unarrangedMap[w] = adjustedUnarranged
+        }
+
+        // 考试块按周聚合（仅标准考试且时间可映射节次）
+        val examBlocksMap = exams.filter { it.isScheduled }
+            .mapNotNull { exam ->
+                val week = exam.resolveWeek(parsedStart) ?: return@mapNotNull null
+                val day = exam.resolvedWeekday ?: return@mapNotNull null
+                val sections = ExamTimeMapper.resolveSections(exam.startTime, exam.endTime)
+                    ?: return@mapNotNull null
+                if (week !in 1..totalWeeks || day !in 1..7) return@mapNotNull null
+                ExamGridBlock(week, day, sections.first, sections.second, exam)
+            }
+            .groupBy { it.week }
+
+        // 周次角标同步计入考试条目
+        examBlocksMap.forEach { (week, blocks) ->
+            countMap[week] = (countMap[week] ?: 0) + blocks.size
+        }
+
+        // 课程配色索引（课程 ID 与统一标识均可命中）
+        val colorIndexByCourseId = buildMap {
+            allCourses.forEach { relation ->
+                val course = relation.course
+                put(course.id, course.colorIndex)
+                putIfAbsent(course.unifiedCode, course.colorIndex)
+            }
+        }
+
+        // 生成每周网格单元
+        val cellsMap = (1..totalWeeks).associateWith { week ->
+            buildScheduleGridCells(
+                courseBlocks = blocksMap[week].orEmpty(),
+                examBlocks = examBlocksMap[week].orEmpty(),
+                colorIndexByCourseId = colorIndexByCourseId
+            )
         }
 
         val wallpaperFile = settingsRepository.getWallpaperFile()
@@ -164,7 +228,8 @@ class WeeklyScheduleViewModel(
             isVacation = vacation,
             timeSlots = DefaultTimeSlots,
             currentSemesterId = currentSemester?.id.orEmpty(),
-            weekBlocksMap = blocksMap,
+            weekCellsMap = cellsMap,
+            weekExamBlocksMap = examBlocksMap,
             weekUnarrangedMap = unarrangedMap,
             weekCourseCountMap = countMap,
             isSyncing = syncing,
@@ -173,7 +238,8 @@ class WeeklyScheduleViewModel(
             wallpaperMaskDim = settings.wallpaperMaskDim,
             courseCardAlpha = settings.courseCardAlpha,
             wallpaperFile = if (hasWallpaper) wallpaperFile else null,
-            courseColors = palette
+            courseColors = palette,
+            courseColorIndexMap = colorIndexByCourseId
         )
     }.stateIn(
         scope = viewModelScope,
@@ -318,19 +384,31 @@ class WeeklyScheduleViewModel(
         excludeCourseId: String,
         excludeStartSection: Int
     ): CourseEventWithMeta? {
-        val blocks = uiState.value.weekBlocksMap[week] ?: return null
-        for (block in blocks) {
-            if (block.day == day) {
-                val overlaps = maxOf(startSection, block.startSection) <= minOf(endSection, block.endSection)
-                if (overlaps) {
-                    val found = block.events.find { ev ->
-                        !(ev.courseId == excludeCourseId && ev.startSection == excludeStartSection)
-                    }
-                    if (found != null) return found
-                }
+        val cells = uiState.value.weekCellsMap[week] ?: return null
+        for (cell in cells) {
+            if (cell.day != day) continue
+            for (event in cell.courses) {
+                val isOverlapped = maxOf(startSection, event.startSection) <= minOf(endSection, event.endSection)
+                if (!isOverlapped) continue
+                if (event.courseId == excludeCourseId && event.startSection == excludeStartSection) continue
+                return event
             }
         }
         return null
+    }
+
+    // 检索指定周次与节次上的考试安排
+    fun getExamAtSlot(
+        week: Int,
+        day: Int,
+        startSection: Int,
+        endSection: Int
+    ): ExamRecord? {
+        val blocks = uiState.value.weekExamBlocksMap[week] ?: return null
+        return blocks.firstOrNull { block ->
+            block.day == day &&
+                maxOf(startSection, block.startSection) <= minOf(endSection, block.endSection)
+        }?.exam
     }
 
     // 关闭更新弹窗

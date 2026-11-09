@@ -8,6 +8,7 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import androidx.room.Relation
 import kotlinx.serialization.Serializable
+import top.msfxp.schedule.util.CourseLocationFormatter
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
@@ -58,6 +59,11 @@ data class Course(
 ) {
     val isPractical: Boolean get() = courseType == COURSE_TYPE_PRACTICAL
 }
+
+// 课程统一标识：基础课程代码（去除教学班号后缀）
+fun courseUnifiedCode(code: String): String = code.substringBefore('.').trim()
+
+val Course.unifiedCode: String get() = courseUnifiedCode(courseCode)
 
 // 课程事件实体
 @Entity(
@@ -119,6 +125,21 @@ val DefaultTimeSlots = listOf(
     TimeSlot(10, "19:55", "20:40"),
     TimeSlot(11, "20:50", "21:35")
 )
+
+// 非标准作息节次（-1 中午1节、-2 中午2节，后续继续向下编号；作息为估计值）
+val NonStandardTimeSlots = listOf(
+    TimeSlot(-1, "12:10", "12:55"),
+    TimeSlot(-2, "13:05", "13:50")
+)
+
+// 按节次取作息：1..11 为标准作息节次，负数为非标准作息节次，0 待安排无作息
+fun findSectionTimeSlot(sectionNumber: Int): TimeSlot? =
+    DefaultTimeSlots.find { it.sectionNumber == sectionNumber }
+        ?: NonStandardTimeSlots.find { it.sectionNumber == sectionNumber }
+
+// 节次排序键，按作息时刻而非编号排序，未知作息排最后
+fun sectionTimeKey(sectionNumber: Int): String =
+    findSectionTimeSlot(sectionNumber)?.startTime ?: "99:99"
 
 // 调课规则实体
 @Entity(
@@ -198,6 +219,9 @@ data class CourseEventWithMeta(
 
     val isPractical: Boolean get() = courseType == COURSE_TYPE_PRACTICAL
 
+    // 规范化展示地点
+    val displayLocation: String get() = CourseLocationFormatter.formatDisplay(location)
+
     // 网格展示标题
     val displayName: String
         get() = if (isPractical && projectName.isNotBlank()) {
@@ -221,10 +245,6 @@ data class CourseEventWithMeta(
         } else {
             courseName
         }
-
-    // 节次区间文本
-    val sectionRangeText: String
-        get() = if (startSection == endSection) "第${startSection}节" else "第${startSection}-${endSection}节"
 }
 
 // 转换为展示模型
@@ -280,7 +300,7 @@ data class CourseWithEvents(
             }
             .sortedWith(
                 compareBy<CompressedCourseSlot> { it.day }
-                    .thenBy { it.startSection }
+                    .thenBy { sectionTimeKey(it.startSection) }
                     .thenBy { it.weeks.minOrNull() ?: 0 }
                     .thenBy { it.projectName }
             )
@@ -297,7 +317,10 @@ data class CompressedCourseSlot(
     val weeks: List<Int>,
     val projectName: String = "",
     val studentCount: Int = 0
-)
+) {
+    // 规范化展示地点
+    val displayLocation: String get() = CourseLocationFormatter.formatDisplay(location)
+}
 
 // 课程栅格合并块模型
 data class MergedCourseBlock(
@@ -309,7 +332,6 @@ data class MergedCourseBlock(
     // 首选展示事件
     val primaryEvent: CourseEventWithMeta get() = events.first()
     val hasMultiple: Boolean get() = events.size > 1
-    val extraCount: Int get() = events.size - 1
 }
 
 // 合并为栅格块列表
@@ -329,6 +351,83 @@ fun List<CourseEventWithMeta>.toMergedBlocks(): List<MergedCourseBlock> {
                 events = sortedGroup
             )
         }
+}
+
+// 课表网格单元（同节次课程与考试聚合）
+data class ScheduleGridCell(
+    val day: Int,
+    val startSection: Int,
+    val endSection: Int,
+    val courses: List<CourseEventWithMeta> = emptyList(),
+    val exams: List<ExamRecord> = emptyList(),
+    val examColorIndex: Int = 0
+) {
+    // 优先展示考试，其次课程
+    val primaryExam: ExamRecord? get() = exams.firstOrNull()
+    val primaryCourse: CourseEventWithMeta? get() = courses.firstOrNull()
+    val totalCount: Int get() = courses.size + exams.size
+    val hasMultiple: Boolean get() = totalCount > 1
+}
+
+// 合并课程块与考试块为同节次网格单元（节次区间重叠即合并）
+fun buildScheduleGridCells(
+    courseBlocks: List<MergedCourseBlock>,
+    examBlocks: List<ExamGridBlock>,
+    colorIndexByCourseId: Map<String, Int>
+): List<ScheduleGridCell> {
+    val cellList = mutableListOf<ScheduleGridCell>()
+
+    for (block in courseBlocks) {
+        cellList.add(
+            ScheduleGridCell(
+                day = block.day,
+                startSection = block.startSection,
+                endSection = block.endSection,
+                courses = block.events
+            )
+        )
+    }
+
+    for (examBlock in examBlocks) {
+        val exam = examBlock.exam
+        val colorIndex = resolveExamColorIndex(exam, colorIndexByCourseId)
+        // 吸收同一天所有与考试区间有交集的单元并取并集
+        val overlapping = cellList
+            .filter { cell ->
+                cell.day == examBlock.day &&
+                    cell.startSection <= examBlock.endSection &&
+                    cell.endSection >= examBlock.startSection
+            }
+            .sortedBy { it.startSection }
+        cellList.removeAll(overlapping)
+
+        cellList.add(
+            ScheduleGridCell(
+                day = examBlock.day,
+                startSection = minOf(
+                    examBlock.startSection,
+                    overlapping.minOfOrNull { it.startSection } ?: examBlock.startSection
+                ),
+                endSection = maxOf(
+                    examBlock.endSection,
+                    overlapping.maxOfOrNull { it.endSection } ?: examBlock.endSection
+                ),
+                courses = overlapping.flatMap { it.courses },
+                exams = overlapping.flatMap { it.exams } + exam,
+                examColorIndex = overlapping.firstOrNull { it.exams.isNotEmpty() }?.examColorIndex
+                    ?: colorIndex
+            )
+        )
+    }
+
+    return cellList.sortedWith(compareBy({ it.day }, { it.startSection }))
+}
+
+// 按考试统一标识取配色编号
+fun resolveExamColorIndex(exam: ExamRecord, colorIndexByCourseId: Map<String, Int>): Int {
+    return exam.courseId?.let { colorIndexByCourseId[it] }
+        ?: colorIndexByCourseId[courseUnifiedCode(exam.courseCode)]
+        ?: 0
 }
 
 // 今日课程项模型

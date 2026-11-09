@@ -61,22 +61,6 @@ class ScheduleRepository(
         dao.replaceCoursesAndEvents(tableId, courses, events)
     }
 
-    // 获取指定周次的合并课程块列表
-    fun getMergedBlocksForWeek(
-        tableId: String,
-        weekNumber: Int
-    ): Flow<List<MergedCourseBlock>> {
-        return dao.getWeekGridEvents(tableId, weekNumber).map { it.toMergedBlocks() }
-    }
-
-    // 获取指定周次的未排时段课程列表
-    fun getWeekUnarrangedEvents(
-        tableId: String,
-        weekNumber: Int
-    ): Flow<List<CourseEventWithMeta>> {
-        return dao.getWeekUnarrangedEvents(tableId, weekNumber)
-    }
-
     // 获取全学期所有已排教学事件
     suspend fun getAllEventsForTable(tableId: String): List<CourseEventWithMeta> {
         return dao.getAllEventsForTable(tableId)
@@ -94,13 +78,12 @@ class ScheduleRepository(
         val adjustments = dao.getAdjustmentsOnce(tableId, semesterId)
         val adjustedWeekEvents = applyAdjustmentsToWeekEvents(rawWeekEvents, adjustments, currentWeek, allEvents)
         val events = adjustedWeekEvents.filter { it.day == dayOfWeek }
-            .sortedWith(compareBy({ it.startSection }, { it.courseName }))
-        val slots = DefaultTimeSlots
         val currentTime = LocalTime.now()
 
+        // 按作息时刻排序，使非标准作息节次落在正确位置
         return events.map { ev ->
-            val startSlot = slots.find { it.sectionNumber == ev.startSection }
-            val endSlot = slots.find { it.sectionNumber == ev.endSection } ?: startSlot
+            val startSlot = findSectionTimeSlot(ev.startSection)
+            val endSlot = findSectionTimeSlot(ev.endSection) ?: startSlot
 
             val startTimeStr = startSlot?.startTime ?: "08:30"
             val endTimeStr = endSlot?.endTime ?: "09:15"
@@ -117,7 +100,7 @@ class ScheduleRepository(
                 endTime = endTimeStr,
                 isFinished = isFinished
             )
-        }
+        }.sortedWith(compareBy({ it.startTime }, { it.event.courseName }))
     }
 
     // 清空课表课程与事件

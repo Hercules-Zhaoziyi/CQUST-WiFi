@@ -30,8 +30,9 @@ import top.yukonga.miuix.kmp.window.WindowDialog
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import top.msfxp.schedule.R
-import top.msfxp.schedule.data.model.MergedCourseBlock
-import top.msfxp.schedule.ui.schedule.components.CourseDetailSheet
+import top.msfxp.schedule.data.model.ScheduleGridCell
+import top.msfxp.schedule.data.model.resolveExamColorIndex
+import top.msfxp.schedule.ui.schedule.components.CellDetailSheet
 import top.msfxp.schedule.ui.schedule.components.ScheduleGrid
 import top.msfxp.schedule.ui.schedule.components.WeekSelectorSheet
 import top.yukonga.miuix.kmp.basic.*
@@ -113,7 +114,7 @@ fun WeeklyScheduleScreen(
     }
 
     var showWeekSelector by remember { mutableStateOf(false) }
-    var selectedBlockForDetail by remember { mutableStateOf<MergedCourseBlock?>(null) }
+    var selectedCell by remember { mutableStateOf<ScheduleGridCell?>(null) }
     val adjustmentsList by viewModel.adjustmentsListFlow.collectAsState()
 
     val wallpaperBitmap by viewModel.wallpaperBitmapFlow.collectAsState()
@@ -275,31 +276,30 @@ fun WeeklyScheduleScreen(
                     }
                     val isCurrent = pageWeek == uiState.currentWeekNumber
 
-                    val pageBlocks = uiState.weekBlocksMap[pageWeek] ?: emptyList()
+                    val pageCells = uiState.weekCellsMap[pageWeek] ?: emptyList()
                     val pageUnarranged = uiState.weekUnarrangedMap[pageWeek] ?: emptyList()
 
                     ScheduleGrid(
                         pageMondayDate = pageMonday,
                         weekNumber = pageWeek,
                         timeSlots = uiState.timeSlots,
-                        mergedBlocks = pageBlocks,
+                        cells = pageCells,
                         unarrangedCourses = pageUnarranged,
                         isCurrentWeek = isCurrent,
                         courseColors = uiState.courseColors,
                         cardAlpha = uiState.courseCardAlpha,
-                        onCourseBlockClick = { block ->
+                        onCellClick = { cell ->
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            selectedBlockForDetail = block
+                            selectedCell = cell
                         },
                         onUnarrangedCourseClick = { ev ->
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            val virtualBlock = MergedCourseBlock(
+                            selectedCell = ScheduleGridCell(
                                 day = 0,
                                 startSection = 0,
                                 endSection = 0,
-                                events = listOf(ev)
+                                courses = listOf(ev)
                             )
-                            selectedBlockForDetail = virtualBlock
                         }
                     )
                 }
@@ -324,20 +324,22 @@ fun WeeklyScheduleScreen(
         onDismissRequest = { showWeekSelector = false }
     )
 
-    // 课程详情抽屉
-    CourseDetailSheet(
-        block = selectedBlockForDetail,
-        timeSlots = uiState.timeSlots,
+    // 课表单元详情抽屉
+    CellDetailSheet(
+        cell = selectedCell,
         currentWeekNumber = currentBrowsingWeek,
         totalWeeks = uiState.totalWeeks,
         currentSemesterId = uiState.currentSemesterId,
         courseColors = uiState.courseColors,
         adjustmentsList = adjustmentsList,
+        colorIndexResolver = { exam ->
+            resolveExamColorIndex(exam, uiState.courseColorIndexMap)
+        },
         onColorIndexSelected = { courseId, newIndex ->
             viewModel.updateCourseColor(courseId, newIndex)
-            selectedBlockForDetail = selectedBlockForDetail?.let { curBlock ->
-                curBlock.copy(
-                    events = curBlock.events.map { ev ->
+            selectedCell = selectedCell?.let { cell ->
+                cell.copy(
+                    courses = cell.courses.map { ev ->
                         if (ev.courseId == courseId) {
                             ev.copy(colorIndex = newIndex).apply { this.weeks = ev.weeks }
                         } else ev
@@ -347,19 +349,19 @@ fun WeeklyScheduleScreen(
         },
         onMoveCourse = { adj ->
             viewModel.moveCourse(adj)
-            selectedBlockForDetail = null
+            selectedCell = null
         },
         onSwapCourses = { adjA, adjB ->
             viewModel.swapCourses(adjA, adjB)
-            selectedBlockForDetail = null
+            selectedCell = null
         },
         onMarkDeleted = { adj ->
             viewModel.markCourseDeleted(adj)
-            selectedBlockForDetail = null
+            selectedCell = null
         },
         onDeleteAdjustment = { adjId ->
             viewModel.deleteAdjustment(adjId)
-            selectedBlockForDetail = null
+            selectedCell = null
         },
         onClearAllAdjustments = {
             viewModel.clearAllAdjustments()
@@ -367,20 +369,20 @@ fun WeeklyScheduleScreen(
         onGetAdjustmentForEvent = { cId, w, d, s ->
             viewModel.getAdjustmentForEvent(cId, w, d, s)
         },
-        getCourseAtSlot = { w, d, s, e ->
-            val currentEv = selectedBlockForDetail?.events?.firstOrNull()
-            if (currentEv != null) {
-                viewModel.getCourseAtSlot(
-                    week = w,
-                    day = d,
-                    startSection = s,
-                    endSection = e,
-                    excludeCourseId = currentEv.courseId,
-                    excludeStartSection = currentEv.startSection
-                )
-            } else null
+        getCourseAtSlot = { w, d, s, e, excludeCourseId, excludeStartSection ->
+            viewModel.getCourseAtSlot(
+                week = w,
+                day = d,
+                startSection = s,
+                endSection = e,
+                excludeCourseId = excludeCourseId,
+                excludeStartSection = excludeStartSection
+            )
         },
-        onDismissRequest = { selectedBlockForDetail = null }
+        getExamAtSlot = { w, d, s, e ->
+            viewModel.getExamAtSlot(w, d, s, e)
+        },
+        onDismissRequest = { selectedCell = null }
     )
 
     // 发现新版本主动弹窗 (24小时静默检查发现新版本时触发)

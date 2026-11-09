@@ -17,6 +17,7 @@ import top.msfxp.schedule.R
 import top.msfxp.schedule.data.model.CourseAdjustmentWithMeta
 import top.msfxp.schedule.data.model.CourseColor
 import top.msfxp.schedule.data.model.getCourseColor
+import top.msfxp.schedule.util.CourseLocationFormatter
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
@@ -165,8 +166,10 @@ fun CourseAdjustmentRecordsSubSheet(
                                             overflow = TextOverflow.Ellipsis
                                         )
                                     } else {
-                                        val origLocation = adj.originalLocation.ifBlank { stringResource(R.string.course_label_classroom) }
-                                        val targetLocation = adj.targetLocation.ifBlank { origLocation }
+                                        val origLocation = CourseLocationFormatter.formatDisplay(adj.originalLocation)
+                                            .ifBlank { stringResource(R.string.course_label_classroom) }
+                                        val targetLocation = CourseLocationFormatter.formatDisplay(adj.targetLocation)
+                                            .ifBlank { origLocation }
                                         Text(
                                             text = stringResource(
                                                 R.string.adjustments_original_label,

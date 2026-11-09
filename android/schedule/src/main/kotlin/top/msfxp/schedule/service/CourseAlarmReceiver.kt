@@ -40,6 +40,7 @@ class CourseAlarmReceiver : BroadcastReceiver(), KoinComponent {
         const val EXTRA_COURSE_POSITION = "extra_course_position"
         const val EXTRA_COURSE_TEACHER = "extra_course_teacher"
         const val EXTRA_NOTIFICATION_ID = "extra_notification_id"
+        const val EXTRA_IS_EXAM = "extra_is_exam"
 
         const val EXTRA_SECTION = "extra_section"
         const val EXTRA_DATE = "extra_date"
@@ -130,18 +131,19 @@ class CourseAlarmReceiver : BroadcastReceiver(), KoinComponent {
             nm.createNotificationChannel(channel)
         }
 
-        // 构建并展示上课提醒系统通知
+        // 构建并展示上课/考试提醒系统通知
         fun showNotification(
             context: Context,
             notificationId: Int,
             name: String,
             position: String,
-            teacher: String
+            teacher: String,
+            titleText: String = name,
+            statusText: String = context.getString(R.string.notification_live_status_preparing)
         ) {
             val nm = context.getSystemService<NotificationManager>() ?: return
             ensureNotificationChannel(context, nm)
 
-            val liveStatusText = context.getString(R.string.notification_live_status_preparing)
             val locationText = if (position.isNotBlank()) context.getString(R.string.notification_location_format, position) else ""
             val teacherText = if (teacher.isNotBlank()) context.getString(R.string.notification_teacher_format, teacher) else ""
             val classStartingText = context.getString(R.string.notification_class_starting)
@@ -152,13 +154,13 @@ class CourseAlarmReceiver : BroadcastReceiver(), KoinComponent {
             ).joinToString(" · ").ifBlank { classStartingText }
 
             val bigTextStyle = NotificationCompat.BigTextStyle()
-                .setBigContentTitle(name)
+                .setBigContentTitle(titleText)
                 .bigText(if (bigTextContent.isNotBlank()) bigTextContent else classStartingText)
-                .setSummaryText(liveStatusText)
+                .setSummaryText(statusText)
 
             val builder = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
                 .setSmallIcon(R.mipmap.ic_launcher)
-                .setContentTitle(name)
+                .setContentTitle(titleText)
                 .setContentText(shortContentText)
                 .setStyle(bigTextStyle)
                 .setAutoCancel(true)
@@ -170,7 +172,7 @@ class CourseAlarmReceiver : BroadcastReceiver(), KoinComponent {
 
             if (Build.VERSION.SDK_INT >= 36) {
                 builder.setRequestPromotedOngoing(true)
-                builder.setShortCriticalText(liveStatusText)
+                builder.setShortCriticalText(statusText)
             }
 
             nm.notify(notificationId, builder.build())
@@ -207,7 +209,11 @@ class CourseAlarmReceiver : BroadcastReceiver(), KoinComponent {
                     }
                 } else if (settings.reminderEnabled) {
                     val notifyId = currentIntent.getIntExtra(EXTRA_NOTIFICATION_ID, 1001)
-                    handleCourseReminder(ctx, currentIntent, notifyId)
+                    if (currentIntent.getBooleanExtra(EXTRA_IS_EXAM, false)) {
+                        handleExamReminder(ctx, currentIntent, notifyId)
+                    } else {
+                        handleCourseReminder(ctx, currentIntent, notifyId)
+                    }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Process alarm broadcast failed", e)
@@ -219,7 +225,7 @@ class CourseAlarmReceiver : BroadcastReceiver(), KoinComponent {
 
     // 校验指定日期的节次当前是否仍有有效课程开始
     private suspend fun hasActiveCourseAtSlot(dateStr: String?, section: Int): Boolean {
-        if (section <= 0) return true
+        if (section == 0) return true
         val date = try {
             if (dateStr.isNullOrBlank()) LocalDate.now() else LocalDate.parse(dateStr)
         } catch (_: DateTimeParseException) {
@@ -232,7 +238,7 @@ class CourseAlarmReceiver : BroadcastReceiver(), KoinComponent {
 
         val tableId = scheduleRepository.getOrCreateDefaultTableId()
         val allEvents = scheduleRepository.getAllEventsForTable(tableId)
-        val weekEvents = allEvents.filter { it.week == weekNumber && it.day == date.dayOfWeek.value && it.startSection > 0 }
+        val weekEvents = allEvents.filter { it.week == weekNumber && it.day == date.dayOfWeek.value }
         if (weekEvents.isEmpty()) return false
 
         val adjustments = scheduleRepository.getAdjustmentsOnce(tableId, semester.id)
@@ -275,6 +281,23 @@ class CourseAlarmReceiver : BroadcastReceiver(), KoinComponent {
         val teacher = intent.getStringExtra(EXTRA_COURSE_TEACHER) ?: ""
 
         showNotification(context, notifyId, courseName, position, teacher)
+        updateAllAppWidgets(context)
+    }
+
+    // 处理考试提醒通知展示与小组件刷新
+    private suspend fun handleExamReminder(context: Context, intent: Intent, notifyId: Int) {
+        val examName = intent.getStringExtra(EXTRA_COURSE_NAME) ?: context.getString(R.string.notification_unknown_course)
+        val position = intent.getStringExtra(EXTRA_COURSE_POSITION).orEmpty()
+
+        showNotification(
+            context = context,
+            notificationId = notifyId,
+            name = examName,
+            position = position,
+            teacher = "",
+            titleText = context.getString(R.string.calendar_exam_title_format, examName),
+            statusText = context.getString(R.string.notification_exam_status)
+        )
         updateAllAppWidgets(context)
     }
 }

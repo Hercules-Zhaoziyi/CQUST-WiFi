@@ -17,20 +17,37 @@ import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import top.msfxp.schedule.R
 import top.msfxp.schedule.data.model.CourseColor
-import top.msfxp.schedule.data.model.DefaultCourseColors
+import top.msfxp.schedule.data.model.ExamRecord
 import top.msfxp.schedule.data.model.SemesterDateHelper
 import top.msfxp.schedule.data.model.TodayCourseItem
 import top.msfxp.schedule.data.model.effectiveStartDate
 import top.msfxp.schedule.data.model.getCourseColor
 import top.msfxp.schedule.data.model.parseCoursePaletteJson
+import top.msfxp.schedule.data.model.resolveExamColorIndex
+import top.msfxp.schedule.data.model.unifiedCode
+import top.msfxp.schedule.data.repository.ExamRepository
 import top.msfxp.schedule.data.repository.ScheduleRepository
 import top.msfxp.schedule.data.repository.SettingsRepository
 import java.time.LocalDate
+import java.time.LocalTime
+
+// 微件日程条目
+data class WidgetAgendaItem(
+    val title: String,
+    val subtitle: String,
+    val roomText: String,
+    val timeText: String,
+    val colorArgb: Int,
+    val isFinished: Boolean,
+    val startMinutes: Int,
+    val isExam: Boolean = false
+)
 
 // 桌面微件依赖注入容器
 private object WidgetDependencyContainer : KoinComponent {
     val scheduleRepository: ScheduleRepository by inject()
     val settingsRepository: SettingsRepository by inject()
+    val examRepository: ExamRepository by inject()
 }
 
 // 全量更新课程表桌面微件
@@ -47,13 +64,28 @@ suspend fun updateAllAppWidgets(context: Context) = withContext(Dispatchers.IO) 
         val tableId = scheduleRepo.getOrCreateDefaultTableId()
 
         val todayCourses = if (isVacation) emptyList() else scheduleRepo.getTodayCourses(tableId, currentSemester?.id.orEmpty(), today.dayOfWeek.value, currentWeek)
+        val todayExams = if (isVacation) emptyList() else runCatching {
+            WidgetDependencyContainer.examRepository
+                .getExamsOnce(tableId, currentSemester?.id.orEmpty())
+                .filter { it.isScheduled && it.examDate == today.toString() }
+        }.getOrDefault(emptyList())
 
         val appWidgetManager = AppWidgetManager.getInstance(context)
         val widgetIds = appWidgetManager.getAppWidgetIds(ComponentName(context, ScheduleWidgetProvider::class.java))
         if (widgetIds.isNotEmpty()) {
             val settings = runCatching { WidgetDependencyContainer.settingsRepository.getAppSettingsOnce() }.getOrNull()
             val palette = parseCoursePaletteJson(settings?.customCourseColorsJson)
-            val views = renderScheduleWidget(context, today, todayCourses, isVacation, palette)
+            val courseColorIndexMap = runCatching {
+                val courses = scheduleRepo.getAllCoursesWithEventsOnce(tableId)
+                buildMap {
+                    courses.forEach { relation ->
+                        put(relation.course.id, relation.course.colorIndex)
+                        putIfAbsent(relation.course.unifiedCode, relation.course.colorIndex)
+                    }
+                }
+            }.getOrDefault(emptyMap())
+            val agenda = buildAgendaItems(context, todayCourses, todayExams, palette, courseColorIndexMap)
+            val views = renderScheduleWidget(context, today, agenda, isVacation)
             appWidgetManager.updateAppWidget(widgetIds, views)
         }
     } catch (_: Exception) {
@@ -65,9 +97,8 @@ suspend fun updateAllAppWidgets(context: Context) = withContext(Dispatchers.IO) 
 fun renderScheduleWidget(
     context: Context,
     today: LocalDate,
-    todayCourses: List<TodayCourseItem>,
-    isVacation: Boolean,
-    palette: List<CourseColor> = DefaultCourseColors
+    agendaItems: List<WidgetAgendaItem>,
+    isVacation: Boolean
 ): RemoteViews {
     val views = RemoteViews(context.packageName, R.layout.widget_schedule)
     views.setOnClickPendingIntent(R.id.widget_root, getOpenAppPendingIntent(context))
@@ -77,11 +108,11 @@ fun renderScheduleWidget(
     views.setTextViewText(R.id.tv_date_month_day, context.getString(R.string.widget_date_format, today.monthValue, today.dayOfMonth))
     views.setTextViewText(R.id.tv_date_weekday, getDayOfWeekString(context, today.dayOfWeek.value))
 
-    // 筛选未上完的课程列表
-    val activeCourses = todayCourses.filter { !it.isFinished }
+    // 筛选未上完的日程条目
+    val activeItems = agendaItems.filter { !it.isFinished }
 
     // 已上完或原本无课，均展示无课颜文字状态
-    if (isVacation || activeCourses.isEmpty()) {
+    if (isVacation || activeItems.isEmpty()) {
         views.setViewVisibility(R.id.layout_courses, View.GONE)
         views.setViewVisibility(R.id.layout_empty, View.VISIBLE)
         views.setTextViewText(R.id.tv_kaomoji, context.getString(R.string.widget_kaomoji_happy))
@@ -92,37 +123,84 @@ fun renderScheduleWidget(
     views.setViewVisibility(R.id.layout_empty, View.GONE)
     views.setViewVisibility(R.id.layout_courses, View.VISIBLE)
 
-    // 焦点课程渲染
-    val first = activeCourses[0]
-    views.setTextViewText(R.id.tv_name_1, first.event.courseName)
+    // 焦点条目渲染
+    val first = activeItems[0]
+    views.setTextViewText(R.id.tv_name_1, first.title)
+    views.setTextViewText(R.id.tv_room_teacher_1, first.subtitle)
+    views.setTextViewText(R.id.tv_time_1, first.timeText)
+    views.setImageViewBitmap(R.id.iv_indicator_1, createBarBitmap(context, first.colorArgb, 3.5f, 42f))
 
-    val room1 = first.event.location.trim()
-    val teacher1 = first.event.teacher.trim()
-    val roomTeacher1 = listOf(room1, teacher1).filter { it.isNotBlank() }.joinToString(" ")
-    views.setTextViewText(R.id.tv_room_teacher_1, roomTeacher1.ifBlank { "--" })
-    views.setTextViewText(R.id.tv_time_1, "${first.startTime} - ${first.endTime}")
-
-    val colorInt1 = palette.getCourseColor(first.event.colorIndex).light.toArgb()
-    views.setImageViewBitmap(R.id.iv_indicator_1, createBarBitmap(context, colorInt1, 3.5f, 42f))
-
-    // 后续课程渲染
-    if (activeCourses.size >= 2) {
-        val second = activeCourses[1]
+    // 后续条目渲染
+    if (activeItems.size >= 2) {
+        val second = activeItems[1]
         views.setViewVisibility(R.id.row_course_2, View.VISIBLE)
-        views.setTextViewText(R.id.tv_name_2, second.event.courseName)
-
-        val room2 = second.event.location.trim()
-        val timeRoom2 = listOf(second.startTime, room2).filter { it.isNotBlank() }.joinToString(" ")
-        views.setTextViewText(R.id.tv_time_room_2, timeRoom2.ifBlank { second.startTime })
-
-        val colorInt2 = palette.getCourseColor(second.event.colorIndex).light.toArgb()
-        views.setImageViewBitmap(R.id.iv_indicator_2, createBarBitmap(context, colorInt2, 3.5f, 32f))
+        views.setTextViewText(R.id.tv_name_2, second.title)
+        views.setTextViewText(
+            R.id.tv_time_room_2,
+            listOf(second.timeText, second.roomText).filter { it.isNotBlank() }.joinToString(" ")
+        )
+        views.setImageViewBitmap(R.id.iv_indicator_2, createBarBitmap(context, second.colorArgb, 3.5f, 32f))
     } else {
-        // 若今日只有 1 节课，则收起第二行条目
+        // 若今日只有 1 项日程，则收起第二行条目
         views.setViewVisibility(R.id.row_course_2, View.GONE)
     }
 
     return views
+}
+
+// 合并今日课程与考试为微件日程条目
+private fun buildAgendaItems(
+    context: Context,
+    todayCourses: List<TodayCourseItem>,
+    todayExams: List<ExamRecord>,
+    palette: List<CourseColor>,
+    courseColorIndexMap: Map<String, Int>
+): List<WidgetAgendaItem> {
+    val now = LocalTime.now()
+    val courseItems = todayCourses.map { item ->
+        WidgetAgendaItem(
+            title = item.event.courseName,
+            subtitle = listOf(item.event.displayLocation.trim(), item.event.teacher.trim())
+                .filter { it.isNotBlank() }
+                .joinToString(" ")
+                .ifBlank { "--" },
+            roomText = item.event.displayLocation.trim(),
+            timeText = "${item.startTime} - ${item.endTime}",
+            colorArgb = palette.getCourseColor(item.event.colorIndex).light.toArgb(),
+            isFinished = item.isFinished,
+            startMinutes = parseMinutes(item.startTime)
+        )
+    }
+    val examItems = todayExams.map { exam ->
+        val startTime = exam.startTime.orEmpty()
+        val endTime = exam.endTime.orEmpty()
+        val seatText = exam.seatNo?.takeIf { it.isNotBlank() }
+            ?.let { context.getString(R.string.exam_seat_number_format, it) }
+            .orEmpty()
+        WidgetAgendaItem(
+            title = context.getString(R.string.calendar_exam_title_format, exam.courseName),
+            subtitle = listOf(exam.displayPosition, seatText)
+                .filter { it.isNotBlank() }
+                .joinToString(" ")
+                .ifBlank { "--" },
+            roomText = exam.displayPosition,
+            timeText = "$startTime - $endTime",
+            colorArgb = palette.getCourseColor(resolveExamColorIndex(exam, courseColorIndexMap)).light.toArgb(),
+            isFinished = runCatching { LocalTime.parse(endTime) < now }.getOrDefault(false),
+            startMinutes = parseMinutes(startTime),
+            isExam = true
+        )
+    }
+    return (courseItems + examItems)
+        .sortedWith(compareBy({ it.startMinutes }, { if (it.isExam) 0 else 1 }))
+}
+
+// 解析 HH:mm 文本为当日分钟数
+private fun parseMinutes(text: String): Int {
+    return runCatching {
+        val time = LocalTime.parse(text)
+        time.hour * 60 + time.minute
+    }.getOrDefault(Int.MAX_VALUE)
 }
 
 // 生成抗锯齿圆角矩形纯色指示条

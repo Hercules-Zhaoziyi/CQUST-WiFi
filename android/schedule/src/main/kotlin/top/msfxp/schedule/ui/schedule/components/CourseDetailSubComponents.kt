@@ -106,13 +106,14 @@ fun CourseDetailHeader(
     }
 }
 
-// 教室位置及地图跳转卡片
+// 地点展示与地图跳转卡片
 @Composable
-fun CourseDetailLocationCard(
-    event: CourseEventWithMeta,
-    courseThemeColor: Color,
-    onOpenMap: (String) -> Unit,
-    onNoLocation: () -> Unit
+fun DetailLocationCard(
+    label: String,
+    locationText: String,
+    rawPosition: String,
+    accentColor: Color,
+    onOpenMap: (String) -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -134,15 +135,15 @@ fun CourseDetailLocationCard(
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 Text(
-                    text = stringResource(R.string.course_sheet_label_location),
+                    text = label,
                     style = MiuixTheme.textStyles.footnote2,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                 )
                 Text(
-                    text = event.location.ifBlank { stringResource(R.string.course_pending_location) },
+                    text = locationText.ifBlank { stringResource(R.string.course_pending_location) },
                     style = MiuixTheme.textStyles.title3.copy(fontWeight = FontWeight.Bold),
                     color = MiuixTheme.colorScheme.onSurface,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
             }
@@ -150,14 +151,8 @@ fun CourseDetailLocationCard(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
-                    .background(courseThemeColor)
-                    .clickable {
-                        if (event.location.isNotBlank() && event.location != "待定") {
-                            onOpenMap(event.location)
-                        } else {
-                            onNoLocation()
-                        }
-                    },
+                    .background(accentColor)
+                    .clickable { onOpenMap(rawPosition) },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -282,9 +277,10 @@ fun CourseDetailPropertiesGrid(
     }
 }
 
-// 全学期行课周次点阵图
+// 全学期周次点阵图
 @Composable
 fun CourseDetailWeeksMatrix(
+    label: String,
     activeWeeksSet: Set<Int>,
     currentWeekNumber: Int,
     courseThemeColor: Color
@@ -298,7 +294,7 @@ fun CourseDetailWeeksMatrix(
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                text = stringResource(R.string.course_sheet_label_weeks),
+                text = label,
                 style = MiuixTheme.textStyles.footnote1.copy(fontWeight = FontWeight.Bold),
                 color = MiuixTheme.colorScheme.onSurface
             )

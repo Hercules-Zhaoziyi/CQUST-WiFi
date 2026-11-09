@@ -21,6 +21,7 @@ import top.msfxp.schedule.data.model.CourseEvent
 import top.msfxp.schedule.data.model.Semester
 import top.msfxp.schedule.data.model.CourseEventWithMeta
 import top.msfxp.schedule.data.model.MergedCourseBlock
+import top.msfxp.schedule.data.model.ScheduleGridCell
 import top.msfxp.schedule.ui.schedule.components.ScheduleGrid
 import top.yukonga.miuix.kmp.theme.*
 import java.io.File
@@ -59,8 +60,8 @@ class MiuixIntegrationTest {
         val pending=late.copy(id=2,courseId="pending",day=0,startSection=0,endSection=0,courseName="待安排测试")
         rule.runOnUiThread { rule.activity.setContent {
             MiuixTheme(controller=ThemeController(ColorSchemeMode.Light)){
-                ScheduleGrid(pageMondayDate=LocalDate.now(),mergedBlocks=listOf(MergedCourseBlock(2,11,12,listOf(late))),
-                    unarrangedCourses=listOf(pending),isCurrentWeek=false,onCourseBlockClick={},onUnarrangedCourseClick={},
+                ScheduleGrid(pageMondayDate=LocalDate.now(),cells=listOf(ScheduleGridCell(2,11,12,courses=listOf(late))),
+                    unarrangedCourses=listOf(pending),isCurrentWeek=false,onCellClick={},onUnarrangedCourseClick={},
                     modifier=Modifier.fillMaxSize())
             }
         }}

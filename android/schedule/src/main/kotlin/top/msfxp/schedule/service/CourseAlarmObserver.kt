@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import top.msfxp.schedule.data.model.AutoControlMode
+import top.msfxp.schedule.data.repository.ExamRepository
 import top.msfxp.schedule.data.repository.ScheduleRepository
 import top.msfxp.schedule.data.repository.SettingsRepository
 import top.msfxp.schedule.widget.updateAllAppWidgets
@@ -23,6 +24,7 @@ class CourseAlarmObserver(
     private val settingsRepository: SettingsRepository,
     private val scheduleRepository: ScheduleRepository,
     private val calendarSyncHelper: CalendarSyncHelper,
+    private val examRepository: ExamRepository,
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 ) {
     // 自动化调度与小组件触发参数
@@ -44,7 +46,8 @@ class CourseAlarmObserver(
         val semesterStartDate: String?,
         val totalWeeks: Int?,
         val coursesHash: Int,
-        val adjustmentsHash: Int
+        val adjustmentsHash: Int,
+        val examsHash: Int
     )
 
     // 启动响应式监听管道
@@ -81,18 +84,20 @@ class CourseAlarmObserver(
             }
             .launchIn(scope)
 
-        // 2. 日历自动同步管道：仅在课表课程排课数据发生变动时触发
+        // 2. 日历自动同步管道：课表或考试数据变动时触发
         combine(
             scheduleRepository.currentSemesterFlow,
             scheduleRepository.allCoursesFlow,
-            adjustmentsWithSemesterFlow
-        ) { semester, courses, adjustments ->
+            adjustmentsWithSemesterFlow,
+            examRepository.currentSemesterExamsFlow
+        ) { semester, courses, adjustments, exams ->
             CourseScheduleDataParams(
                 semesterId = semester?.id,
                 semesterStartDate = semester?.startDate,
                 totalWeeks = semester?.totalWeeks,
                 coursesHash = courses.hashCode(),
-                adjustmentsHash = adjustments.hashCode()
+                adjustmentsHash = adjustments.hashCode(),
+                examsHash = exams.hashCode()
             )
         }
             .distinctUntilChanged()

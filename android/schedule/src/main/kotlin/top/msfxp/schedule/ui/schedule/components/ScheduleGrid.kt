@@ -34,7 +34,7 @@ import top.msfxp.schedule.data.model.CourseColor
 import top.msfxp.schedule.data.model.CourseEventWithMeta
 import top.msfxp.schedule.data.model.DefaultCourseColors
 import top.msfxp.schedule.data.model.DefaultTimeSlots
-import top.msfxp.schedule.data.model.MergedCourseBlock
+import top.msfxp.schedule.data.model.ScheduleGridCell
 import top.msfxp.schedule.data.model.TimeSlot
 import top.msfxp.schedule.data.model.getCourseColor
 import top.yukonga.miuix.kmp.basic.Card
@@ -54,10 +54,10 @@ fun ScheduleGrid(
     pageMondayDate: LocalDate,
     weekNumber: Int = 1,
     timeSlots: List<TimeSlot> = DefaultTimeSlots,
-    mergedBlocks: List<MergedCourseBlock>,
+    cells: List<ScheduleGridCell>,
     unarrangedCourses: List<CourseEventWithMeta>,
     isCurrentWeek: Boolean,
-    onCourseBlockClick: (MergedCourseBlock) -> Unit,
+    onCellClick: (ScheduleGridCell) -> Unit,
     onUnarrangedCourseClick: (CourseEventWithMeta) -> Unit,
     courseColors: List<CourseColor> = DefaultCourseColors,
     cardAlpha: Float = 1f,
@@ -80,8 +80,8 @@ fun ScheduleGrid(
     val effectiveSlots = remember(timeSlots) {
         if (timeSlots.isNotEmpty()) timeSlots else DefaultTimeSlots
     }
-    val totalSections = remember(effectiveSlots, mergedBlocks) {
-        scheduleSectionCount(effectiveSlots.map { it.sectionNumber }, mergedBlocks.map { it.endSection })
+    val totalSections = remember(effectiveSlots, cells) {
+        scheduleSectionCount(effectiveSlots.map { it.sectionNumber }, cells.map { it.endSection })
     }
 
     // 计算当前进行中或即将开始的节次
@@ -157,8 +157,8 @@ fun ScheduleGrid(
                             }
                         }
 
-                        // 渲染各天课程合并块
-                        val blocksByDay = remember(mergedBlocks) { mergedBlocks.groupBy { it.day } }
+                        // 渲染各天课表单元（课程、实践与考试聚合卡片）
+                        val cellsByDay = remember(cells) { cells.groupBy { it.day } }
                         Row(modifier = Modifier.fillMaxSize()) {
                             for (dayIndex in 1..totalDays) {
                                 Box(
@@ -167,14 +167,14 @@ fun ScheduleGrid(
                                         .fillMaxHeight()
                                         .padding(horizontal = 2.dp)
                                 ) {
-                                    val dayBlocks = blocksByDay[dayIndex] ?: emptyList()
-                                    dayBlocks.filter { it.startSection in 1..totalSections && it.endSection >= it.startSection && it.events.isNotEmpty() }.forEach { block ->
-                                        ScheduleCourseBlockItem(
-                                            block = block,
+                                    val dayCells = cellsByDay[dayIndex] ?: emptyList()
+                                    dayCells.filter { it.startSection in 1..totalSections && it.endSection >= it.startSection && it.totalCount > 0 }.forEach { cell ->
+                                        ScheduleCellCard(
+                                            cell = cell,
                                             lastSection = totalSections,
                                             courseColors = courseColors,
                                             cardAlpha = cardAlpha,
-                                            onClick = { onCourseBlockClick(block) }
+                                            onClick = { onCellClick(cell) }
                                         )
                                     }
                                 }
@@ -324,29 +324,51 @@ private fun ScheduleTimeColumn(
     }
 }
 
-// 单门课程网格卡片
+// 课表单元卡片（课程、实践与考试统一布局）
 @Composable
-private fun ScheduleCourseBlockItem(
-    block: MergedCourseBlock,
+private fun ScheduleCellCard(
+    cell: ScheduleGridCell,
     lastSection: Int,
     courseColors: List<CourseColor>,
     cardAlpha: Float,
     onClick: () -> Unit
 ) {
     val cardVerticalMargin = 2.dp
-    val topOffset = SectionHeight * (block.startSection - 1) + cardVerticalMargin
-    val blockHeight = SectionHeight * (block.endSection.coerceAtMost(lastSection) - block.startSection + 1) - (cardVerticalMargin * 2)
-    val primary = block.primaryEvent
-    val courseColor = courseColors.getCourseColor(primary.colorIndex).light.copy(alpha = cardAlpha)
+    val topOffset = SectionHeight * (cell.startSection - 1) + cardVerticalMargin
+    val blockHeight = SectionHeight * (cell.endSection.coerceAtMost(lastSection) - cell.startSection + 1) - (cardVerticalMargin * 2)
+    val exam = cell.primaryExam
+    val course = cell.primaryCourse
+
+    val title = exam?.courseName ?: course?.courseName.orEmpty()
+    val tagText = when {
+        exam != null -> stringResource(R.string.schedule_exam_badge)
+        course?.isPractical == true && course.projectName.isNotBlank() -> "(${course.projectName})"
+        else -> ""
+    }
+    val locationText = exam?.displayPosition ?: course?.displayLocation.orEmpty()
+    val secondaryText = if (exam != null) {
+        exam.seatNo?.takeIf { it.isNotBlank() }
+            ?.let { stringResource(R.string.exam_seat_number_format, it) }
+            ?: listOfNotNull(exam.startTime, exam.endTime).joinToString("-")
+    } else {
+        course?.teacher.orEmpty()
+    }
+    val colorIndex = exam?.let { cell.examColorIndex } ?: course?.colorIndex ?: 0
+    val cardColor = courseColors.getCourseColor(colorIndex).light.copy(alpha = cardAlpha)
+    val titleMaxLines = when {
+        tagText.isNotBlank() -> 2
+        cell.endSection - cell.startSection >= 1 -> 3
+        else -> 2
+    }
 
     Box(
         modifier = Modifier
             .offset(y = topOffset)
             .fillMaxWidth()
             .height(blockHeight)
-            .testTag("schedule-block-${block.day}-${block.startSection}-${block.endSection}")
+            .testTag("schedule-block-${cell.day}-${cell.startSection}-${cell.endSection}")
             .clip(RoundedCornerShape(CardCornerRadius))
-            .background(courseColor)
+            .background(cardColor)
             .clickable(onClick = onClick)
             .padding(horizontal = 4.dp, vertical = 6.dp)
     ) {
@@ -356,16 +378,16 @@ private fun ScheduleCourseBlockItem(
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    text = primary.courseName,
+                    text = title,
                     style = MiuixTheme.textStyles.footnote1.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold, lineHeight = 13.5.sp),
                     color = Color.White,
-                    maxLines = if (primary.isPractical && primary.projectName.isNotBlank()) 2 else (if (block.endSection - block.startSection >= 1) 3 else 2),
+                    maxLines = titleMaxLines,
                     overflow = TextOverflow.Ellipsis
                 )
-                if (primary.isPractical && primary.projectName.isNotBlank()) {
+                if (tagText.isNotBlank()) {
                     Spacer(modifier = Modifier.height(1.5.dp))
                     Text(
-                        text = "(${primary.projectName})",
+                        text = tagText,
                         style = MiuixTheme.textStyles.footnote2.copy(fontSize = 9.sp, fontWeight = FontWeight.Normal, lineHeight = 11.sp),
                         color = Color.White.copy(alpha = 0.90f),
                         maxLines = 2,
@@ -375,18 +397,18 @@ private fun ScheduleCourseBlockItem(
             }
 
             Column(modifier = Modifier.fillMaxWidth()) {
-                if (primary.location.isNotBlank()) {
+                if (locationText.isNotBlank()) {
                     Text(
-                        text = primary.location,
+                        text = locationText,
                         style = MiuixTheme.textStyles.footnote2.copy(fontSize = 9.sp, lineHeight = 11.5.sp),
                         color = Color.White.copy(alpha = 0.95f),
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-                if (primary.teacher.isNotBlank()) {
+                if (secondaryText.isNotBlank()) {
                     Text(
-                        text = primary.teacher,
+                        text = secondaryText,
                         style = MiuixTheme.textStyles.footnote2.copy(fontSize = 8.5.sp, lineHeight = 10.5.sp),
                         color = Color.White.copy(alpha = 0.82f),
                         maxLines = 1,
@@ -396,7 +418,7 @@ private fun ScheduleCourseBlockItem(
             }
         }
 
-        if (block.hasMultiple) {
+        if (cell.hasMultiple) {
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(3.dp))
@@ -405,7 +427,7 @@ private fun ScheduleCourseBlockItem(
                     .align(Alignment.TopEnd)
             ) {
                 Text(
-                    text = "+${block.events.size}",
+                    text = "+${cell.totalCount}",
                     style = MiuixTheme.textStyles.footnote2.copy(fontSize = 8.sp, fontWeight = FontWeight.Bold),
                     color = Color.White
                 )

@@ -44,7 +44,7 @@ object CqustPracticalParser {
     private val WEEKDAY_MAP = mapOf(
         '一' to 1, '二' to 2, '三' to 3, '四' to 4, '五' to 5, '六' to 6, '日' to 7, '天' to 7
     )
-    private val TIME_REGEX = Regex("""([\d,\-~—至]+)\s*周\s*(?:星期|周)\s*([一二三四五六日天])\s*(\d+)\s*[-~—至]\s*(\d+)\s*节""")
+    private val TIME_REGEX = Regex("""([\d,\-~—至]+)\s*周\s*(?:星期|周)\s*([一二三四五六日天])\s*(中午)?\s*第?\s*(\d+)\s*[-~—至]\s*(?:中午)?\s*第?\s*(\d+)\s*节""")
     private val RANGE_REGEX = Regex("""^(\d+)\s*[-~至—]\s*(\d+)$""")
 
     // 获取并解析实践教学课表
@@ -308,14 +308,18 @@ object CqustPracticalParser {
         val match = TIME_REGEX.find(text) ?: return null
         val weeksStr = match.groupValues[1]
         val dayChar = match.groupValues[2].firstOrNull() ?: return null
-        val startSec = match.groupValues[3].toIntOrNull() ?: return null
-        val endSec = match.groupValues[4].toIntOrNull() ?: return null
+        val isNonStandard = match.groupValues[3].isNotBlank() || match.value.contains("中午")
+        val startSec = match.groupValues[4].toIntOrNull() ?: return null
+        val endSec = match.groupValues[5].toIntOrNull() ?: return null
 
         val day = WEEKDAY_MAP[dayChar] ?: return null
         val weeks = parseWeeksList(weeksStr)
         if (weeks.isEmpty()) return null
 
-        return ParsedTime(day, startSec, endSec, weeks)
+        // 非标准作息节次以负数编号与原文节次对应
+        val startSection = if (isNonStandard) -startSec else startSec
+        val endSection = if (isNonStandard) -endSec else endSec
+        return ParsedTime(day, startSection, endSection, weeks)
     }
 
     // 解析周次片段列表
