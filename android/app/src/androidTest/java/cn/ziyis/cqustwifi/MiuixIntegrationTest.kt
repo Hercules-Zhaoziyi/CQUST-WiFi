@@ -85,6 +85,7 @@ class MiuixIntegrationTest {
         rule.onNodeWithTag("proxy-scan-entry").performTouchInput{click()}
         rule.onNodeWithText("扫码连接").assertExists()
         rule.onNodeWithContentDescription("返回").performTouchInput{click()}
+        rule.waitUntil(10000){runCatching{rule.onAllNodesWithTag("proxy-scan-entry").fetchSemanticsNodes().isNotEmpty()}.getOrDefault(false)}
         rule.onNodeWithTag("proxy-scan-entry").assertExists()
     }
     @Test fun completeTimetableAndSettingsAreReachable(){
