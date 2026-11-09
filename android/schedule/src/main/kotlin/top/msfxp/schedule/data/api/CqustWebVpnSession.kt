@@ -37,7 +37,7 @@ class CqustWebVpnSession(
     // 仅向应用内门户窗口转交网关域的有效 Cookie。
     fun portalCookies(): List<String> = cookieMap.values.filter {
         it.domain == "web.cqust.edu.cn" && it.expiresAt > System.currentTimeMillis()
-    }.map { it.newBuilder().secure(true).build().toString() }
+    }.map { if(it.secure)it.toString()else "$it; Secure" }
 
     // 教务与实践系统基地址
     var eamsBaseUrl: String? = null
