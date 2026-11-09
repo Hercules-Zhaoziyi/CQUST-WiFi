@@ -14,6 +14,7 @@ object PortalStore {
     const val URL="https://web.cqust.edu.cn/"
     private val scope=CoroutineScope(SupervisorJob()+Dispatchers.IO)
     private val busy=AtomicBoolean(false)
+    val connecting=kotlinx.coroutines.flow.MutableStateFlow(false)
     @Volatile private var cookies:List<String> = emptyList()
     @Volatile private var portalUser=""
     fun cookiesForWindow()=cookies.toList()
@@ -30,6 +31,7 @@ object PortalStore {
     fun forget(user:String){if(portalUser==user){cookies=emptyList();portalUser=""}}
     fun signIn(user:String,password:String,remember:Boolean){
         if(!busy.compareAndSet(false,true))return
+        connecting.value=true
         scope.launch {
             try {
                 require(user.trim().matches(Regex("[A-Za-z0-9_-]{1,32}"))&&password.isNotEmpty()&&password.length<=256)
@@ -46,7 +48,7 @@ object PortalStore {
                 }finally{session.close()}
             }catch(cancel:CancellationException){throw cancel}
             catch(_:Exception){Repository.message(Repository.app.getString(R.string.portal_failed))}
-            finally{busy.set(false)}
+            finally{busy.set(false);connecting.value=false}
         }
     }
 }

@@ -206,6 +206,7 @@ private val CardShape=RoundedCornerShape(26.dp)
 }
 @OptIn(ExperimentalLayoutApi::class)
 @Composable private fun Home(s:ViewState,onPortal:()->Unit,initialMode:Int=0,onMode:(Int)->Unit={}){
+    val portalConnecting by PortalStore.connecting.collectAsStateWithLifecycle()
     var loginMode by remember{mutableIntStateOf(initialMode)}
     val scheduleMessage by ScheduleStore.message.collectAsStateWithLifecycle()
     var user by remember{mutableStateOf(s.username)}
@@ -286,11 +287,11 @@ private val CardShape=RoundedCornerShape(26.dp)
                     Checkbox(rememberPassword,{rememberPassword=it});Text("记住账号密码",fontSize=13.sp,modifier=Modifier.weight(1f))
                     QuietButton(onClick=onPortal){Text("认证帮助")}
                 }
-                ActionButton(onClick=submitLogin,enabled=!s.busy,modifier=Modifier.fillMaxWidth().height(52.dp),shape=RoundedCornerShape(17.dp)){Text("登录");Spacer(Modifier.width(10.dp));Icon(Icons.Outlined.ArrowForward,null)}
+                ActionButton(onClick=submitLogin,enabled=!s.busy&&!portalConnecting,modifier=Modifier.fillMaxWidth().height(52.dp),shape=RoundedCornerShape(17.dp)){Text(if(portalConnecting)stringResource(R.string.portal_connecting)else "登录");Spacer(Modifier.width(10.dp));Icon(Icons.Outlined.ArrowForward,null)}
                 Text("密码使用 Android Keystore 加密保存在本机。",fontSize=11.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        Panel{Setting("自动登录","仅选择校园网或两者时，检测到认证入口后自动连接。",s.prefs.autoLogin){Repository.preferences(s.prefs.copy(autoLogin=it))}}
+        Panel{Setting("自动登录",stringResource(R.string.auto_login_purposes),s.prefs.autoLogin){Repository.preferences(s.prefs.copy(autoLogin=it))}}
         Text("每 ${if(s.prefs.interval==120)"2 分钟"else"${s.prefs.interval} 秒"}检查 · 可在设置中调整",fontSize=12.sp,
             color=MaterialTheme.colorScheme.onSurfaceVariant,modifier=Modifier.align(Alignment.CenterHorizontally))
     }
