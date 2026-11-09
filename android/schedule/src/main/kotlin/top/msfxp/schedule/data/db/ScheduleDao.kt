@@ -57,15 +57,20 @@ interface ScheduleDao {
     @Query("DELETE FROM course_events WHERE tableId = :tableId")
     suspend fun deleteEventsByTableId(tableId: String)
 
+    @Query("UPDATE course_adjustments SET courseId = :newId WHERE tableId = :tableId AND courseId = :oldId")
+    suspend fun migrateAdjustmentCourseId(tableId:String,oldId:String,newId:String)
+
     @Transaction
     suspend fun replaceCoursesAndEvents(
         tableId: String,
         courses: List<Course>,
         events: List<CourseEvent>
     ) {
+        val previous=getAllCoursesWithEventsOnce(tableId).map{it.course}
+        for((oldId,newId) in courseIdentityMappings(previous,courses))migrateAdjustmentCourseId(tableId,oldId,newId)
         deleteEventsByTableId(tableId)
         deleteCoursesByTableId(tableId)
-        insertCourses(courses)
+        insertCourses(preserveCourseColors(previous,courses))
         insertEvents(events)
     }
 
