@@ -173,9 +173,35 @@ pub fn command(app: &AppHandle, state: &Schedule, method: &str, args: Value, ctx
             Ok(view(&store))
         }
         "scheduleSync" | "scheduleSignIn" => sync(app, state, args, ctx),
+        "portalSignIn" => open_portal(args, ctx),
         "scheduleStartDate" => set_start_date(state, args),
         _ => Err(error("不支持的课表操作。")),
     }
+}
+
+// 将校方返回的网关提升地址交给默认浏览器，不导出 Cookie。
+fn open_portal(args: Value, ctx: CampusContext) -> Result<Value, Error> {
+    let user=args["student_id"].as_str().unwrap_or("").trim();
+    if user.is_empty() || user.len()>32 || !user.chars().all(|c|c.is_ascii_alphanumeric()||c=='_'||c=='-') {
+        return Err(credentials("请输入有效学校账号。"));
+    }
+    let typed=args["password"].as_str().unwrap_or("");
+    let password=if typed.is_empty(){ctx.password.ok_or_else(||credentials("请输入统一认证密码。"))?}else{Zeroizing::new(typed.to_owned())};
+    if password.is_empty()||password.len()>256{return Err(credentials("密码长度无效。"))}
+    let mut session=VpnSession::new()?;
+    session.browser_handoff=true;
+    session.cas_login(user,&password)?;
+    let target=session.browser_url.take().ok_or_else(||context("校方没有返回可交接的浏览器登录地址，请稍后重试。"))?;
+    crate::platform::open_url(&target).map_err(|_|context("无法打开默认浏览器。"))?;
+    Ok(json!({"opened":true,"message":"已将校方登录跳转交给默认浏览器；浏览器实际登录状态以校方页面为准。"}))
+}
+
+fn valid_browser_handoff(url: &str) -> bool {
+    let Ok(u)=Url::parse(url) else{return false};
+    let pairs=u.query_pairs().collect::<Vec<_>>();
+    u.scheme()=="https"&&u.host_str()==Some("web.cqust.edu.cn")&&u.port_or_known_default()==Some(443)
+        &&u.username().is_empty()&&u.password().is_none()&&u.fragment().is_none()&&u.path()=="/token-login"
+        &&pairs.len()==1&&pairs[0].0=="token"&&!pairs[0].1.is_empty()&&pairs[0].1.len()<=4096
 }
 
 // 保存开学日期；空值回退到按学期推算的默认日期。
@@ -421,6 +447,8 @@ struct VpnSession {
     client: Client,
     cookies: HashMap<String, StoredCookie>,
     eams_base: Option<String>,
+    browser_handoff: bool,
+    browser_url: Option<String>,
 }
 
 impl VpnSession {
@@ -433,7 +461,7 @@ impl VpnSession {
             .user_agent(USER_AGENT_VALUE)
             .build()
             .map_err(|_| network())?;
-        Ok(Self { client, cookies: HashMap::new(), eams_base: None })
+        Ok(Self { client, cookies: HashMap::new(), eams_base: None, browser_handoff:false, browser_url:None })
     }
 
     fn cookie_header(&self, url: &Url) -> String {
@@ -686,6 +714,9 @@ impl VpnSession {
     fn promote(&mut self, start: &str) -> Result<(), Error> {
         let mut current = start.to_string();
         for _ in 0..6 {
+            if self.browser_handoff && valid_browser_handoff(&current) {
+                self.browser_url=Some(current);return Ok(())
+            }
             let page = self.get(&current, None, false)?;
             if current.contains("/token-login") {
                 return Ok(());
@@ -1819,6 +1850,13 @@ index = 1 * unitCount + 2;
 #[cfg(test)]
 mod cookie_scope_tests {
     use super::*;
+    #[test]
+    fn browser_handoff_only_accepts_official_server_token_endpoint() {
+        assert!(valid_browser_handoff("https://web.cqust.edu.cn/token-login?token=fixture"));
+        for url in ["https://web.cqust.edu.cn.evil.test/token-login?token=x","http://web.cqust.edu.cn/token-login?token=x","https://web.cqust.edu.cn:444/token-login?token=x","https://u:p@web.cqust.edu.cn/token-login?token=x","https://web.cqust.edu.cn/token-login","https://web.cqust.edu.cn/other?token=x","https://web.cqust.edu.cn/token-login?token=x&redirect=https://other.test/","https://web.cqust.edu.cn/token-login?token=x#other"] {
+            assert!(!valid_browser_handoff(url));
+        }
+    }
 
     fn cookie(domain: &str, path: &str, host_only: bool, secure: bool) -> StoredCookie {
         StoredCookie {

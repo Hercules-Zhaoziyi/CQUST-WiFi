@@ -20,16 +20,17 @@ const release=document.createElement('article');release.innerHTML='<span>5.3.0</
 document.querySelector('.changelog h3').after(release);
 const patchRelease=document.createElement('article');patchRelease.innerHTML='<span>5.3.1</span><div><strong>课表访问与扫码体验优化</strong><p>兼容学校官方 HTTP 与 CAS 跳转，保留未知来源拦截；重新设计手机扫码入口和连接二维码面板。</p></div>';document.querySelector('.changelog h3').after(patchRelease);
 const layoutRelease=document.createElement('article');layoutRelease.innerHTML='<span>5.3.2</span><div><strong>课表优先，操作归位</strong><p>账号、更换、同步与课表设置移至课表底部；修复特别鸣谢图标与文字错行。</p></div>';document.querySelector('.changelog h3').after(layoutRelease);
+const portalRelease=document.createElement('article');portalRelease.innerHTML='<span>5.4.0</span><div><strong>统一登录，门户随行</strong><p>新增信息门户和全部登录用途；通过校方登录跳转在默认浏览器接入门户，三条认证链路独立运行。</p></div>';document.querySelector('.changelog h3').after(portalRelease);
 
 document.querySelector('#login-card h1').textContent='统一登录';
-document.querySelector('#login-card .card-heading p').textContent='一套账号，校园网与课表按需使用。';
+document.querySelector('#login-card .card-heading p').textContent='一套账号，校园网、课表与信息门户按需使用。';
 document.querySelector('label[for="password"]').textContent='统一认证密码';
 const purposes=document.createElement('div');purposes.className='login-purposes';purposes.setAttribute('role','radiogroup');purposes.setAttribute('aria-label','登录用途');
 let purpose=localStorage.getItem('cqust-login-purpose')||'network',unifiedBusy=false;
 const status=document.createElement('p');status.className='unified-status';status.setAttribute('role','status');
-for(const [value,label] of [['network','校园网'],['schedule','课表'],['both','两者']]){const button=document.createElement('button');button.type='button';button.textContent=label;button.dataset.purpose=value;button.setAttribute('role','radio');button.onclick=()=>choosePurpose(value);purposes.append(button);}
+for(const [value,label] of [['network','校园网'],['schedule','课表'],['portal','信息门户'],['all','全部']]){const button=document.createElement('button');button.type='button';button.textContent=label;button.dataset.purpose=value;button.setAttribute('role','radio');button.onclick=()=>choosePurpose(value);purposes.append(button);}
 $('login').before(purposes,status);
-function choosePurpose(value){purpose=['network','schedule','both'].includes(value)?value:'network';localStorage.setItem('cqust-login-purpose',purpose);purposes.querySelectorAll('button').forEach(n=>n.setAttribute('aria-checked',String(n.dataset.purpose===purpose)));status.textContent=purpose==='network'?'仅进行校园网上网认证。':'课表使用统一认证，不要求开通校园网；两条认证链路独立运行。';}
+function choosePurpose(value){purpose=value==='both'?'all':['network','schedule','portal','all'].includes(value)?value:'network';localStorage.setItem('cqust-login-purpose',purpose);purposes.querySelectorAll('button').forEach(n=>n.setAttribute('aria-checked',String(n.dataset.purpose===purpose)));status.textContent=purpose==='network'?'仅进行校园网上网认证。':purpose==='portal'?'信息门户独立认证，使用默认浏览器打开。':'校园网、课表与门户认证独立运行，仅看课表或门户不要求开通校园网。';}
 choosePurpose(purpose);
 window.openUnifiedLogin=(target='schedule',message='')=>{choosePurpose(target);forceLoginForm=true;if(state)apply(state);page('home');if(message)status.textContent=message;$('username').focus();};
 window.unifiedSignIn=async()=>{
@@ -37,15 +38,18 @@ window.unifiedSignIn=async()=>{
  if(!input.username){$('username').focus();return;}
  unifiedBusy=true;
  try{
-  const course=purpose!=='network'?window.cqustSchedule.signIn(input):null;
-  const network=purpose!=='schedule'?login('login',input):null;
+  const course=['schedule','all'].includes(purpose)?window.cqustSchedule.signIn(input):null;
+  const network=['network','all'].includes(purpose)?login('login',input):null;
+  const portal=['portal','all'].includes(purpose)?window.cqust.request('portalSignIn',{student_id:input.username,password:input.password,remember:input.remember,network_requested:purpose==='all'}).catch(()=>({ok:false,error:{message:'门户连接未完成，请重试。'}})):null;
   if(course){status.textContent='统一认证与课表同步中…';const result=await course;
    if(result.ok){status.textContent='课表已同步。';forceLoginForm=false;if(state)apply(state);page('schedule');if(!network)$('password').value='';}
    else{status.textContent=result.error?.message||'课表同步未完成，原缓存已保留。';}
   }
   if(network)await network;
+  if(portal){const result=await portal;status.textContent=result.ok?result.data.message:result.error?.message||'门户认证未完成。';if(!result.ok)toast(status.textContent);}
  }finally{unifiedBusy=false;}
 };
+document.querySelector('[data-campus="campus-portal"]').onclick=async()=>{const input=credentials();if(!input.username){window.openUnifiedLogin('portal');return}const result=await window.cqust.request('portalSignIn',{student_id:input.username,password:input.password,remember:input.remember});if(!result.ok)window.openUnifiedLogin('portal',result.error?.message||'请先登录信息门户。');};
 for(const node of document.querySelectorAll('#schedule-setup label,#schedule-student,.schedule-password,#schedule-password-hint'))node.hidden=true;
 $('schedule-sync').textContent='前往共用登录入口';$('schedule-sync').onclick=()=>window.openUnifiedLogin('schedule');
 $('schedule-change-account').onclick=()=>window.openUnifiedLogin('schedule');

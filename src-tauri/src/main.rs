@@ -26,14 +26,14 @@ use tauri::{Manager,Emitter,menu::{Menu,MenuItem},tray::{TrayIconBuilder,TrayIco
 async fn request(app:tauri::AppHandle,window:tauri::WebviewWindow,method:String,args:Value)->Result<Value,String>{
  if window.label()!="main"{return Err("不允许的调用来源".into())}
  #[cfg(feature="verify-ui")]if app.state::<Backend>().1{return Ok(verify::request(&app,&method,args))}
- if method.starts_with("schedule"){
+ if method.starts_with("schedule")||method=="portalSignIn"{
   let backend=app.state::<Backend>().0.clone();
   let student_id=args["student_id"].as_str().unwrap_or("").to_string();
   let context=if !args["password"].as_str().unwrap_or("").is_empty(){schedule::CampusContext::default()}else if let Ok(service)=backend.try_lock(){service.campus_context(&student_id)}else{
    let password=if student_id.len()<=32&&student_id.chars().all(|c|c.is_ascii_alphanumeric()||c=='_'||c=='-'){vault::get(&student_id)}else{zeroize::Zeroizing::new(String::new())};
    schedule::CampusContext{password:if password.is_empty(){None}else{Some(password)}}
   };
-  let verified=if method=="scheduleSignIn"{Some((student_id.clone(),zeroize::Zeroizing::new(args["password"].as_str().filter(|s|!s.is_empty()).map(str::to_owned).or_else(||context.password.as_ref().map(|s|s.to_string())).unwrap_or_default()),args["remember"].as_bool().unwrap_or(false),args["network_requested"].as_bool().unwrap_or(false)))}else{None};
+  let verified=if method=="scheduleSignIn"||method=="portalSignIn"{Some((student_id.clone(),zeroize::Zeroizing::new(args["password"].as_str().filter(|s|!s.is_empty()).map(str::to_owned).or_else(||context.password.as_ref().map(|s|s.to_string())).unwrap_or_default()),args["remember"].as_bool().unwrap_or(false),args["network_requested"].as_bool().unwrap_or(false)))}else{None};
   let state=app.state::<schedule::Schedule>().inner().clone();
   let handle=app.clone();
   let result=tauri::async_runtime::spawn_blocking(move||match schedule::command(&handle,&state,&method,args,context){

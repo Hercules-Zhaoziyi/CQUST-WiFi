@@ -1,6 +1,12 @@
 # CQUST Wi-Fi
 
-重庆科技大学校园网与课表客户端。当前 Windows 版本：**v5.3.2**；Android：**1.1.0-beta02**。Windows 使用 **Tauri 2 + Rust**；Android 使用 Kotlin / Jetpack Compose / Miuix。macOS 仍提供此前 v5.1.1 Apple Silicon 安装包，本次未重新构建或验证 Mac。
+重庆科技大学校园网与课表客户端。当前 Windows 版本：**v5.4.0**；Android：**1.2.0-beta01**。Windows 使用 **Tauri 2 + Rust**；Android 使用 Kotlin / Jetpack Compose / Miuix。macOS 仍提供此前 v5.1.1 Apple Silicon 安装包，本次未重新构建或验证 Mac。
+
+## v5.4.0 与 Android 1.2.0-beta01
+
+新增信息门户与全部登录用途。桌面通过学校返回的网关登录地址交接默认浏览器；安卓使用应用内受限 WebView。三条认证独立执行，不绕过校方验证。真实校园账号的会话交接仍需实际验证。
+
+安卓合并课表上游 v1.0.3：考试、非标准作息、同格详情、地点格式化和重复导航修复。桌面本轮不移植安卓新增考试界面。旧版本说明如下。
 
 ## v5.3.2 与 Android 1.1.0-beta02
 
