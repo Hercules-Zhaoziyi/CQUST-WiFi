@@ -82,7 +82,9 @@ class PortalActivity:Activity(){
     override fun onNewIntent(intent:Intent){super.onNewIntent(intent);loadPortal()}
     private fun loadPortal(){
         val generation=++loadGeneration
+        web.clearCache(true);web.clearHistory();WebStorage.getInstance().deleteAllData()
         val manager=CookieManager.getInstance()
+        manager.setAcceptCookie(true)
         manager.removeAllCookies {
             if(generation!=loadGeneration||isFinishing||isDestroyed)return@removeAllCookies
             val cookies=PortalStore.cookiesForWindow()
@@ -93,5 +95,5 @@ class PortalActivity:Activity(){
             }
         }
     }
-    override fun onDestroy(){loadGeneration++;web.stopLoading();web.destroy();CookieManager.getInstance().removeAllCookies(null);super.onDestroy()}
+    override fun onDestroy(){loadGeneration++;web.stopLoading();web.clearCache(true);web.destroy();CookieManager.getInstance().removeAllCookies(null);WebStorage.getInstance().deleteAllData();super.onDestroy()}
 }

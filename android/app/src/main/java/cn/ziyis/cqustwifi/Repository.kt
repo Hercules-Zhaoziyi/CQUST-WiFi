@@ -111,7 +111,7 @@ object Repository {
         select(user);manualPause=true
     }}}
     fun forgetAccount(user:String){scope.launch{gate.withLock{
-        if(ScheduleStore.busy.value){message("课表正在同步，请完成后再移除账号。");return@withLock}
+        if(ScheduleStore.busy.value||PortalStore.connecting.value){message(app.getString(R.string.portal_busy_remove));return@withLock}
         if(session!=null&&state.value.username==user){message("请先退出当前账号。");return@withLock}
         try{
             ScheduleStore.forgetSavedPassword(user)

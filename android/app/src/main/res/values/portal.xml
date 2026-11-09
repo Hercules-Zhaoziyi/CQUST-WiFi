@@ -7,4 +7,5 @@
     <string name="portal_hint">信息门户独立认证，无需开通校园网上网服务。</string>
     <string name="portal_connecting">正在登录信息门户…</string>
     <string name="auto_login_purposes">仅选择校园网或全部时，检测到认证入口后自动连接。</string>
+    <string name="portal_busy_remove">身份认证或课表同步正在进行，请完成后再移除账号。</string>
 </resources>
