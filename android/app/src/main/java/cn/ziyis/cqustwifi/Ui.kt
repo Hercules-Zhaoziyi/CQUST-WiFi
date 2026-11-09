@@ -204,6 +204,7 @@ private val CardShape=RoundedCornerShape(26.dp)
         Text(value.ifBlank{"—"},fontSize=15.sp,fontWeight=FontWeight.SemiBold,modifier=Modifier.padding(top=7.dp))
     }
 }
+@OptIn(ExperimentalLayoutApi::class)
 @Composable private fun Home(s:ViewState,onPortal:()->Unit,initialMode:Int=0,onMode:(Int)->Unit={}){
     var loginMode by remember{mutableIntStateOf(initialMode)}
     val scheduleMessage by ScheduleStore.message.collectAsStateWithLifecycle()

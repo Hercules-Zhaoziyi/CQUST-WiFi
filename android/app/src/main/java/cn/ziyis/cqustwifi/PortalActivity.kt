@@ -53,6 +53,7 @@ object PortalStore {
 
 class PortalActivity:Activity(){
     private lateinit var web:WebView
+    private var loadGeneration=0
     override fun onCreate(savedInstanceState:Bundle?){
         super.onCreate(savedInstanceState)
         val column=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;fitsSystemWindows=true}
@@ -74,15 +75,21 @@ class PortalActivity:Activity(){
         }
         CookieManager.getInstance().setAcceptThirdPartyCookies(web,false)
         column.addView(toolbar);column.addView(web,LinearLayout.LayoutParams(-1,0,1f));setContentView(column)
+        loadPortal()
+    }
+    override fun onNewIntent(intent:Intent){super.onNewIntent(intent);loadPortal()}
+    private fun loadPortal(){
+        val generation=++loadGeneration
         val manager=CookieManager.getInstance()
         manager.removeAllCookies {
+            if(generation!=loadGeneration||isFinishing||isDestroyed)return@removeAllCookies
             val cookies=PortalStore.cookiesForWindow()
-            fun load(){manager.flush();web.loadUrl(PortalStore.URL)}
+            fun load(){if(generation==loadGeneration&&!isFinishing&&!isDestroyed){manager.flush();web.loadUrl(PortalStore.URL)}}
             if(cookies.isEmpty())load()else{
                 var remaining=cookies.size
                 cookies.forEach{cookie->manager.setCookie(PortalStore.URL,cookie){if(--remaining==0)load()}}
             }
         }
     }
-    override fun onDestroy(){web.stopLoading();web.destroy();CookieManager.getInstance().removeAllCookies(null);super.onDestroy()}
+    override fun onDestroy(){loadGeneration++;web.stopLoading();web.destroy();CookieManager.getInstance().removeAllCookies(null);super.onDestroy()}
 }
