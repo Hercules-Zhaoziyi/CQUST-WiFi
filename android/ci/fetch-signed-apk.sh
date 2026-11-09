@@ -13,4 +13,4 @@ if [ -n "${SIGNED_APK_BLOB:-}" ]; then
 else
   gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern 'CQUST-WiFi-Android-*.apk' --dir artifacts/release-current
 fi
-gh release download android-v1.1.0-beta01 --repo "$GITHUB_REPOSITORY" --pattern 'CQUST-WiFi-Android-*.apk' --dir artifacts/release-previous
+gh release download android-v1.1.0-beta02 --repo "$GITHUB_REPOSITORY" --pattern 'CQUST-WiFi-Android-*.apk' --dir artifacts/release-previous
