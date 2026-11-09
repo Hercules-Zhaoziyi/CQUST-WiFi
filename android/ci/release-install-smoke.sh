@@ -30,6 +30,11 @@ sleep 3
 adb -s "$serial" shell pidof "$package"
 adb -s "$serial" shell uiautomator dump /sdcard/release-window.xml
 adb -s "$serial" pull /sdcard/release-window.xml artifacts/release-window.xml
+python3 ci/dismiss-launcher-anr.py "$serial" artifacts/release-window.xml
+adb -s "$serial" shell am start -W -n "$package/.MainActivity"
+sleep 3
+adb -s "$serial" shell uiautomator dump /sdcard/release-window.xml
+adb -s "$serial" pull /sdcard/release-window.xml artifacts/release-window.xml
 grep -q 'CQUST Wi-Fi' artifacts/release-window.xml
 mkdir -p artifacts/screenshots
 adb -s "$serial" exec-out screencap -p > artifacts/screenshots/14-signed-release.png
