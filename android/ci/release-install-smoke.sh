@@ -35,6 +35,7 @@ adb -s "$serial" shell am start -W -n "$package/.MainActivity"
 sleep 3
 adb -s "$serial" shell uiautomator dump /sdcard/release-window.xml
 adb -s "$serial" pull /sdcard/release-window.xml artifacts/release-window.xml
+if grep -q "isn't responding" artifacts/release-window.xml; then echo 'Unexpected ANR dialog remains'; exit 1; fi
 grep -q 'CQUST Wi-Fi' artifacts/release-window.xml
 mkdir -p artifacts/screenshots
 adb -s "$serial" exec-out screencap -p > artifacts/screenshots/14-signed-release.png

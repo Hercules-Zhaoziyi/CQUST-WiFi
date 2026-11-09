@@ -4,6 +4,7 @@ import subprocess
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
+sys.stdout.reconfigure(encoding='utf-8')
 
 def launcher_button(xml):
     nodes=list(ET.fromstring(xml).iter('node'))
