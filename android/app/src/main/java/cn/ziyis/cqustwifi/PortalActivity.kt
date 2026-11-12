@@ -17,32 +17,40 @@ object PortalStore {
     val connecting=kotlinx.coroutines.flow.MutableStateFlow(false)
     @Volatile private var cookies:List<String> = emptyList()
     @Volatile private var portalUser=""
+    @Volatile private var destination=URL
+    fun destinationForWindow()=destination
     fun cookiesForWindow()=cookies.toList()
     fun open(context:android.content.Context){
         context.startActivity(Intent(context,PortalActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
-    fun openAuthenticated(context:android.content.Context){
+    fun openAuthenticated(context:android.content.Context,target:String=URL){
         val user=portalUser.ifBlank{Repository.state.value.username}
         val account=Repository.sharedAccount(user)
-        if(account!=null)signIn(user,account.password,account.remember)else{
-            cookies=emptyList();open(context)
+        if(account!=null)signIn(user,account.password,account.remember,target)else{
+            cookies=emptyList();destination=target;open(context)
         }
     }
     fun forget(user:String){if(portalUser==user){cookies=emptyList();portalUser=""}}
-    fun signIn(user:String,password:String,remember:Boolean){
+    fun signIn(user:String,password:String,remember:Boolean,target:String=URL){
         if(!busy.compareAndSet(false,true))return
         connecting.value=true
         scope.launch {
             try {
                 require(user.trim().matches(Regex("[A-Za-z0-9_-]{1,32}"))&&password.isNotEmpty()&&password.length<=256)
-                val result=CqustCasAuthClient.login(user.trim(),password)
+                val result=CqustCasAuthClient.login(user.trim(),password,handoffToBrowser=true)
                 val session=result.session
                 if(!result.success||session==null){Repository.message(result.errorMessage?:Repository.app.getString(R.string.portal_failed));return@launch}
                 try {
+                    result.browserUrl?.let{handoff->
+                        portalUser=user.trim();Repository.rememberIdentity(portalUser,password,remember)
+                        withContext(Dispatchers.Main){PortalBrowser.launch(Repository.app,handoff,target)}
+                        return@launch
+                    }
                     check(session.hasVpnTicket())
                     cookies=session.portalCookies()
                     check(cookies.isNotEmpty())
                     portalUser=user.trim()
+                    destination=target
                     Repository.rememberIdentity(user.trim(),password,remember)
                     withContext(Dispatchers.Main){open(Repository.app)}
                 }finally{session.close()}
@@ -88,7 +96,7 @@ class PortalActivity:Activity(){
         manager.removeAllCookies {
             if(generation!=loadGeneration||isFinishing||isDestroyed)return@removeAllCookies
             val cookies=PortalStore.cookiesForWindow()
-            fun load(){if(generation==loadGeneration&&!isFinishing&&!isDestroyed){manager.flush();web.loadUrl(PortalStore.URL)}}
+            fun load(){if(generation==loadGeneration&&!isFinishing&&!isDestroyed){manager.flush();web.loadUrl(PortalStore.destinationForWindow())}}
             if(cookies.isEmpty())load()else{
                 var remaining=cookies.size
                 cookies.forEach{cookie->manager.setCookie(PortalStore.URL,cookie){if(--remaining==0)load()}}

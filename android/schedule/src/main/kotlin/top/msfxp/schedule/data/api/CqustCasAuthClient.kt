@@ -11,7 +11,8 @@ data class CasAuthResult(
     val statusCode: Int? = null,
     val isNetworkError: Boolean = false,
     val isNeedCaptcha: Boolean = false,
-    val session: CqustWebVpnSession? = null
+    val session: CqustWebVpnSession? = null,
+    val browserUrl:String?=null
 )
 
 // 统一身份认证客户端
@@ -66,7 +67,8 @@ object CqustCasAuthClient {
     suspend fun login(
         studentId: String,
         passwordRaw: String,
-        existingSession: CqustWebVpnSession? = null
+        existingSession: CqustWebVpnSession? = null,
+        handoffToBrowser:Boolean=false
     ): CasAuthResult {
         val session = existingSession ?: CqustWebVpnSession()
         var keepSession=false
@@ -144,9 +146,13 @@ object CqustCasAuthClient {
             // 4. 判定认证结果：若成功，CAS 一定会下发重定向且带有 ticket=ST-
             if (redirectLocation != null && redirectLocation.contains("ticket=ST-")) {
                 val startTarget = session.resolveUrl(actualUrl, redirectLocation)
-                promoteSession(session, startTarget)
+                if(handoffToBrowser&&PortalBrowserHandoff.accepts(startTarget)){
+                    keepSession=true
+                    return CasAuthResult(success=true,session=session,browserUrl=startTarget)
+                }
+                val browserUrl=promoteSession(session, startTarget,handoffToBrowser)
                 keepSession=true
-                return CasAuthResult(success = true, session = session)
+                return CasAuthResult(success = true, session = session,browserUrl=browserUrl)
             }
 
             // 若未返回 ST 票据，说明学号或密码错误
@@ -178,14 +184,16 @@ object CqustCasAuthClient {
     }
 
     // 跟随 CAS 票据至网关会话提升点
-    private suspend fun promoteSession(session: CqustWebVpnSession, startUrl: String) {
+    private suspend fun promoteSession(session: CqustWebVpnSession, startUrl: String,handoffToBrowser:Boolean=false):String? {
         var current = startUrl
-        for (hop in 0 until 6) {
+        for (hop in 0 until 12) {
+            if(handoffToBrowser&&PortalBrowserHandoff.accepts(current))return current
             val result = session.get(current)
-            if (current.contains("/token-login")) return
-            val location = result.headers[HttpHeaders.Location] ?: return
+            if (current.contains("/token-login")) return null
+            val location = result.headers[HttpHeaders.Location] ?: return null
             current = session.resolveUrl(current, location)
         }
+        return null
     }
 
     // 预检是否需要验证码

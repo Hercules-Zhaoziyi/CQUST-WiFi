@@ -321,7 +321,7 @@ private val CardShape=RoundedCornerShape(26.dp)
         items(sites.chunked(2)){row->
             Row(horizontalArrangement=Arrangement.spacedBy(12.dp)){
                 row.forEach{site->
-                    Surface(onClick={if(site.name=="信息门户")PortalStore.openAuthenticated(context)else openLink(context,site.url)},shape=RoundedCornerShape(22.dp),color=MaterialTheme.colorScheme.surface,modifier=Modifier.weight(1f)){
+                    Surface(onClick={if(CampusServiceRoutes.authenticated(site))PortalStore.openAuthenticated(context,CampusServiceRoutes.destination(site))else openLink(context,site.url)},shape=RoundedCornerShape(22.dp),color=MaterialTheme.colorScheme.surface,modifier=Modifier.weight(1f)){
                         Column(Modifier.padding(17.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
                             AsyncImage("file:///android_asset/${site.icon}",site.name,imageLoader=loader,modifier=Modifier.size(42.dp))
                             Text(site.name,fontSize=15.sp,fontWeight=FontWeight.SemiBold,lineHeight=22.sp)
