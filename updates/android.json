@@ -1,16 +1,16 @@
 [
   {
-    "tag_name": "android-v1.2.0-beta02",
+    "tag_name": "android-v1.2.0-beta03",
     "draft": false,
     "prerelease": true,
-    "html_url": "https://gitee.com/ithercules/CQUST-WiFi/releases/tag/android-v1.2.0-beta02",
-    "body": "## 门户与 Chrome Custom Tabs\n\n- 优先使用 Chrome Custom Tabs 打开校方签发的登录回调，Chrome 不可用时转交默认浏览器。\n- 修复 CAS 回调和网关包裹提升路径识别；认证、浏览器会话交接分别处理。\n- “经信息门户”、教务与实践入口统一接入。已知路径直连对应业务；尚无独立地址的服务进入门户菜单。\n- Gitee 优先检测更新，GitHub 作为备用。保留课表、代理、二维码、原发布证书和覆盖升级能力。\n\n学校验证码及二次验证不会绕过。真实账号与业务页面尚待实际验证，不将浏览器打开或后台认证成功等同于全部业务已登录。\n",
+    "html_url": "https://gitee.com/ithercules/CQUST-WiFi/releases/tag/android-v1.2.0-beta03",
+    "body": "补全常用网站中的门户服务入口，科研、学工、毕业论文、邮件、课程中心等卡片可前往已核对的校方菜单项；教务和实践教学保留专用 SSO 入口。\n\n包含此前的完整 Miuix 课表更新、统一设置、二维码代理配置、主题过渡和 Chrome Custom Tabs 登录交接。更新检测优先使用 Gitee，GitHub 作为备用。\n\n可从 1.2.0-beta02 直接覆盖升级。部分业务系统仍可能要求校方二次认证；本次不承诺消除校方维护或网络错误。\n\n[加入 QQ 内测群](https://qm.qq.com/q/Rn7B5NBbiK)\n",
     "assets": [
       {
-        "name": "CQUST-WiFi-Android-1.2.0-beta02.apk",
+        "name": "CQUST-WiFi-Android-1.2.0-beta03.apk",
         "size": 67551057,
-        "digest": "sha256:ed55f9cfb33ccb133a35a87391e1b8c8be216c33a4e93f4b000c9408ad19ea23",
-        "browser_download_url": "https://gitee.com/ithercules/CQUST-WiFi/releases/download/android-v1.2.0-beta02/CQUST-WiFi-Android-1.2.0-beta02.apk"
+        "digest": "sha256:3184d9c8bbf9b5269846715ae4204f4df505125afa89be2772fa5051b8be987e",
+        "browser_download_url": "https://gitee.com/ithercules/CQUST-WiFi/releases/download/android-v1.2.0-beta03/CQUST-WiFi-Android-1.2.0-beta03.apk"
       }
     ]
   }
