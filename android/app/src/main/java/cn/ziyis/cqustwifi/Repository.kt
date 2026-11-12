@@ -264,7 +264,7 @@ object Repository {
     fun stopSharing(){sharing?.close();sharing=null;sharePassword=null;activeShareOptions=null;mutable.update{it.copy(sharing=false,sharingAddress="",sharingUser="",sharingSecret=false)}}
     fun sites():List<CampusSite> {
         val a=JSONArray(app.assets.open("sites.json").bufferedReader().readText())
-        return (0 until a.length()).map{val o=a.getJSONObject(it);CampusSite(o.getString("name"),o.getString("url"),o.getString("icon"),o.optBoolean("viaPortal"))}
+        return (0 until a.length()).map{val o=a.getJSONObject(it);CampusSite(o.getString("name"),o.getString("url"),o.getString("icon"),o.optBoolean("viaPortal"),o.optString("portalPath").ifBlank{null})}
     }
     suspend fun checkUpdate():UpdateInfo=withContext(Dispatchers.IO){
         val client=ApplicationClients.client()

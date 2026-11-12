@@ -25,70 +25,80 @@
     "name": "科研系统",
     "icon": "sites/serviceIcon_940200712325849088.png",
     "url": "https://casp.cqust.edu.cn/index.html#/",
-    "viaPortal": true
+    "viaPortal": true,
+    "portalPath": "/index.html#/ServiceShow?isMobile=2&wid=888009823426125824"
   },
   {
     "id": "campus-2",
     "name": "学工系统",
     "icon": "sites/学生组织管理-1184165712839319552.png",
     "url": "https://xgfw.cqust.edu.cn/",
-    "viaPortal": false
+    "viaPortal": true,
+    "portalPath": "/index.html#/ServiceShow?isMobile=0&wid=1458841330256875520"
   },
   {
     "id": "campus-3",
     "name": "实践教学",
     "icon": "sites/serviceIcon_940201635458605056.png",
     "url": "https://casp.cqust.edu.cn/index.html#/",
-    "viaPortal": true
+    "viaPortal": true,
+    "portalPath": "/index.html#/ServiceShow?isMobile=2&wid=888014394286350336"
   },
   {
     "id": "campus-4",
     "name": "毕业论文",
     "icon": "sites/serviceIcon_940201809199259648.png",
     "url": "https://casp.cqust.edu.cn/index.html#/",
-    "viaPortal": true
+    "viaPortal": true,
+    "portalPath": "/index.html#/ServiceShow?isMobile=2&wid=888014962421604352"
   },
   {
     "id": "campus-5",
     "name": "邮件系统",
     "icon": "sites/serviceIcon_940202170962173952.png",
     "url": "https://casp.cqust.edu.cn/index.html#/",
-    "viaPortal": true
+    "viaPortal": true,
+    "portalPath": "/index.html#/ServiceShow?isMobile=2&wid=890025512538152960"
   },
   {
     "id": "campus-6",
     "name": "课程中心",
     "icon": "sites/serviceIcon_940202403502776320.png",
     "url": "https://casp.cqust.edu.cn/index.html#/",
-    "viaPortal": true
+    "viaPortal": true,
+    "portalPath": "/index.html#/ServiceShow?isMobile=2&wid=888016520167133184"
   },
   {
     "id": "campus-7",
     "name": "心理健康",
     "icon": "sites/serviceIcon_966024540092178432.png",
     "url": "https://casp.cqust.edu.cn/index.html#/",
-    "viaPortal": true
+    "viaPortal": true,
+    "portalPath": "/index.html#/ServiceShow?isMobile=2&wid=965980060326469632"
   },
   {
     "id": "campus-8",
     "name": "运维中心",
     "icon": "sites/serviceIcon_940208869332770816.png",
     "url": "https://casp.cqust.edu.cn/index.html#/",
-    "viaPortal": true
+    "viaPortal": true,
+    "portalPath": "/index.html#/ServiceShow?isMobile=0&wid=914893678305026048"
   },
   {
     "id": "campus-9",
     "name": "学生收费系统",
     "icon": "sites/serviceIcon_1032329883344248832.png",
     "url": "https://casp.cqust.edu.cn/index.html#/",
-    "viaPortal": true
+    "viaPortal": true,
+    "portalPath": "/index.html#/ServiceShow?isMobile=0&wid=1032329890595876864"
   },
   {
     "id": "campus-10",
     "name": "软件正版化",
     "icon": "sites/serviceIcon_1047467011807977472.png",
     "url": "https://ms.cqust.edu.cn/",
-    "viaPortal": false
+    "viaPortal": true,
+    "portalPath": "/index.html#/ServiceShow?isMobile=0&wid=1047467018682118144"
   },
   {
     "id": "campus-11",
