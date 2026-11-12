@@ -1,0 +1,17 @@
+[
+  {
+    "tag_name": "android-v1.2.0-beta02",
+    "draft": false,
+    "prerelease": true,
+    "html_url": "https://gitee.com/ithercules/CQUST-WiFi/releases/tag/android-v1.2.0-beta02",
+    "body": "## 门户与 Chrome Custom Tabs\n\n- 优先使用 Chrome Custom Tabs 打开校方签发的登录回调，Chrome 不可用时转交默认浏览器。\n- 修复 CAS 回调和网关包裹提升路径识别；认证、浏览器会话交接分别处理。\n- “经信息门户”、教务与实践入口统一接入。已知路径直连对应业务；尚无独立地址的服务进入门户菜单。\n- Gitee 优先检测更新，GitHub 作为备用。保留课表、代理、二维码、原发布证书和覆盖升级能力。\n\n学校验证码及二次验证不会绕过。真实账号与业务页面尚待实际验证，不将浏览器打开或后台认证成功等同于全部业务已登录。\n",
+    "assets": [
+      {
+        "name": "CQUST-WiFi-Android-1.2.0-beta02.apk",
+        "size": 67551057,
+        "digest": "sha256:ed55f9cfb33ccb133a35a87391e1b8c8be216c33a4e93f4b000c9408ad19ea23",
+        "browser_download_url": "https://gitee.com/ithercules/CQUST-WiFi/releases/download/android-v1.2.0-beta02/CQUST-WiFi-Android-1.2.0-beta02.apk"
+      }
+    ]
+  }
+]

@@ -1,0 +1,15 @@
+{
+  "tag_name": "v5.4.1",
+  "draft": false,
+  "prerelease": false,
+  "html_url": "https://gitee.com/ithercules/CQUST-WiFi/releases/tag/v5.4.1",
+  "body": "## 门户会话交接修复\n\n- 修复只识别根路径 token-login、遗漏校方 CAS 回调及网关包裹地址的问题；在消费校方票据前交给浏览器处理。\n- 所有标注“经信息门户”的卡片统一走认证入口。教务、实践教学使用已知单点登录路径；没有独立业务地址的服务先进入已登录门户菜单，不伪造直达链接。\n- Gitee 优先检测更新，GitHub 作为备用；安装包继续执行长度与 SHA-256 校验。\n\n本版修正的是协议与入口处理，真实账号和每个业务系统的最终登录状态仍以校方页面为准；验证码、二次认证由学校执行。\n",
+  "assets": [
+    {
+      "name": "CQUST-WiFi-5.4.1-Tauri-Setup.exe",
+      "size": 4036462,
+      "digest": "sha256:9c6b5a803526928cdb01e9863cc0c65b8b358102b552d4c5e5f98f33d58e069d",
+      "browser_download_url": "https://gitee.com/ithercules/CQUST-WiFi/releases/download/v5.4.1/CQUST-WiFi-5.4.1-Tauri-Setup.exe"
+    }
+  ]
+}
