@@ -2,34 +2,40 @@ use serde::Serialize;
 use serde_json::Value;
 use std::{io::Read,sync::Mutex,time::Duration};
 const REPO:&str="https://github.com/Hercules-Zhaoziyi/CQUST-WiFi";
+const GITEE:&str="https://gitee.com/ithercules/CQUST-WiFi";
 #[derive(Clone,Serialize)]pub struct Update{pub current:String,pub latest:String,pub available:bool,pub notes:String,pub url:String,pub download:Option<String>,pub digest:Option<String>,pub size:u64}
 #[derive(Default)]pub struct Updates(pub Mutex<Option<Update>>,pub Mutex<Option<(Update,std::path::PathBuf)>>,pub std::sync::atomic::AtomicBool);
 pub fn check()->Result<Update,String>{
- let client=reqwest::blocking::Client::builder().connect_timeout(Duration::from_secs(6)).timeout(Duration::from_secs(18)).redirect(reqwest::redirect::Policy::none()).build().map_err(|_|"无法初始化更新检测")?;
- let response=client.get("https://api.github.com/repos/Hercules-Zhaoziyi/CQUST-WiFi/releases/latest").header("User-Agent",format!("CQUST-WiFi/{}",env!("CARGO_PKG_VERSION"))).header("Accept","application/vnd.github+json").send().map_err(|_|"连接 GitHub 失败，请检查网络后重试。")?;
- if response.status().as_u16()==403||response.status().as_u16()==429{return Err("GitHub 请求次数受限，请稍后重试。".into())}if !response.status().is_success(){return Err("暂时无法获取 GitHub 最新版本。".into())}
- let mut bytes=Vec::new();response.take(2_000_001).read_to_end(&mut bytes).map_err(|_|"读取更新信息失败")?;if bytes.len()>2_000_000{return Err("更新信息异常，请前往 GitHub 查看。".into())}
- let value:Value=serde_json::from_slice(&bytes).map_err(|_|"更新信息格式无效")?;parse(&value,env!("CARGO_PKG_VERSION"))
+ let client=reqwest::blocking::Client::builder().connect_timeout(Duration::from_secs(6)).timeout(Duration::from_secs(18)).redirect(reqwest::redirect::Policy::custom(|attempt|{let u=attempt.url();if attempt.previous().len()<5&&u.scheme()=="https"&&u.username().is_empty()&&u.password().is_none()&&u.port_or_known_default()==Some(443)&&matches!(u.host_str(),Some("gitee.com"|"raw.giteeusercontent.com"|"api.github.com")){attempt.follow()}else{attempt.stop()}})).build().map_err(|_|"无法初始化更新检测")?;
+ for feed in ["https://gitee.com/ithercules/CQUST-WiFi/raw/main/updates/windows.json","https://api.github.com/repos/Hercules-Zhaoziyi/CQUST-WiFi/releases/latest"]{
+  let Ok(response)=client.get(feed).header("User-Agent",format!("CQUST-WiFi/{}",env!("CARGO_PKG_VERSION"))).header("Accept","application/json").send()else{continue};
+  if !response.status().is_success(){continue}
+  let mut bytes=Vec::new();if response.take(2_000_001).read_to_end(&mut bytes).is_err()||bytes.len()>2_000_000{continue}
+  let Ok(value)=serde_json::from_slice::<Value>(&bytes)else{continue};
+  if let Ok(update)=parse(&value,env!("CARGO_PKG_VERSION")){return Ok(update)}
+ }
+ Err("Gitee 与备用更新源暂不可用，请稍后重试。".into())
 }
 pub fn parse(v:&Value,current:&str)->Result<Update,String>{
  let tag=v["tag_name"].as_str().ok_or("更新信息缺少版本号")?;let latest=semver::Version::parse(tag.trim_start_matches('v')).map_err(|_|"更新版本号格式无效")?;
  let current_version=semver::Version::parse(current).map_err(|_|"本机版本号无效")?;
  if v["draft"]==true||v["prerelease"]==true||!latest.pre.is_empty(){return Err("暂无可用的正式版更新。".into())}
- let url=format!("{REPO}/releases/tag/{tag}");if v["html_url"].as_str()!=Some(&url){return Err("更新来源不符合预期，已停止。".into())}
- let prefix=format!("{REPO}/releases/download/{tag}/");
+ let repo=if v["html_url"].as_str()==Some(&format!("{GITEE}/releases/tag/{tag}")){GITEE}else{REPO};
+ let url=format!("{repo}/releases/tag/{tag}");if v["html_url"].as_str()!=Some(&url){return Err("更新来源不符合预期，已停止。".into())}
+ let prefix=format!("{repo}/releases/download/{tag}/");
  let asset=v["assets"].as_array().and_then(|list|list.iter().find(|a|{let name=a["name"].as_str().unwrap_or("");let link=a["browser_download_url"].as_str().unwrap_or("");let size=a["size"].as_u64().unwrap_or(0);let supported=if cfg!(target_os="macos"){name.starts_with("CQUST")&&name.ends_with(".dmg")}else{name.ends_with(".exe")&&name.contains("Tauri")};supported&&size>0&&size<=200_000_000&&link==format!("{prefix}{name}")}));
  let download=asset.and_then(|a|a["browser_download_url"].as_str()).map(str::to_owned);
  let digest=asset.and_then(|a|a["digest"].as_str()).filter(|s|valid_digest(s)).map(str::to_owned);
  Ok(Update{current:current.into(),latest:latest.to_string(),available:latest>current_version,notes:v["body"].as_str().unwrap_or("暂无更新说明").chars().take(16000).collect(),url,download,digest,size:asset.and_then(|a|a["size"].as_u64()).unwrap_or(0)})
 }
 fn valid_digest(s:&str)->bool{s.strip_prefix("sha256:").map(|s|s.len()==64&&s.bytes().all(|b|b.is_ascii_hexdigit())).unwrap_or(false)}
-fn trusted_asset_url(url:&url::Url)->bool{url.scheme()=="https"&&url.username().is_empty()&&url.password().is_none()&&url.port_or_known_default()==Some(443)&&matches!(url.host_str(),Some("github.com"|"release-assets.githubusercontent.com"|"objects.githubusercontent.com"))}
+fn trusted_asset_url(url:&url::Url)->bool{url.scheme()=="https"&&url.username().is_empty()&&url.password().is_none()&&url.port_or_known_default()==Some(443)&&matches!(url.host_str(),Some("gitee.com"|"foruda.gitee.com"|"github.com"|"release-assets.githubusercontent.com"|"objects.githubusercontent.com"))}
 pub fn download(app:&tauri::AppHandle,u:&Update)->Result<std::path::PathBuf,String>{
  use std::io::Write;use tauri::{Manager,Emitter};
  if !u.available||u.size==0||u.size>200_000_000||u.digest.as_ref().filter(|d|valid_digest(d)).is_none(){return Err("发布包缺少有效校验信息，请在 GitHub 发布页查看。".into())}
  semver::Version::parse(&u.latest).map_err(|_|"版本无效")?;
  let link=u.download.as_ref().ok_or("暂无适用于本系统的安装包")?;
- if !link.starts_with(&format!("{REPO}/releases/download/v{}/",u.latest)){return Err("下载来源无效".into())}
+ if ![REPO,GITEE].iter().any(|repo|link.starts_with(&format!("{repo}/releases/download/v{}/",u.latest))){return Err("下载来源无效".into())}
  let client=reqwest::blocking::Client::builder().connect_timeout(Duration::from_secs(10)).timeout(Duration::from_secs(600)).redirect(reqwest::redirect::Policy::custom(|attempt|{if attempt.previous().len()<5&&trusted_asset_url(attempt.url()){attempt.follow()}else{attempt.stop()}})).build().map_err(|_|"无法初始化下载")?;
  let mut response=client.get(link).header("User-Agent","CQUST-WiFi").send().map_err(|_|"下载连接失败")?;
  if !response.status().is_success(){return Err("下载未成功，请稍后重试。".into())}
@@ -50,6 +56,13 @@ pub fn install(u:&Update,path:&std::path::Path)->Result<(),String>{verify_file(p
  #[cfg(target_os="macos")]{std::process::Command::new("/usr/bin/open").arg(path).spawn().map(|_|()).map_err(|_|"无法打开安装包。".into())}
 }
 #[cfg(test)]mod tests{use super::*;use serde_json::json;
+#[test]fn accepts_owned_gitee_manifest_and_download_host(){
+ let name=if cfg!(target_os="macos"){"CQUST-test.dmg"}else{"CQUST-Tauri-Setup.exe"};
+ let value=json!({"tag_name":"v5.4.1","html_url":format!("{GITEE}/releases/tag/v5.4.1"),"assets":[{"name":name,"size":12,"digest":format!("sha256:{}","a".repeat(64)),"browser_download_url":format!("{GITEE}/releases/download/v5.4.1/{name}")}]});
+ assert!(parse(&value,"5.4.0").unwrap().download.is_some());
+ assert!(trusted_asset_url(&url::Url::parse("https://foruda.gitee.com/attach_file/test/file.exe").unwrap()));
+ assert!(!trusted_asset_url(&url::Url::parse("https://foruda.gitee.com.evil.test/file.exe").unwrap()));
+}
 #[test]fn installer_hash_and_redirect_policy(){
  assert!(valid_digest(&format!("sha256:{}","a".repeat(64))));assert!(!valid_digest("sha256:short"));
  for address in ["http://github.com/setup","https://github.com.evil.test/setup","https://user@github.com/setup","https://github.com:444/setup"]{assert!(!trusted_asset_url(&url::Url::parse(address).unwrap()));}

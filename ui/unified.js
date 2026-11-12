@@ -21,6 +21,7 @@ document.querySelector('.changelog h3').after(release);
 const patchRelease=document.createElement('article');patchRelease.innerHTML='<span>5.3.1</span><div><strong>课表访问与扫码体验优化</strong><p>兼容学校官方 HTTP 与 CAS 跳转，保留未知来源拦截；重新设计手机扫码入口和连接二维码面板。</p></div>';document.querySelector('.changelog h3').after(patchRelease);
 const layoutRelease=document.createElement('article');layoutRelease.innerHTML='<span>5.3.2</span><div><strong>课表优先，操作归位</strong><p>账号、更换、同步与课表设置移至课表底部；修复特别鸣谢图标与文字错行。</p></div>';document.querySelector('.changelog h3').after(layoutRelease);
 const portalRelease=document.createElement('article');portalRelease.innerHTML='<span>5.4.0</span><div><strong>统一登录，门户随行</strong><p>新增信息门户和全部登录用途；通过校方登录跳转在默认浏览器接入门户，三条认证链路独立运行。</p></div>';document.querySelector('.changelog h3').after(portalRelease);
+const repairRelease=document.createElement('article');repairRelease.innerHTML='<span>5.4.1</span><div><strong>门户交接与服务入口修复</strong><p>补齐 CAS 回调和网关包裹地址识别；统一门户服务入口，更新检测优先使用 Gitee。</p></div>';document.querySelector('.changelog h3').after(repairRelease);
 
 document.querySelector('#login-card h1').textContent='统一登录';
 document.querySelector('#login-card .card-heading p').textContent='一套账号，校园网、课表与信息门户按需使用。';
@@ -49,7 +50,11 @@ window.unifiedSignIn=async()=>{
   if(portal){const result=await portal;status.textContent=result.ok?result.data.message:result.error?.message||'门户认证未完成。';if(!result.ok)toast(status.textContent);}
  }finally{unifiedBusy=false;}
 };
-document.querySelector('[data-campus="campus-portal"]').onclick=async()=>{const input=credentials();if(!input.username){window.openUnifiedLogin('portal');return}const result=await window.cqust.request('portalSignIn',{student_id:input.username,password:input.password,remember:input.remember});if(!result.ok)window.openUnifiedLogin('portal',result.error?.message||'请先登录信息门户。');};
+for(const button of document.querySelectorAll('[data-campus]')){
+ const label=button.textContent;
+ if(button.dataset.campus!=='campus-portal'&&!label.includes('经信息门户')&&!label.includes('教务系统')&&!label.includes('实践教学'))continue;
+ button.onclick=async()=>{try{const input=credentials();if(!input.username){window.openUnifiedLogin('portal');return}const result=await window.cqust.request('portalSignIn',{student_id:input.username,password:input.password,remember:input.remember,site_id:button.dataset.campus});if(!result.ok)window.openUnifiedLogin('portal',result.error?.message||'请先登录信息门户。');else toast(result.data.message);}catch{toast('门户服务暂不可用，请稍后重试。')}};
+}
 for(const node of document.querySelectorAll('#schedule-setup label,#schedule-student,.schedule-password,#schedule-password-hint'))node.hidden=true;
 $('schedule-sync').textContent='前往共用登录入口';$('schedule-sync').onclick=()=>window.openUnifiedLogin('schedule');
 $('schedule-change-account').onclick=()=>window.openUnifiedLogin('schedule');

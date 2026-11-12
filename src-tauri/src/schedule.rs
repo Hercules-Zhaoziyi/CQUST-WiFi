@@ -110,6 +110,7 @@ pub struct Store {
 pub struct Schedule {
     cache: Arc<Mutex<Store>>,
     path: PathBuf,
+    browser_launch: Arc<Mutex<Option<(String,std::time::Instant)>>>,
 }
 
 impl Schedule {
@@ -122,7 +123,7 @@ impl Schedule {
             .and_then(|bytes| serde_json::from_slice::<Store>(&bytes).ok())
             .filter(valid_store)
             .unwrap_or_default();
-        Self { cache: Arc::new(Mutex::new(store)), path }
+        Self { cache: Arc::new(Mutex::new(store)), path, browser_launch:Arc::new(Mutex::new(None)) }
     }
     fn save(&self, store: &Store) -> Result<(), Error> {
         let bytes = serde_json::to_vec_pretty(store).map_err(|_| error("课表保存失败。"))?;
@@ -173,17 +174,22 @@ pub fn command(app: &AppHandle, state: &Schedule, method: &str, args: Value, ctx
             Ok(view(&store))
         }
         "scheduleSync" | "scheduleSignIn" => sync(app, state, args, ctx),
-        "portalSignIn" => open_portal(args, ctx),
+        "portalSignIn" => open_portal(state,args, ctx),
         "scheduleStartDate" => set_start_date(state, args),
         _ => Err(error("不支持的课表操作。")),
     }
 }
 
 // 将校方返回的网关提升地址交给默认浏览器，不导出 Cookie。
-fn open_portal(args: Value, ctx: CampusContext) -> Result<Value, Error> {
+fn open_portal(state:&Schedule,args: Value, ctx: CampusContext) -> Result<Value, Error> {
     let user=args["student_id"].as_str().unwrap_or("").trim();
     if user.is_empty() || user.len()>32 || !user.chars().all(|c|c.is_ascii_alphanumeric()||c=='_'||c=='-') {
         return Err(credentials("请输入有效学校账号。"));
+    }
+    if let Some(id)=args["site_id"].as_str(){
+        let destination=portal_service_destination(id)?;
+        let recent=state.browser_launch.lock().map_err(|_|context("门户状态暂不可用。"))?.as_ref().map(|(name,time)|name==user&&time.elapsed()<Duration::from_secs(180)).unwrap_or(false);
+        if recent{crate::platform::open_url(&destination).map_err(|_|context("无法打开默认浏览器。"))?;return Ok(json!({"opened":true,"identity_verified":false,"message":"已使用浏览器现有会话打开服务；是否需要二次认证以校方页面为准。"}))}
     }
     let typed=args["password"].as_str().unwrap_or("");
     let password=if typed.is_empty(){ctx.password.ok_or_else(||credentials("请输入统一认证密码。"))?}else{Zeroizing::new(typed.to_owned())};
@@ -193,15 +199,34 @@ fn open_portal(args: Value, ctx: CampusContext) -> Result<Value, Error> {
     session.cas_login(user,&password)?;
     let target=session.browser_url.take().ok_or_else(||context("校方没有返回可交接的浏览器登录地址，请稍后重试。"))?;
     crate::platform::open_url(&target).map_err(|_|context("无法打开默认浏览器。"))?;
-    Ok(json!({"opened":true,"message":"已将校方登录跳转交给默认浏览器；浏览器实际登录状态以校方页面为准。"}))
+    *state.browser_launch.lock().map_err(|_|context("门户状态暂不可用。"))?=Some((user.to_owned(),std::time::Instant::now()));
+    Ok(json!({"opened":true,"identity_verified":true,"message":"已将校方登录跳转交给默认浏览器；浏览器实际登录状态以校方页面为准。"}))
+}
+
+fn portal_service_destination(id:&str)->Result<String,Error>{
+    let sites:Vec<Value>=serde_json::from_str(include_str!("../../ui/sites.json")).map_err(|_|context("服务清单无效。"))?;
+    let site=sites.iter().find(|v|v["id"]==id).ok_or_else(||context("未知的校园服务。"))?;
+    match site["name"].as_str().unwrap_or(""){
+        "教务系统"=>vpn_url(JWNEW_HOST,"/eams/unifiedLogin.action"),
+        "实践教学"=>vpn_url(SJJX_HOST,"/cqust_sso/"),
+        _ if site["viaPortal"]==true||id=="campus-portal"=>Ok(format!("{GATEWAY}/https/{}/index.html#/",vpn_token("casp.cqust.edu.cn").unwrap())),
+        _=>Err(context("该服务无需门户认证。"))
+    }
 }
 
 fn valid_browser_handoff(url: &str) -> bool {
     let Ok(u)=Url::parse(url) else{return false};
     let pairs=u.query_pairs().collect::<Vec<_>>();
-    u.scheme()=="https"&&u.host_str()==Some("web.cqust.edu.cn")&&u.port_or_known_default()==Some(443)
-        &&u.username().is_empty()&&u.password().is_none()&&u.fragment().is_none()&&u.path()=="/token-login"
-        &&pairs.len()==1&&pairs[0].0=="token"&&!pairs[0].1.is_empty()&&pairs[0].1.len()<=4096
+    if u.scheme()!="https"||u.host_str()!=Some("web.cqust.edu.cn")||u.port_or_known_default()!=Some(443)
+        ||!u.username().is_empty()||u.password().is_some()||u.fragment().is_some(){return false}
+    let wrapped=format!("/https/{}",vpn_token("web.cqust.edu.cn").unwrap());
+    let path=u.path();
+    let token_path=path=="/token-login"||path=="/wengine-vpn-token-login"||path==format!("{wrapped}/wengine-vpn-token-login")||path==format!("{wrapped}/token-login");
+    if token_path{return pairs.len()==1&&pairs[0].0=="token"&&!pairs[0].1.is_empty()&&pairs[0].1.len()<=4096}
+    let callback=path=="/login"||path==format!("{wrapped}/login");
+    callback&&pairs.len()==2&&pairs.iter().all(|(key,_)|key=="ticket"||key=="cas_login")
+        &&u.query_pairs().any(|(k,v)|k=="cas_login"&&v=="true")
+        &&u.query_pairs().any(|(k,v)|k=="ticket"&&v.starts_with("ST-")&&v.len()<=4096)
 }
 
 // 保存开学日期；空值回退到按学期推算的默认日期。
@@ -672,6 +697,7 @@ impl VpnSession {
         if let Some(location) = response.location.as_deref() {
             if location.contains("ticket=ST-") {
                 let target = resolve(&actual_url, location)?;
+                if self.browser_handoff&&valid_browser_handoff(&target){self.browser_url=Some(target);return Ok(())}
                 self.promote(&target)?;
                 return Ok(());
             }
@@ -713,7 +739,7 @@ impl VpnSession {
 
     fn promote(&mut self, start: &str) -> Result<(), Error> {
         let mut current = start.to_string();
-        for _ in 0..6 {
+        for _ in 0..12 {
             if self.browser_handoff && valid_browser_handoff(&current) {
                 self.browser_url=Some(current);return Ok(())
             }
@@ -721,7 +747,8 @@ impl VpnSession {
             if current.contains("/token-login") {
                 return Ok(());
             }
-            let Some(location) = page.location else { return Ok(()) };
+            let location=page.location.or_else(||rx(r#"(?:self|window)\.location(?:\.href)?\s*=\s*['"]([^'"]+)['"]"#).captures(&page.text).and_then(|c|c.get(1)).map(|v|v.as_str().to_string()));
+            let Some(location) = location else { return Ok(()) };
             current = resolve(&current, &location)?;
         }
         Ok(())
@@ -1850,6 +1877,13 @@ index = 1 * unitCount + 2;
 #[cfg(test)]
 mod cookie_scope_tests {
     use super::*;
+    #[test]
+    fn browser_handoff_accepts_cas_callback_and_wrapped_token() {
+        let prefix=format!("{GATEWAY}/https/{}",vpn_token("web.cqust.edu.cn").unwrap());
+        assert!(valid_browser_handoff(&format!("{prefix}/login?cas_login=true&ticket=ST-fixture")));
+        assert!(valid_browser_handoff(&format!("{prefix}/wengine-vpn-token-login?token=fixture")));
+        assert!(!valid_browser_handoff(&format!("{prefix}/login?cas_login=true&ticket=wrong")));
+    }
     #[test]
     fn browser_handoff_only_accepts_official_server_token_endpoint() {
         assert!(valid_browser_handoff("https://web.cqust.edu.cn/token-login?token=fixture"));

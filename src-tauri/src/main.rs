@@ -35,11 +35,12 @@ async fn request(app:tauri::AppHandle,window:tauri::WebviewWindow,method:String,
   };
   let verified=if method=="scheduleSignIn"||method=="portalSignIn"{Some((student_id.clone(),zeroize::Zeroizing::new(args["password"].as_str().filter(|s|!s.is_empty()).map(str::to_owned).or_else(||context.password.as_ref().map(|s|s.to_string())).unwrap_or_default()),args["remember"].as_bool().unwrap_or(false),args["network_requested"].as_bool().unwrap_or(false)))}else{None};
   let state=app.state::<schedule::Schedule>().inner().clone();
+  let portal_request=method=="portalSignIn";
   let handle=app.clone();
   let result=tauri::async_runtime::spawn_blocking(move||match schedule::command(&handle,&state,&method,args,context){
    Ok(data)=>json!({"ok":true,"data":data}),Err(error)=>json!({"ok":false,"error":error})
   }).await.map_err(|_|"课表操作未完成，请稍后重试。".to_string())?;
-  if result["ok"]==true{if let Some((username,password,remember,network_requested))=verified{
+  if result["ok"]==true&&(!portal_request||result["data"]["identity_verified"]==true){if let Some((username,password,remember,network_requested))=verified{
    if remember{let _=vault::set(&username,&password);}else{let _=vault::remove(&username);}
    let app=app.clone();tauri::async_runtime::spawn_blocking(move||{if let Ok(mut service)=backend.lock(){service.remember_identity(&app,username,password,remember,network_requested)}});
   }}
