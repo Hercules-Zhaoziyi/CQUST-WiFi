@@ -1,7 +1,7 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 process.chdir(__dirname);
 const html=fs.readFileSync('dist/index.html','utf8'),js=fs.readFileSync('dist/app.js','utf8'),css=fs.readFileSync('dist/style.css','utf8');
-for(const asset of ['v5.4.1/CQUST-WiFi-5.4.1-Tauri-Setup.exe','v5.1.1/CQUST-Wi-Fi_5.1.1_macOS_arm64.dmg','android-v1.2.0-beta02/CQUST-WiFi-Android-1.2.0-beta02.apk']){
+for(const asset of ['v5.4.2/CQUST-WiFi-5.4.2-Tauri-Setup.exe','v5.1.1/CQUST-Wi-Fi_5.1.1_macOS_arm64.dmg','android-v1.2.0-beta03/CQUST-WiFi-Android-1.2.0-beta03.apk']){
  const repo=asset.startsWith('v5.1.1/')?'https://github.com/Hercules-Zhaoziyi/CQUST-WiFi':'https://gitee.com/ithercules/CQUST-WiFi';
  assert.equal(html.split('href="'+repo+'/releases/download/'+asset+'"').length-1,2,asset);
 }
@@ -11,11 +11,11 @@ assert.ok(html.includes('Android 10+'));
 assert.ok(html.includes('旧数据会清除')||html.includes('会清除旧数据'));
 assert.ok(html.includes('课表不依赖上网服务开通'));
 assert.ok(html.includes('macOS v5.1.1 尚未同步本次新功能'));
-assert.ok(js.includes('9c6b5a803526928cdb01e9863cc0c65b8b358102b552d4c5e5f98f33d58e069d'));
-assert.ok(js.includes('ed55f9cfb33ccb133a35a87391e1b8c8be216c33a4e93f4b000c9408ad19ea23'));
+assert.ok(js.includes('3927964d23d12be6e8e2a1bf76383e62769017ae0155fceee0d6b7b80128c728'));
+assert.ok(js.includes('3184d9c8bbf9b5269846715ae4204f4df505125afa89be2772fa5051b8be987e'));
 assert.ok(html.includes('copy-android-checksum')&&html.includes('统一而顺手'));
-assert.ok(html.includes('20261112-w541-m511-a120beta02'));
-assert.ok(html.includes('541-android-120beta02'));
+assert.ok(html.includes('20261112-w542-m511-a120beta03'));
+assert.ok(html.includes('542-android-120beta03'));
 assert.ok(html.includes('实际可用性以校园网策略为准'));
 assert.ok(css.includes('grid-template-columns:24px minmax(0,1fr) 20px'));
 assert.ok(css.includes('.gallery-tabs button>span:last-child'));
@@ -25,7 +25,7 @@ assert.ok(css.includes('.secondary-platforms{display:grid;grid-template-columns:
 assert.equal(html.split('href="https://qm.qq.com/q/Rn7B5NBbiK"').length-1,2);
 assert.ok(html.includes('>藏ICP备2024002229号-1</a>')&&html.includes('href="https://beian.miit.gov.cn/"'));
 for(const match of html.matchAll(/(?:href|src)="\.\/([^"]+)"/g))assert.ok(fs.existsSync('dist/'+match[1].split('?')[0]),'Missing asset: '+match[1]);
-for(const area of ['sites','schedule','proxy'])for(const theme of ['light','dark'])assert.ok(fs.existsSync('dist/assets/'+area+'-'+theme+'-w541.png'));
+for(const area of ['sites','schedule','proxy'])for(const theme of ['light','dark'])assert.ok(fs.existsSync('dist/assets/'+area+'-'+theme+'-w542.png'));
 const ids=[...html.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]);assert.equal(new Set(ids).size,ids.length,'Duplicate IDs');
 const source=js.slice(js.indexOf('const isMacOS='),js.indexOf('let currentGallery='));
 for(const [platform,touch,clientPlatform,userAgent,expected] of [
@@ -47,4 +47,4 @@ for(const [platform,touch,clientPlatform,userAgent,expected] of [
  assert.ok(elements[primary].classes.has('download-current'));
  assert.ok(elements['secondary-downloads'].children.every(n=>n.classes.has('download-secondary')));
 }
-console.log('Passed: Windows 5.4.1, Android 1.2.0-beta02, real macOS 5.1.1 links, checksum, cache marker, QQ/ICP, preview assets and seven platform ordering cases.');
+console.log('Passed: Windows 5.4.2, Android 1.2.0-beta03, real macOS 5.1.1 links, checksum, cache marker, QQ/ICP, preview assets and seven platform ordering cases.');

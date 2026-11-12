@@ -9,8 +9,8 @@ android {
         applicationId = "cn.ziyis.cqustwifi"
         minSdk = 29
         targetSdk = 35
-        versionCode = 6
-        versionName = "1.2.0-beta02"
+        versionCode = 7
+        versionName = "1.2.0-beta03"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildFeatures { compose = true; buildConfig = true }

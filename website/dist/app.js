@@ -42,7 +42,7 @@ try{const saved=localStorage.getItem('cqust-site-theme');if(saved==='dark'||save
 const galleryNames={sites:'常用网站',schedule:'课程表',proxy:'代理与扫码连接'};
 function updateGallery(){
   const theme=root.dataset.theme==='dark'?'dark':'light',image=document.getElementById('gallery-image');
-  image.src='./assets/'+currentGallery+'-'+theme+'-w541.png';image.alt='CQUST Wi-Fi '+(theme==='dark'?'深色':'亮色')+galleryNames[currentGallery]+'界面';
+  image.src='./assets/'+currentGallery+'-'+theme+'-w542.png';image.alt='CQUST Wi-Fi '+(theme==='dark'?'深色':'亮色')+galleryNames[currentGallery]+'界面';
   document.getElementById('gallery-label').textContent=galleryNames[currentGallery]+' · '+(theme==='dark'?'深色模式':'亮色模式');
   document.getElementById('gallery-panel').setAttribute('aria-labelledby','tab-'+currentGallery);
 }
@@ -80,6 +80,6 @@ function closeMenu(){navigation.classList.remove('open');menu.setAttribute('aria
 menu.addEventListener('click',()=>{const open=!navigation.classList.contains('open');navigation.classList.toggle('open',open);menu.setAttribute('aria-expanded',String(open));menu.setAttribute('aria-label',open?'收起导航':'展开导航');});
 navigation.querySelectorAll('a').forEach(link=>link.addEventListener('click',closeMenu));document.addEventListener('keydown',event=>{if(event.key==='Escape')closeMenu();});document.addEventListener('click',event=>{if(!event.target.closest('.nav-wrap'))closeMenu();});
 function toast(message){const node=document.getElementById('toast');node.textContent=message;node.classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>node.classList.remove('visible'),3000);}
-document.getElementById('copy-checksum').addEventListener('click',async()=>{try{await navigator.clipboard.writeText('9c6b5a803526928cdb01e9863cc0c65b8b358102b552d4c5e5f98f33d58e069d');toast('完整 SHA-256 校验值已复制');}catch{toast('请在 GitHub Release 中查看 SHA256SUMS.txt');}});
-document.getElementById('copy-android-checksum').addEventListener('click',async()=>{try{await navigator.clipboard.writeText('ed55f9cfb33ccb133a35a87391e1b8c8be216c33a4e93f4b000c9408ad19ea23');toast('Android 完整 SHA-256 校验值已复制');}catch{toast('请在 Android 发布页查看 SHA-256 校验值');}});
+document.getElementById('copy-checksum').addEventListener('click',async()=>{try{await navigator.clipboard.writeText('3927964d23d12be6e8e2a1bf76383e62769017ae0155fceee0d6b7b80128c728');toast('完整 SHA-256 校验值已复制');}catch{toast('请在 GitHub Release 中查看 SHA256SUMS.txt');}});
+document.getElementById('copy-android-checksum').addEventListener('click',async()=>{try{await navigator.clipboard.writeText('3184d9c8bbf9b5269846715ae4204f4df505125afa89be2772fa5051b8be987e');toast('Android 完整 SHA-256 校验值已复制');}catch{toast('请在 Android 发布页查看 SHA-256 校验值');}});
 if('IntersectionObserver'in window&&!reduceMotion.matches){root.classList.add('js-motion');const observer=new IntersectionObserver(entries=>{for(const entry of entries)if(entry.isIntersecting){entry.target.classList.add('in-view');observer.unobserve(entry.target);}},{threshold:.08});document.querySelectorAll('[data-reveal]').forEach(node=>observer.observe(node));}

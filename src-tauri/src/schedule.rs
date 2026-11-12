@@ -209,7 +209,10 @@ fn portal_service_destination(id:&str)->Result<String,Error>{
     match site["name"].as_str().unwrap_or(""){
         "教务系统"=>vpn_url(JWNEW_HOST,"/eams/unifiedLogin.action"),
         "实践教学"=>vpn_url(SJJX_HOST,"/cqust_sso/"),
-        _ if site["viaPortal"]==true||id=="campus-portal"=>Ok(format!("{GATEWAY}/https/{}/index.html#/",vpn_token("casp.cqust.edu.cn").unwrap())),
+        _ if site["viaPortal"]==true||id=="campus-portal"=>{
+            let route=site["portalPath"].as_str().filter(|path|rx(r"^/index\.html#/ServiceShow\?isMobile=[012]&wid=[0-9]{1,32}$").is_match(path)).unwrap_or("/index.html#/");
+            Ok(format!("{GATEWAY}/https/{}{route}",vpn_token("casp.cqust.edu.cn").unwrap()))
+        },
         _=>Err(context("该服务无需门户认证。"))
     }
 }
@@ -1877,6 +1880,19 @@ index = 1 * unitCount + 2;
 #[cfg(test)]
 mod cookie_scope_tests {
     use super::*;
+    #[test]
+    fn service_cards_keep_observed_portal_routes() {
+        let sites:Vec<Value>=serde_json::from_str(include_str!("../../ui/sites.json")).unwrap();
+        let mapped:Vec<_>=sites.iter().filter(|site|site["portalPath"].is_string()).collect();
+        assert_eq!(mapped.len(),10);
+        for site in mapped {
+            let destination=portal_service_destination(site["id"].as_str().unwrap()).unwrap();
+            if site["name"]=="实践教学" {assert!(destination.ends_with("/cqust_sso/"));}
+            else {assert!(destination.ends_with(site["portalPath"].as_str().unwrap()));}
+            assert_eq!(Url::parse(&destination).unwrap().host_str(),Some("web.cqust.edu.cn"));
+        }
+        assert!(portal_service_destination("unknown-service").is_err());
+    }
     #[test]
     fn browser_handoff_accepts_cas_callback_and_wrapped_token() {
         let prefix=format!("{GATEWAY}/https/{}",vpn_token("web.cqust.edu.cn").unwrap());
