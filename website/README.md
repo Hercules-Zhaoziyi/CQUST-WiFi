@@ -4,7 +4,7 @@
 
 ## 本次内容
 
-- Windows v5.4.1：3.85 MiB，连接 GitHub 安装包，完整 SHA-256 可复制。
+- Windows v5.4.1：3.85 MiB，主下载来自 Gitee，完整 SHA-256 可复制。
 - Android 1.2.0-beta02：64.42 MiB，提供真实 APK 下载，标明 Android 10+、测试版与旧签名迁移注意事项。
 - macOS 保留已经发布的 v5.1.1 Apple Silicon arm64 DMG，不冒称已包含本次新功能。
 - Windows 与安卓主下载链接改为已核验的 Gitee 同版附件；macOS 旧包按不迁移旧版本的要求保留原 GitHub 地址。
