@@ -21,8 +21,8 @@ if adb -s "$serial" install --no-streaming "${previous[0]}"; then
 fi
 adb -s "$serial" install --no-streaming -r "${current[0]}"
 adb -s "$serial" shell dumpsys package "$package" > artifacts/release-package.txt
-grep -q 'versionCode=5' artifacts/release-package.txt
-grep -q 'versionName=1.2.0-beta01' artifacts/release-package.txt
+grep -q 'versionCode=6' artifacts/release-package.txt
+grep -q 'versionName=1.2.0-beta02' artifacts/release-package.txt
 if [ "$upgrading" = true ]; then adb -s "$serial" shell test -f "/sdcard/Android/data/$package/files/upgrade-marker"; fi
 adb -s "$serial" shell am force-stop "$package"
 adb -s "$serial" shell am start -W -n "$package/.MainActivity"

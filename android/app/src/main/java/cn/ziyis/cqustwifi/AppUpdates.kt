@@ -50,7 +50,7 @@ object AppUpdates {
         val url=info.download?:return
         if(state.value.downloading)return
         try{
-            require(info.newer&&url.startsWith("https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases/download/"))
+            require(info.newer&&UpdateSource.asset(url))
             require(info.digest.matches(Regex("sha256:[0-9a-fA-F]{64}"))){"发布包尚缺校验信息，请在发布页查看。"}
             require(info.size in 1..200_000_000){"安装包大小异常"}
             val file=target(info.version);file.parentFile!!.mkdirs()

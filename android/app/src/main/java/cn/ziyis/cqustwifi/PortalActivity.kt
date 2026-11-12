@@ -27,7 +27,7 @@ object PortalStore {
         val user=portalUser.ifBlank{Repository.state.value.username}
         val account=Repository.sharedAccount(user)
         if(account!=null)signIn(user,account.password,account.remember,target)else{
-            cookies=emptyList();destination=target;open(context)
+            cookies=emptyList();destination=target;PortalBrowser.launch(context,target,target)
         }
     }
     fun forget(user:String){if(portalUser==user){cookies=emptyList();portalUser=""}}

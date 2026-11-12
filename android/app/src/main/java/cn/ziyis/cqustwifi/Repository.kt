@@ -268,11 +268,15 @@ object Repository {
     }
     suspend fun checkUpdate():UpdateInfo=withContext(Dispatchers.IO){
         val client=ApplicationClients.client()
-        val req=Request.Builder().url("https://api.github.com/repos/Hercules-Zhaoziyi/CQUST-WiFi/releases?per_page=30")
+        var loaded=false
+        for(feed in UpdateSource.feeds){
+        try {
+        val req=Request.Builder().url(feed)
             .header("Accept","application/vnd.github+json").header("User-Agent","CQUST-WiFi-Android").build()
         client.newCall(req).execute().use{r->
-            require(r.isSuccessful){"更新服务器暂不可用。"}
+            if(!r.isSuccessful)return@use
             val array=JSONArray(r.body?.string().orEmpty())
+            loaded=true
             for(i in 0 until array.length()){
                 val release=array.getJSONObject(i);if(release.optBoolean("draft"))continue
                 val assets=release.optJSONArray("assets")?:continue
@@ -280,14 +284,17 @@ object Repository {
                     val asset=assets.getJSONObject(j);val name=asset.optString("name")
                     if(!name.startsWith("CQUST-WiFi-Android-")||!name.endsWith(".apk"))continue
                     val url=asset.optString("browser_download_url")
-                    if(!url.startsWith("https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases/download/"))continue
+                    if(!UpdateSource.asset(url))continue
                     val version=Regex("""\d+\.\d+\.\d+(?:-beta\d+)?""").find(name)?.value?:continue
                     return@withContext UpdateInfo(version,release.optString("body"),url,
                         release.optString("html_url"),Protocol.newer(version,BuildConfig.VERSION_NAME),asset.optString("digest"),asset.optLong("size"))
                 }
             }
-            UpdateInfo(BuildConfig.VERSION_NAME,"暂无适用于 Android 的新版本。",null,
-                "https://github.com/Hercules-Zhaoziyi/CQUST-WiFi/releases",false)
         }
+        }catch(cancel:kotlinx.coroutines.CancellationException){throw cancel}
+        catch(_:Exception){continue}
+        }
+        check(loaded){"Gitee 与备用更新源暂不可用，请稍后重试。"}
+        UpdateInfo(BuildConfig.VERSION_NAME,"暂无适用于 Android 的新版本。",null,"${UpdateSource.GITEE}/releases",false)
     }
 }

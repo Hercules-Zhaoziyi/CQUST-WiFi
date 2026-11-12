@@ -28,7 +28,7 @@ object PortalBrowser {
             override fun onCustomTabsServiceConnected(name:ComponentName,client:CustomTabsClient){
                 session=client.newSession(object:CustomTabsCallback(){
                     override fun onNavigationEvent(event:Int,extras:android.os.Bundle?){
-                        if(event==CustomTabsCallback.NAVIGATION_FINISHED&&!navigated){navigated=true;if(destination!=PortalStore.URL)handler.post{open(destination)}}
+                        if(event==CustomTabsCallback.NAVIGATION_FINISHED&&!navigated){navigated=true;if(destination!=PortalStore.URL&&destination!=address)handler.post{open(destination)}}
                     }
                 })
                 open(address)
