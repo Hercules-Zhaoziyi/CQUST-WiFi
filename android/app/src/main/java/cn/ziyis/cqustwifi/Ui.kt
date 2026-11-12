@@ -499,7 +499,7 @@ private fun copy(context:Context,text:String){context.getSystemService(Clipboard
             ActionButton(onClick={checking=true;scope.launch{
                 runCatching{Repository.checkUpdate()}.onSuccess{update=it}.onFailure{Repository.message("更新检测失败，请稍后重试。")}
                 checking=false
-            }},enabled=!checking){Text(if(checking)"正在检查…"else"检查 GitHub 新版本")}
+            }},enabled=!checking){Text(if(checking)"正在检查…"else stringResource(R.string.update_check_primary))}
             update?.let{u->
                 Text(if(u.newer)"发现新版本 ${u.version}"else"暂未发现更新版本",fontWeight=FontWeight.SemiBold)
                 Markdown(u.notes)
