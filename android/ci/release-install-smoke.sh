@@ -9,6 +9,7 @@ test "${#current[@]}" -eq 1 && test -f "${current[0]}"
 exec > >(tee artifacts/release-install.txt) 2>&1
 adb -s "$serial" uninstall "$package.test" || true
 adb -s "$serial" uninstall "$package" || true
+bash ci/wait-for-services.sh
 adb -s "$serial" shell svc wifi disable
 adb -s "$serial" shell svc data disable
 upgrading=false
